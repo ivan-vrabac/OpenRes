@@ -487,6 +487,7 @@ def install(api) -> None:
         """Who is signed in (0.2.3; the 1.2.3 /api/game/player sent mines, HQ and warehouse too)."""
         with econ.tx(conn):
             active_today(conn, hid)
+            state_row(conn, hid)                     # a new company gets its start credits here
         p = conn.execute("SELECT company_name, credits, country_code FROM players WHERE hID=?", (hid,)).fetchone()
         if not p:
             raise econ.GameError("no_player", "Please sign in again.")

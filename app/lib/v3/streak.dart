@@ -31,7 +31,7 @@ Future<void> offerLoginStreak(BuildContext context, Company co) async {
         ]),
         const SizedBox(height: 12),
         Text('Come back every day: the reward grows on days ${table.skip(1).map((t) => t['from']).join(', ')}. '
-            'Missing a day starts again from day 1.',
+            'Missing a day starts this reward again from day 1. Your quest streak is separate.',
             style: TextStyle(fontSize: 12, color: AppColors.t54)),
       ]),
       actions: [

@@ -364,8 +364,10 @@ def test_storage_is_one_total_for_all_items():
 
 
 def test_me_says_who_is_signed_in_and_counts_the_day():
-    hid, sid, name = new_player("meq", credits=12345)
+    hid, sid, name = new_player("meq")
+    call("/api/v3/state", sid)
     with main.get_db() as conn:
+        conn.execute("UPDATE players SET credits=12345 WHERE hID=?", (hid,))
         conn.execute("DELETE FROM player_activity WHERE hid=?", (hid,))
         conn.commit()
     r = call("/api/v3/me", sid)
@@ -435,3 +437,8 @@ def test_a_moving_campus_holds_both_places_and_shows_its_site():
                     plat=spot[0], plng=spot[1])["code"] == "overlap"
     assert call("/api/v3/campus/move/cancel", sid)["err"] == 0
     assert call("/api/v3/map", other, **box)["moves"] == []                      # the site is gone again
+
+
+def test_a_new_company_has_its_start_credits_from_the_first_call():
+    hid, sid, _ = new_player("mefirst")
+    assert call("/api/v3/me", sid)["credits"] == co.START_CREDITS

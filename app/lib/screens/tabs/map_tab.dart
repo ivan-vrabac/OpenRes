@@ -108,6 +108,7 @@ class _MapTabState extends State<MapTab> {
     final screen = MediaQuery.of(context).size;
     final at = btn?.localToGlobal(Offset.zero) ?? Offset(screen.width - 60, screen.height - 90);
     final topRoom = at.dy - MediaQuery.of(context).padding.top - 16;
+    final onLeft = at.dx < screen.width / 2;
     return Navigator.of(context).push<T>(PageRouteBuilder(
       opaque: false,
       barrierDismissible: true,
@@ -115,10 +116,11 @@ class _MapTabState extends State<MapTab> {
       transitionDuration: const Duration(milliseconds: 160),
       pageBuilder: (ctx, anim, _) => Stack(children: [
         Positioned(
-          right: math.max(4.0, screen.width - at.dx - 52),
+          left: onLeft ? math.max(4.0, at.dx) : null,
+          right: onLeft ? null : math.max(4.0, screen.width - at.dx - 52),
           bottom: screen.height - at.dy + 6,
           child: ScaleTransition(
-            alignment: Alignment.bottomRight,
+            alignment: onLeft ? Alignment.bottomLeft : Alignment.bottomRight,
             scale: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
             child: Material(
               elevation: 8,
@@ -179,13 +181,16 @@ class _MapTabState extends State<MapTab> {
         }(),
     ]);
     if (pick == null || !mounted) return;
+    final before = _category;
     setState(() => _category = pick);
-    await _openResourceMenu();
+    if (await _openResourceMenu() || !mounted) return;
+    // no resource picked: back to the category of the resource in use
+    setState(() => _category = entries.where((e) => e.key == _selectedMineType).firstOrNull?.cat ?? before);
   }
 
   /// The resources of the chosen category, highest unlock at the top (the cheapest next to the
-  /// button); locked ones say at which Campus level they unlock.
-  Future<void> _openResourceMenu() async {
+  /// button); locked ones say at which Campus level they unlock. True when one was picked.
+  Future<bool> _openResourceMenu() async {
     final co = _co;
     final level = math.max(1, co.campusLevel);
     final list = _entries((co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {})
@@ -200,13 +205,14 @@ class _MapTabState extends State<MapTab> {
             locked: e.unlock > level, note: e.unlock > level ? 'Unlocks at Campus ${e.unlock}' : null,
             leading: Center(child: HexPicture(_hexImage({'item': e.item, 'op': e.op}), size: 28))),
     ]);
-    if (pick == null || !mounted) return;
+    if (pick == null || !mounted) return false;
     setState(() {
       _selectedMineType = pick;
       _rebuildHeatmapOverlays();
     });
     _saveLastMineType(pick);
     _colorizeAndRebuild();
+    return true;
   }
 
   /// What the survey heatmap shows for a picker key.
@@ -1008,7 +1014,112 @@ class _MapTabState extends State<MapTab> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
 
-              // ── Left: coords + mine build ─────────────────────────────────
+              // ── Left: the resource of the chosen category ───────────────
+              SizedBox(
+                key: _resourceBtnKey,
+                width: 52,
+                height: 66,
+                child: GestureDetector(
+                  onTap: _openResourceMenu,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(_innerR),
+                    ),
+                    child: Center(
+                      child: sel != null
+                          ? HexPicture(_hexImage({'item': sel.item, 'op': sel.op}), size: 42)
+                          : Icon(Icons.terrain, size: 22, color: AppColors.t70),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // ── Survey categories (same style as the settings button) ─────────
+              SizedBox(
+                key: _categoryBtnKey,
+                width: 52, height: 66,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(_innerR),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(_innerR),
+                    onTap: _openCategoryMenu,
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_kCategoryIcon[_category], size: 20, color: AppColors.accent),
+                      const SizedBox(height: 2),
+                      Text(_category, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 9, color: AppColors.t54)),
+                    ]),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // ── Center: scan button ───────────────────────────────────────
+              Expanded(
+                child: ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
+                  // the Campus goes down like a hex: the ghost at the crosshair, within 100 m of you
+                  final c = _mapCenter ?? _pos;
+                  if (_placingCampus) {
+                    final at = c == null ? null : _snapCampus(c);
+                    final inReach = _pos != null && at != null && _distM(_pos!, at) <= 100;
+                    final now = co.campus;
+                    final same = _movingCampus && at != null && now != null &&
+                        _distM(at, LatLng((now['lat'] as num).toDouble(), (now['lng'] as num).toDouble())) < 1;
+                    return SlideToConfirm(
+                      label: _movingCampus ? 'Move here' : 'Place here',
+                      sublabel: _pos == null ? 'No location yet' : !inReach ? 'Too far' : same ? 'Already here' : '7 hexes',
+                      icon: Icons.apartment,
+                      enabled: inReach && !same,
+                      radius: _innerR,
+                      onConfirm: _placeCampus,
+                    );
+                  }
+                  // a survey can go anywhere (at the crosshair)
+                  // slide to survey (a safety switch: a stray tap can't spend credits; owner 2026-10-31)
+                  return SlideToConfirm(
+                    label: 'Survey here',
+                    sublabel: 'ꞓ${fmtNum(scanCost)}',
+                    icon: Icons.satellite_alt,
+                    enabled: !_scanning,
+                    busy: _scanning,
+                    radius: _innerR,
+                    onConfirm: _scan,
+                  );
+                }),
+              ),
+
+              const SizedBox(width: 8),
+
+              // ── Survey settings: the radius (limited by the Campus level), remembered ──
+              SizedBox(
+                width: 44, height: 66,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(_innerR),
+                  child: InkWell(
+                    onTap: _movingCampus ? () => setState(() => _movingCampus = false)
+                        : co.hasCampus ? _surveySettings : null,
+                    borderRadius: BorderRadius.circular(_innerR),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_movingCampus ? Icons.close : Icons.tune, size: 20,
+                          color: co.hasCampus ? AppColors.accent : Colors.white24),
+                      const SizedBox(height: 2),
+                      Text(_movingCampus ? 'Cancel'
+                          : scanRadius >= 1000 ? '${(scanRadius / 1000).toStringAsFixed(1)} km' : '${scanRadius.round()} m',
+                          style: TextStyle(fontSize: 9, color: AppColors.t54)),
+                    ]),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // ── Right, near the thumb: coords + build ─────────────────────────────────
               SizedBox(
                 width: 52,
                 child: Column(
@@ -1063,111 +1174,6 @@ class _MapTabState extends State<MapTab> {
                     );
                     }),
                   ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // ── Survey settings: the radius (limited by the Campus level), remembered ──
-              SizedBox(
-                width: 44, height: 66,
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(_innerR),
-                  child: InkWell(
-                    onTap: _movingCampus ? () => setState(() => _movingCampus = false)
-                        : co.hasCampus ? _surveySettings : null,
-                    borderRadius: BorderRadius.circular(_innerR),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(_movingCampus ? Icons.close : Icons.tune, size: 20,
-                          color: co.hasCampus ? AppColors.accent : Colors.white24),
-                      const SizedBox(height: 2),
-                      Text(_movingCampus ? 'Cancel'
-                          : scanRadius >= 1000 ? '${(scanRadius / 1000).toStringAsFixed(1)} km' : '${scanRadius.round()} m',
-                          style: TextStyle(fontSize: 9, color: AppColors.t54)),
-                    ]),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // ── Center: scan button ───────────────────────────────────────
-              Expanded(
-                child: ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
-                  // the Campus goes down like a hex: the ghost at the crosshair, within 100 m of you
-                  final c = _mapCenter ?? _pos;
-                  if (_placingCampus) {
-                    final at = c == null ? null : _snapCampus(c);
-                    final inReach = _pos != null && at != null && _distM(_pos!, at) <= 100;
-                    final now = co.campus;
-                    final same = _movingCampus && at != null && now != null &&
-                        _distM(at, LatLng((now['lat'] as num).toDouble(), (now['lng'] as num).toDouble())) < 1;
-                    return SlideToConfirm(
-                      label: _movingCampus ? 'Move here' : 'Place here',
-                      sublabel: _pos == null ? 'No location yet' : !inReach ? 'Too far' : same ? 'Already here' : '7 hexes',
-                      icon: Icons.apartment,
-                      enabled: inReach && !same,
-                      radius: _innerR,
-                      onConfirm: _placeCampus,
-                    );
-                  }
-                  // a survey can go anywhere (at the crosshair)
-                  // slide to survey (a safety switch: a stray tap can't spend credits; owner 2026-10-31)
-                  return SlideToConfirm(
-                    label: 'Survey here',
-                    sublabel: 'ꞓ${fmtNum(scanCost)}',
-                    icon: Icons.satellite_alt,
-                    enabled: !_scanning,
-                    busy: _scanning,
-                    radius: _innerR,
-                    onConfirm: _scan,
-                  );
-                }),
-              ),
-
-              const SizedBox(width: 8),
-
-              // ── Survey categories (same style as the settings button) ─────────
-              SizedBox(
-                key: _categoryBtnKey,
-                width: 52, height: 66,
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(_innerR),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(_innerR),
-                    onTap: _openCategoryMenu,
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(_kCategoryIcon[_category], size: 20, color: AppColors.accent),
-                      const SizedBox(height: 2),
-                      Text(_category, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 9, color: AppColors.t54)),
-                    ]),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // ── Right: the resource of the chosen category ───────────────
-              SizedBox(
-                key: _resourceBtnKey,
-                width: 52,
-                height: 66,
-                child: GestureDetector(
-                  onTap: _openResourceMenu,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(_innerR),
-                    ),
-                    child: Center(
-                      child: sel != null
-                          ? HexPicture(_hexImage({'item': sel.item, 'op': sel.op}), size: 42)
-                          : Icon(Icons.terrain, size: 22, color: AppColors.t70),
-                    ),
-                  ),
                 ),
               ),
             ],

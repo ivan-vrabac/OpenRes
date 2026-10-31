@@ -8,7 +8,10 @@ import '../services/game_api.dart';
 /// OpenRes 0.3: the company as the server sees it (/api/v3/state) plus the catalog of names.
 /// Screens read it through Provider and call [refresh] after anything that changes it.
 class Company extends ChangeNotifier {
-  Company(this.sid);
+  Company(this.sid, {this.onCredits});
+
+  /// The balance of every refresh, for the top bar.
+  final void Function(int credits)? onCredits;
 
   /// The signed-in company, provided at the app root (main.dart) so pages pushed from any tab can
   /// read it too (owner 2026-10-31: the Luxury screen stayed empty, it could not reach the company).
@@ -35,6 +38,7 @@ class Company extends ChangeNotifier {
     if (r.ok) {
       state = r.data;
       error = null;
+      if (state['credits'] is num) onCredits?.call((state['credits'] as num).floor());
     } else {
       error = r.message;
     }

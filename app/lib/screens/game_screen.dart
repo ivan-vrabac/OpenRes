@@ -95,7 +95,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   TabConfig _config = const TabConfig(kDefaultBottomTabs);
   bool _configLoaded = false;
   /// The company in the redesigned game (state + catalog), shared by every tab.
-  late final Company _company = Company(context.read<PlayerProvider>().sid)..start();
+  late final Company _company = Company(context.read<PlayerProvider>().sid,
+      onCredits: context.read<PlayerProvider>().setCredits)..start();
   late PageController _pageCtrl;
   int _currentIndex = 0;
 

@@ -23,6 +23,13 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The balance the server just reported.
+  void setCredits(int value) {
+    if (_player == null || credits == value) return;
+    _creditsNow = value;
+    notifyListeners();
+  }
+
   void setPlayer(Player p, {String? sid}) {
     _player = p;
     _creditsNow = null;
