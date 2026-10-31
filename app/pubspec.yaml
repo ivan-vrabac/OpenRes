@@ -1,0 +1,39 @@
+name: openres
+description: OpenRes, a location-based business game (client)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  crypto: ^3.0.6
+  shared_preferences: ^2.3.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^13.0.0
+  provider: ^6.1.2
+  flutter_local_notifications: ^18.0.0
+  timezone: ^0.9.4
+  google_sign_in: 6.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/game/items/
+    - assets/game/operations/
+    - assets/game/plants/
+    - assets/game/land/
+    - assets/game/campus/
+    - assets/game/ui/
+    - assets/images_countryflags/
+    - assets/credits/

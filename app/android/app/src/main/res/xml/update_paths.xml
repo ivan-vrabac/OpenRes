@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Downloaded update APKs live in <external files>/updates (MainActivity "openres/updater");
+     cache/updates held them before 2026-10-24. -->
+<paths>
+    <external-files-path name="updates" path="updates/"/>
+    <files-path name="updates_internal" path="updates/"/>
+    <cache-path name="updates_cache" path="updates/"/>
+</paths>

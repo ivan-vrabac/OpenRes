@@ -1,0 +1,124 @@
+category,key,name,file,status,source,license
+item,stone,Stone,items/stone.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,sand,Sand,items/sand.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,clay,Clay,items/clay.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,limestone,Limestone,items/limestone.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,coal,Coal,items/coal.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,iron_ore,Iron ore,items/iron_ore.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,copper_ore,Copper ore,items/copper_ore.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,bauxite,Bauxite,items/bauxite.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,gold_ore,Gold ore,items/gold_ore.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,lithium_ore,Lithium ore,items/lithium_ore.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,uranium_ore,Uranium ore,items/uranium_ore.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,coltan,Coltan,items/coltan.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,crude_oil,Crude oil,items/crude_oil.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,wood,Wood,items/wood.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,wheat,Wheat,items/wheat.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,potatoes,Potatoes,items/potatoes.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,corn,Corn,items/corn.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,tomatoes,Tomatoes,items/tomatoes.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,sugar_beet,Sugar beet,items/sugar_beet.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,apples,Apples,items/apples.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,grapes,Grapes,items/grapes.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,cotton,Cotton,items/cotton.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,milk,Milk,items/milk.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,eggs,Eggs,items/eggs.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,wool,Wool,items/wool.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,honey,Honey,items/honey.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,beef,Beef,items/beef.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,pork,Pork,items/pork.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,chicken_meat,Chicken meat,items/chicken_meat.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,carp,Carp,items/carp.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,trout,Trout,items/trout.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,sardines,Sardines,items/sardines.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,cod,Cod,items/cod.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,tuna,Tuna,items/tuna.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,electricity,Electricity,items/electricity.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,lumber,Lumber,items/lumber.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,wood_pellets,Wood pellets,items/wood_pellets.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,paper,Paper,items/paper.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,books,Books,items/books.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,furniture,Furniture,items/furniture.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,bricks,Bricks,items/bricks.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,cement,Cement,items/cement.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,concrete,Concrete,items/concrete.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,glass,Glass,items/glass.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,steel,Steel,items/steel.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,aluminium,Aluminium,items/aluminium.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,copper_wire,Copper wire,items/copper_wire.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,plastics,Plastics,items/plastics.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,flour,Flour,items/flour.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,sugar,Sugar,items/sugar.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,dairy_products,Dairy products,items/dairy_products.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,meat_products,Meat products,items/meat_products.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,fish_products,Fish products,items/fish_products.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,grocery_packs,Grocery packs,items/grocery_packs.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,juice,Juice,items/juice.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,meals,Meals,items/meals.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,fabric,Fabric,items/fabric.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,clothing,Clothing,items/clothing.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,sweets,Sweets,items/sweets.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,fuel_rods,Fuel rods,items/fuel_rods.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,silicon,Silicon,items/silicon.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,wafers,Wafers,items/wafers.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,microchips,Microchips,items/microchips.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,batteries,Batteries,items/batteries.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,phones,Phones,items/phones.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,laptops,Laptops,items/laptops.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,computers,Computers,items/computers.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,servers,Servers,items/servers.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,supercomputers,Supercomputers,items/supercomputers.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,medical_devices,Medical devices,items/medical_devices.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,tantalum,Tantalum,items/tantalum.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,ta180m,Tantalum-180m,items/ta180m.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,mine,Mine,operations/mine.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,oil_well,Oil well,operations/oil_well.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,logging_camp,Logging camp,operations/logging_camp.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,farm,Farm,operations/farm.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,ranch,Ranch,operations/ranch.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,fish_farm,Fish farm,operations/fish_farm.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,fishing_port,Fishing port,operations/fishing_port.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,solar_farm,Solar farm,operations/solar_farm.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+operation,wind_farm,Wind farm,operations/wind_farm.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,coal_power,Coal power plant,plants/coal_power.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,pellet_power,Pellet power plant,plants/pellet_power.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,uranium_enrichment,Uranium enrichment,plants/uranium_enrichment.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,nuclear_power,Nuclear power plant,plants/nuclear_power.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,sawmill,Sawmill,plants/sawmill.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,pellet_plant,Pellet plant,plants/pellet_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,paper_mill,Paper mill,plants/paper_mill.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,printing_house,Printing house,plants/printing_house.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,furniture_factory,Furniture factory,plants/furniture_factory.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,brick_works,Brick works,plants/brick_works.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,cement_plant,Cement plant,plants/cement_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,concrete_plant,Concrete plant,plants/concrete_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,glass_works,Glass works,plants/glass_works.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,steel_works,Steel works,plants/steel_works.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,aluminium_smelter,Aluminium smelter,plants/aluminium_smelter.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,wire_mill,Wire mill,plants/wire_mill.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,plastics_plant,Plastics plant,plants/plastics_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,flour_mill,Flour mill,plants/flour_mill.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,sugar_refinery,Sugar refinery,plants/sugar_refinery.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,food_processing,Food processing plant,plants/food_processing.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,grocery_packing,Grocery packing,plants/grocery_packing.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,juice_plant,Juice plant,plants/juice_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,textile_mill,Textile mill,plants/textile_mill.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,restaurant_kitchen,Restaurant kitchen,plants/restaurant_kitchen.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,clothing_factory,Clothing factory,plants/clothing_factory.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,confectionery,Confectionery,plants/confectionery.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,silicon_refinery,Silicon refinery,plants/silicon_refinery.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,wafer_fab,Wafer fab,plants/wafer_fab.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,battery_plant,Battery plant,plants/battery_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,chip_fab,Chip fab,plants/chip_fab.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,electronics_assembly,Electronics assembly,plants/electronics_assembly.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,server_plant,Server plant,plants/server_plant.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,supercomputer_center,Supercomputer center,plants/supercomputer_center.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,medical_lab,Medical lab,plants/medical_lab.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,tantalum_refinery,Tantalum refinery,plants/tantalum_refinery.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+plant,isotope_lab,Isotope lab,plants/isotope_lab.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+land,mineral,Mineral deposit,land/mineral.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+land,forest,Forest,land/forest.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+land,farmland,Farmland,land/farmland.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+land,pasture,Pasture,land/pasture.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+land,water,Water,land/water.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+ui,logo,OpenRes logo,ui/logo.png,photo,the launcher icon diamond (RPG icon pack),CC0

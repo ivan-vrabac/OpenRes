@@ -1,0 +1,9 @@
+{
+  "APP_NAME": "OpenRes",
+  "APP_TITLE": "OpenRes",
+  "APP_ID": "com.example.openres",
+  "API_BASE_URL": "http://10.0.2.2:8000",
+  "THEME_SEED": "0xFF009688",
+  "LOGO_ASSET": "",
+  "UPDATE_URL": ""
+}

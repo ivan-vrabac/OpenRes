@@ -1,0 +1,110 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../constants.dart' show fmtNum;
+import '../models/player_provider.dart';
+import '../services/game_api.dart';
+import '../widgets/async_view.dart';
+import '../widgets/cards.dart';
+
+import '../app_colors.dart';
+/// Achievements: three stars each, progress to the next star (all computed by the server).
+class AchievementsScreen extends StatefulWidget {
+  /// Another player's achievements (public); null = your own.
+  final String? pid;
+  final String? name;
+  const AchievementsScreen({super.key, this.pid, this.name});
+  @override
+  State<AchievementsScreen> createState() => _AchievementsScreenState();
+}
+
+class _AchievementsScreenState extends State<AchievementsScreen> {
+  Map<String, dynamic>? _d;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final r = await GameApi.call('/api/v1/achievements', context.read<PlayerProvider>().sid,
+        {if (widget.pid != null) 'pid': widget.pid});
+    if (!mounted) return;
+    setState(() { _loading = false; _error = r.ok ? null : r.message; if (r.ok) _d = r.data; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(toolbarHeight: 40, title: Text(widget.name == null ? 'Achievements' : '${widget.name}: achievements')),
+      body: AsyncView(
+        loading: _loading,
+        error: _error,
+        onRetry: _load,
+        builder: () {
+          final list = (_d!['achievements'] as List).cast<Map<String, dynamic>>();
+          return RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(padding: const EdgeInsets.all(12), children: [
+              Panel(
+                color: Colors.amber.withValues(alpha: 0.07),
+                child: Row(children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 34),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text('${_d!['stars']} of ${_d!['maxStars']} stars',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: ((_d!['stars'] as num) / (_d!['maxStars'] as num)).clamp(0.0, 1.0).toDouble(),
+                        minHeight: 6, backgroundColor: Colors.white12, color: Colors.amber,
+                      ),
+                    ),
+                  ])),
+                ]),
+              ),
+              const SizedBox(height: 10),
+              for (final a in list) Padding(padding: const EdgeInsets.only(bottom: 8), child: _tile(a)),
+            ]),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _tile(Map<String, dynamic> a) {
+    final tiers = (a['tiers'] as List).cast<num>();
+    final stars = (a['stars'] as num).toInt();
+    final value = (a['value'] as num);
+    final next = a['next'] as num?;
+    final prev = stars == 0 ? 0 : tiers[stars - 1];
+    final frac = next == null ? 1.0 : ((value - prev) / (next - prev)).clamp(0.0, 1.0).toDouble();
+    final unit = (a['unit'] as String? ?? '');
+    return Panel(
+      padding: const EdgeInsets.all(12),
+      color: next == null ? Colors.amber.withValues(alpha: 0.07) : null,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(a['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold))),
+          for (var i = 0; i < 3; i++)
+            Icon(i < stars ? Icons.star : Icons.star_border, size: 20,
+                color: i < stars ? Colors.amber : Colors.white24),
+        ]),
+        Text(a['description'] as String, style: TextStyle(fontSize: 12, color: AppColors.t54)),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(value: frac, minHeight: 5, backgroundColor: Colors.white12,
+              color: next == null ? Colors.amber : AppColors.accent),
+        ),
+        const SizedBox(height: 4),
+        Text('${a['label'] ?? unit}: ${fmtNum(value)} / ${fmtNum(next ?? tiers.last)}',
+            style: TextStyle(fontSize: 11, color: AppColors.t60)),
+      ]),
+    );
+  }
+}

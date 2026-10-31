@@ -1,0 +1,195 @@
+package com.example.openres
+
+import android.app.DownloadManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.StatFs
+import android.provider.Settings
+import android.os.Bundle
+import androidx.activity.enableEdgeToEdge
+import androidx.core.content.FileProvider
+import java.io.File
+import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity : FlutterFragmentActivity() {
+    private var location: LocationBridge? = null
+    private var chat: ChatBridge? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // edge to edge on every Android version (Play: Android 15 does it by default); Flutter pads
+        // the UI with the system-bar insets
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        keepUprightOnPhones()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        keepUprightOnPhones()                     // a foldable opened or closed
+    }
+
+    /** Played upright on phones (owner 2026-10-25); tablets and open foldables turn as they like. */
+    private fun keepUprightOnPhones() {
+        requestedOrientation = if (resources.configuration.smallestScreenWidthDp < 600)
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        chat?.onIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Poller.foreground = true
+    }
+
+    override fun onPause() {
+        Poller.foreground = false
+        super.onPause()
+    }
+
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code, permissions, results)
+        location?.onPermissionResult(code)
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        location = LocationBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        chat = ChatBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        // Settings > Performance > No FPS limit: the screen's fastest mode instead of what Android picks
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "openres/display")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "noFpsLimit" -> result.success(setNoFpsLimit(call.argument<Boolean>("on") == true))
+                    else -> result.notImplemented()
+                }
+            }
+        // In-app updates (owner 2026-10-24): Android's DownloadManager fetches the APK into
+        // updateDir, so the download goes on when the player leaves the screen or the app, resumes
+        // after a dropped connection and shows a notification; then Dart asks us to install it.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "openres/updater")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "updateDir" -> result.success(updateDir().absolutePath)
+                    "cleanup" -> {
+                        // the update is installed: forget its download (removes the file and any
+                        // notification Android still shows for it)
+                        val current = (call.argument<Number>("build") ?: 0).toLong()
+                        val p = prefs()
+                        val ed = p.edit()
+                        for ((k, v) in p.all) {
+                            val b = k.removePrefix("dl_").toLongOrNull() ?: continue
+                            if (b <= current && v is Long) { try { dm().remove(v) } catch (_: Exception) {}; ed.remove(k) }
+                        }
+                        ed.apply()
+                        result.success(true)
+                    }
+                    "download" -> result.success(download(
+                        call.argument<String>("url")!!, (call.argument<Number>("build")!!).toLong(),
+                        (call.argument<Number>("size") ?: 0).toLong()))
+                    "progress" -> result.success(progress((call.argument<Number>("id")!!).toLong()))
+                    "known" -> result.success(prefs().getLong("dl_${(call.argument<Number>("build")!!).toLong()}", -1))
+                    "cancel" -> {
+                        dm().remove((call.argument<Number>("id")!!).toLong())
+                        result.success(true)
+                    }
+                    "install" -> {
+                        val path = call.argument<String>("path")
+                        if (path == null) result.success("error") else result.success(install(File(path)))
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /** Asks for the fastest mode at the current resolution (or leaves it to Android); returns its Hz. */
+    private fun setNoFpsLimit(on: Boolean): Double {
+        @Suppress("DEPRECATION")
+        val d = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display!! else windowManager.defaultDisplay
+        val now = d.mode
+        val best = d.supportedModes
+            .filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
+            .maxByOrNull { it.refreshRate } ?: now
+        window.attributes = window.attributes.apply { preferredDisplayModeId = if (on) best.modeId else 0 }
+        return best.refreshRate.toDouble()
+    }
+
+    private fun updateDir(): File =
+        File(getExternalFilesDir(null) ?: filesDir, "updates").apply { mkdirs() }
+
+    private fun dm() = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    private fun prefs() = getSharedPreferences("updater", Context.MODE_PRIVATE)
+
+    /** Starts (or finds the running) download of [build]: {"id": n}, or {"error": "space", "free": bytes, "need": bytes}. */
+    private fun download(url: String, build: Long, size: Long): Map<String, Any> {
+        val file = File(updateDir(), "update-$build.apk")
+        val key = "dl_$build"
+        val known = prefs().getLong(key, -1)
+        if (known >= 0) {
+            val st = progress(known)["status"]
+            if (st == "running" || st == "pending" || st == "paused" || st == "done") return mapOf("id" to known)
+            dm().remove(known)
+        }
+        if (size > 0 && file.exists() && file.length() == size) return mapOf("id" to -1L)   // already here
+        file.delete()
+        // the APK plus room for the installer to unpack it
+        val free = StatFs(updateDir().absolutePath).availableBytes
+        val need = size + maxOf(size, 100L * 1024 * 1024)
+        if (size > 0 && free < need) return mapOf("error" to "space", "free" to free, "need" to need)
+        val id = dm().enqueue(DownloadManager.Request(Uri.parse(url))
+            .setTitle("Update (build $build)")
+            .setDescription("Downloading the new version")
+            .setMimeType("application/vnd.android.package-archive")
+            // only while downloading (owner 2026-10-25: a "completed" notification stayed after updating)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+            .setDestinationUri(Uri.fromFile(file)))
+        prefs().edit().putLong(key, id).apply()
+        return mapOf("id" to id)
+    }
+
+    /** {"status": pending|running|paused|done|failed|gone, "done": bytes, "total": bytes, "reason": n, "path": file}. */
+    private fun progress(id: Long): Map<String, Any?> {
+        if (id < 0) return mapOf("status" to "done")
+        dm().query(DownloadManager.Query().setFilterById(id)).use { c ->
+            if (c == null || !c.moveToFirst()) return mapOf("status" to "gone")
+            fun col(n: String) = c.getColumnIndex(n)
+            val status = when (c.getInt(col(DownloadManager.COLUMN_STATUS))) {
+                DownloadManager.STATUS_PENDING -> "pending"
+                DownloadManager.STATUS_RUNNING -> "running"
+                DownloadManager.STATUS_PAUSED -> "paused"          // waiting for the network: resumes by itself
+                DownloadManager.STATUS_SUCCESSFUL -> "done"
+                else -> "failed"
+            }
+            return mapOf("status" to status,
+                "done" to c.getLong(col(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                "total" to c.getLong(col(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
+                "reason" to c.getInt(col(DownloadManager.COLUMN_REASON)))
+        }
+    }
+
+    /** "started", or "permission" when the user must first allow installs from this app. */
+    private fun install(apk: File): String {
+        if (!apk.exists()) return "error"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return "permission"
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.updates", apk)
+        startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+        return "started"
+    }
+}
