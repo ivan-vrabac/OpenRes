@@ -10,11 +10,13 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
+import android.util.Log
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.FileProvider
 import com.google.android.gms.games.PlayGames
 import com.google.android.gms.games.PlayGamesSdk
+import com.google.android.gms.games.achievement.Achievement
 import com.google.android.gms.games.gamessignin.AuthScope
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.StandardIntegrityManager.PrepareIntegrityTokenRequest
@@ -97,16 +99,33 @@ class MainActivity : FlutterFragmentActivity() {
         // Play Games sign-in: a one-time code for our server, or null when the player isn't signed in
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "openres/playgames")
             .setMethodCallHandler { call, result ->
-                val client = call.argument<String>("client")
-                if (client == null) { result.success(null); return@setMethodCallHandler }
                 val games = PlayGames.getGamesSignInClient(this)
-                games.isAuthenticated.addOnCompleteListener { signedIn ->
-                    if (!signedIn.isSuccessful || !signedIn.result.isAuthenticated) {
-                        result.success(null)
-                    } else {
-                        games.requestServerSideAccess(client, false, listOf(AuthScope.OPEN_ID, AuthScope.EMAIL))
-                            .addOnCompleteListener { result.success(if (it.isSuccessful) it.result.authCode else null) }
+                val signedIn = { then: (Boolean) -> Unit ->
+                    games.isAuthenticated.addOnCompleteListener { t ->
+                        val yes = t.isSuccessful && t.result.isAuthenticated
+                        if (yes || call.argument<Boolean>("ask") != true) then(yes)
+                        else games.signIn().addOnCompleteListener { s -> then(s.isSuccessful && s.result.isAuthenticated) }
                     }
+                }
+                when (call.method) {
+                    "code" -> signedIn { yes ->
+                        val client = call.argument<String>("client")
+                        if (!yes || client == null) {
+                            Log.i("OpenResGames", "no code: signed in $yes")
+                            result.success(null)
+                        } else {
+                            games.requestServerSideAccess(client, false, listOf(AuthScope.OPEN_ID, AuthScope.EMAIL))
+                                .addOnCompleteListener {
+                                    if (!it.isSuccessful) Log.w("OpenResGames", "server access failed", it.exception)
+                                    result.success(if (it.isSuccessful) it.result.authCode else null)
+                                }
+                        }
+                    }
+                    "unlock" -> signedIn { yes ->
+                        val names = call.argument<List<String>>("names").orEmpty().toSet()
+                        if (!yes) result.success(0) else unlockByName(names) { result.success(it) }
+                    }
+                    else -> result.notImplemented()
                 }
             }
         // In-app updates (owner 2026-10-24): Android's DownloadManager fetches the APK into
@@ -145,6 +164,29 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Unlocks the Play Games achievements with these names (no IDs to keep in step); answers how many were new. */
+    private fun unlockByName(names: Set<String>, done: (Int) -> Unit) {
+        val achievements = PlayGames.getAchievementsClient(this)
+        achievements.load(false).addOnCompleteListener { t ->
+            val list = if (t.isSuccessful) t.result.get() else null
+            if (list == null) {
+                Log.w("OpenResGames", "achievements did not load", t.exception)
+                done(0)
+                return@addOnCompleteListener
+            }
+            var new = 0
+            for (a in list) {
+                if (a.name in names && a.state != Achievement.STATE_UNLOCKED) {
+                    achievements.unlock(a.achievementId)
+                    new++
+                }
+            }
+            Log.i("OpenResGames", "achievements: ${list.count} known, ${names.size} earned, $new new")
+            list.release()
+            done(new)
+        }
     }
 
     /** Asks for the fastest mode at the current resolution (or leaves it to Android); returns its Hz. */

@@ -19,3 +19,4 @@ def test_tiers_unlock_once_and_progress():
     again = call("/api/v1/achievements", sid)
     assert again["new"] == [] and again["stars"] == r["stars"]
     assert len(r["achievements"]) == 13 and r["maxStars"] == 39
+    assert len(r["earned"]) == r["stars"]

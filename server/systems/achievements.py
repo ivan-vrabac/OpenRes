@@ -110,5 +110,8 @@ def install(api) -> None:
                         "value": m[key],
                         "tiers": list(tiers), "stars": stars, "next": nxt,
                         "unlockedAt": [got.get(f"{key}_{i + 1}") for i in range(len(tiers))]})
-        return {"err": 0, "achievements": out, "new": new,
+        # by name, the same as in Play Games
+        earned = [f"{title}: {TIER_NAMES[i]}" for key, (title, _, tiers, _) in DEFS.items()
+                  for i in range(len(tiers)) if f"{key}_{i + 1}" in got]
+        return {"err": 0, "achievements": out, "new": new, "earned": earned,
                 "stars": sum(a["stars"] for a in out), "maxStars": 3 * len(out)}

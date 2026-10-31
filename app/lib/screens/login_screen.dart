@@ -37,13 +37,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Signed in to Play Games and not signed out here: straight in, no tap. Anything else leaves the
   /// normal screen.
-  Future<void> _playGames() async {
-    if (await StorageService.getSignedOut() || !mounted) return;
-    setState(() => _loading = true);
-    final token = await PlayGames.idToken().timeout(const Duration(minutes: 2), onTimeout: () => null);
+  Future<void> _playGames({bool ask = false}) async {
+    if ((!ask && await StorageService.getSignedOut()) || !mounted) return;
+    setState(() { _loading = true; _error = null; });
+    final token = await PlayGames.idToken(ask: ask).timeout(const Duration(minutes: 2), onTimeout: () => null);
     if (!mounted) return;
     if (token == null || _form) {
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        if (ask) _error = 'Play Games sign-in did not work. Please use Sign in with Google.';
+      });
       return;
     }
     await _withToken(token);
@@ -230,6 +233,14 @@ class _LoginScreenState extends State<LoginScreen> {
               : const Icon(Icons.account_circle),
           label: const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Sign in with Google')),
         ),
+        if (PlayGames.enabled) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _loading ? null : () => _playGames(ask: true),
+            icon: const Icon(Icons.sports_esports),
+            label: const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Sign in with Play Games')),
+          ),
+        ],
       ]);
 
   Widget _passwordField(TextEditingController c) =>
