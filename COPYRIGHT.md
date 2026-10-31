@@ -1,5 +1,9 @@
 # Copyright and content status
 
+OpenRes, copyright (c) 2026 Ivan Vrabac (https://github.com/ivan-vrabac). All rights reserved except
+as granted by the license: Creative Commons Attribution-NonCommercial 4.0 International (`LICENSE`).
+Non-commercial use only, the author must be credited, commercial use needs written permission.
+
 ## What the license covers
 
 Source code in `app/lib`, `app/test`, `app/android` (excluding generated files),
