@@ -12,9 +12,10 @@ import os
 import econ
 
 RETENTION_DAYS = 30                 # logs and backups (privacy policy)
-_contact_bucket = econ.TokenBucket(20, 180.0)    # site-wide: 20 messages, then one more every 3 minutes
+_contact_bucket = econ.TokenBucket(10, 1800.0)   # site-wide: 10 messages, then one more every 30 minutes
+TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-LEGAL_VERSION = "2026-10-31.4"      # 0.2.3: no chat or messages, Campus/hexes, activity log 7 days
+LEGAL_VERSION = "2026-10-31.5"      # 0.2.3: no chat or messages, Campus/hexes, activity log 7 days
 _DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "legal")
 
 
@@ -27,6 +28,20 @@ def text(name: str) -> str:
                                                   "Questions, data requests (access, correction, deletion, objection) "
                                                   "and complaints: use the contact form at "
                                                   "https://resources.vrabac.eu/contact.html. We answer within 30 days.")))
+
+
+def turnstile_ok(token: str) -> bool:
+    secret = os.environ.get("TURNSTILE_SECRET", "")
+    if not secret:
+        return True
+    if not token:
+        return False
+    import httpx
+    try:
+        return httpx.post(TURNSTILE_URL, timeout=10, data={"secret": secret, "response": token}).json().get("success") is True
+    except Exception as e:
+        print(f"turnstile check failed: {type(e).__name__}", flush=True)
+        return False
 
 
 def install(api) -> None:
@@ -83,7 +98,10 @@ def install(api) -> None:
     @api.endpoint("/api/v1/contact", auth=False)
     def contact(conn, hid, form):
         """The privacy point of contact (Google Play user data policy): a message to the operator.
-        No sign-in needed. Stored in contact_messages; a site-wide limit keeps spam out."""
+        No sign-in needed. Stored in contact_messages. Against spam: Cloudflare Turnstile (with
+        TURNSTILE_SECRET), a hidden field only robots fill in, and a site-wide limit."""
+        if (form.get("website") or "").strip():
+            return {"err": 0}                                  # a robot: it thinks it worked
         topic = (form.get("topic") or "other").strip()[:40]
         message = (form.get("message") or "").strip()
         reply_to = (form.get("reply_to") or "").strip()[:200]
@@ -92,6 +110,8 @@ def install(api) -> None:
             raise econ.GameError("bad_input", "Please write a little more (at least 10 characters)")
         if len(message) > 5000:
             raise econ.GameError("bad_input", "Please keep it under 5 000 characters")
+        if not turnstile_ok(form.get("turnstile") or ""):
+            raise econ.GameError("bad_token", "Please confirm you are not a robot and try again")
         if not _contact_bucket.allow("contact"):
             raise econ.GameError("rate_limited", "Too many messages, please try again later")
         with econ.tx(conn):
