@@ -4,4 +4,5 @@ httpx==0.28.1
 python-multipart==0.0.32
 numpy==2.5.4
 google-auth==2.62.0
+requests==2.32.3
 shapely==2.1.2
