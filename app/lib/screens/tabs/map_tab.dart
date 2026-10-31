@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart' show Geolocator;
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,7 +50,7 @@ class MapTab extends StatefulWidget {
   State<MapTab> createState() => _MapTabState();
 }
 
-class _MapTabState extends State<MapTab> {
+class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   final _mapCtrl = MapController();
   LatLng? _pos;        // GPS position
   /// Where the dot is drawn right now (glides every frame; _pos only moves at the GPS interval).
@@ -66,6 +67,7 @@ class _MapTabState extends State<MapTab> {
   bool _showMines    = true;
   bool _movingCampus = false;                // choosing the Campus's new place
   bool _mockDetected = false;
+  LocationGate? _gate;                       // null until known; the map opens only on ok
 
   /// Everything drawn on the map: hexes, Campuses, clouds.
   late final _world = MapWorld((path, args) => _co.call(path, args), _hexImage);
@@ -241,6 +243,7 @@ class _MapTabState extends State<MapTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _makePuff();
     _initLocation();
     _loadLastMineType();
@@ -371,6 +374,7 @@ class _MapTabState extends State<MapTab> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     mapFocus.removeListener(_onMapFocus);
     campusMoveAsked.removeListener(_onMoveAsked);
     _live.dispose();
@@ -408,14 +412,70 @@ class _MapTabState extends State<MapTab> {
             ),
           ),
         ) == true;
-    if (!await LocationService.instance.start() || !mounted) return;
+    final started = await LocationService.instance.start();
+    if (!mounted) return;
+    await _checkGate();
+    if (!started || !mounted) return;
+    LocationService.instance.fix.removeListener(_onFix);
     LocationService.instance.fix.addListener(_onFix);
     _onFix();
   }
 
+  Future<void> _checkGate() async {
+    final g = await LocationService.instance.gate();
+    if (mounted && g != _gate) setState(() => _gate = g);
+  }
+
+  /// Back from Android's settings: the player may have turned precise location on or off.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final was = _gate;
+    _checkGate().then((_) {
+      if (mounted && _gate == LocationGate.ok && was != LocationGate.ok) _initLocation();
+    });
+  }
+
+  Future<void> _fixGate() async {
+    switch (_gate) {
+      case LocationGate.serviceOff:
+        await Geolocator.openLocationSettings();
+      case LocationGate.deniedForever:
+        await Geolocator.openAppSettings();
+      case LocationGate.approximate:
+        await LocationService.instance.askPrecise();
+        await _initLocation();
+      default:
+        await _initLocation();
+    }
+  }
+
+  /// Instead of the map while location is off, not allowed or only approximate.
+  Widget _gateScreen() {
+    final (title, text, button) = switch (_gate) {
+      LocationGate.serviceOff => ('Turn on location', 'OpenRes is played on the real map, so the phone\'s location has to be on.', 'Open location settings'),
+      LocationGate.approximate => ('Turn on precise location', 'OpenRes needs your exact position: hexes and surveys depend on where you really stand. Approximate location can be kilometres off.', 'Use precise location'),
+      LocationGate.deniedForever => ('Allow precise location', 'In the app\'s settings, open Permissions, Location, choose Allow only while using the app and turn on Use precise location.', 'Open app settings'),
+      _ => ('Allow precise location', 'OpenRes is played on the real map, so it needs your exact position while the app is open.', 'Allow location'),
+    };
+    return Positioned.fill(child: Container(
+      color: AppColors.bg,
+      padding: const EdgeInsets.all(32),
+      child: _gate == null ? const SizedBox.shrink() : Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.location_off, size: 56, color: AppColors.accent),
+        const SizedBox(height: 16),
+        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppColors.t70)),
+        const SizedBox(height: 22),
+        FilledButton(onPressed: _fixGate, child: Text(button)),
+      ])),
+    ));
+  }
+
   void _onFix() {
     final f = LocationService.instance.fix.value;
-    if (!mounted || f == null) return;
+    if (!mounted || f == null || _gate != LocationGate.ok) return;
     // Google Play's reviewers test on emulators with simulated GPS: their account is exempt
     if (f.mock && context.read<PlayerProvider>().player?.name != 'PlayReview') {
       setState(() => _mockDetected = true);
@@ -493,7 +553,7 @@ class _MapTabState extends State<MapTab> {
 
   /// Keep the view covered: cheap, only asks the server when something is missing or old.
   void _loadMarkers() {
-    if (!mounted || context.read<PlayerProvider>().sid.isEmpty) return;
+    if (!mounted || _gate != LocationGate.ok || context.read<PlayerProvider>().sid.isEmpty) return;
     late final MapCamera cam;
     try { cam = _mapCtrl.camera; } catch (_) { return; }
     _world.want(cam.visibleBounds, cam.zoom, maxAge: _survey != null ? const Duration(seconds: 5) : null);
@@ -1180,6 +1240,9 @@ class _MapTabState extends State<MapTab> {
           ),
         ),
       ),
+
+      // ── No precise location: no map ──
+      if (_gate != LocationGate.ok) _gateScreen(),
 
       // ── GPS mock/spoof blocker ──────────────────────────────────────────────
       if (_mockDetected)

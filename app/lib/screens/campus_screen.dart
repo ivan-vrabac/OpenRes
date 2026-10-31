@@ -96,7 +96,7 @@ class _CampusScreenState extends State<CampusScreen> {
   Future<({double lat, double lng})?> _here() async {
     final loc = LocationService.instance;
     if (!await loc.start()) {
-      _snack('Location is off or not allowed', error: true);
+      _snack('This needs precise location', error: true);
       return null;
     }
     setState(() => _busy = true);

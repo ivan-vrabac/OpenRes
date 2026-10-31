@@ -6,6 +6,19 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+/// What stands between the player and the map (owner 2026-10-31: no map without precise location;
+/// approximate location moves a player kilometres for free).
+enum LocationGate { ok, serviceOff, denied, deniedForever, approximate }
+
+LocationGate locationGate(bool serviceOn, LocationPermission permission, LocationAccuracyStatus accuracy) {
+  if (!serviceOn) return LocationGate.serviceOff;
+  if (permission == LocationPermission.deniedForever) return LocationGate.deniedForever;
+  if (permission == LocationPermission.denied || permission == LocationPermission.unableToDetermine) {
+    return LocationGate.denied;
+  }
+  return accuracy == LocationAccuracyStatus.reduced ? LocationGate.approximate : LocationGate.ok;
+}
+
 /// One smoothed position (see [LocationService]).
 class LiveFix {
   final LatLng pos;
@@ -83,7 +96,23 @@ class LocationService with WidgetsBindingObserver {
   /// first, permission only after the player agrees). Returns whether to go on.
   static Future<bool> Function()? disclose;
 
-  /// Asks for the permission (once) and starts the streams. Returns false without permission.
+  /// Where things stand right now; asks nothing.
+  Future<LocationGate> gate() async {
+    final on = await Geolocator.isLocationServiceEnabled();
+    final p = await Geolocator.checkPermission();
+    final granted = p == LocationPermission.whileInUse || p == LocationPermission.always;
+    final a = granted ? await Geolocator.getLocationAccuracy() : LocationAccuracyStatus.unknown;
+    return locationGate(on, p, a);
+  }
+
+  /// Asks Android for precise location; when it won't ask any more, opens the app's settings.
+  Future<void> askPrecise() async {
+    await Geolocator.requestPermission();
+    if (await gate() != LocationGate.ok) await Geolocator.openAppSettings();
+  }
+
+  /// Asks for the permission (once) and starts the streams. Returns false without permission or
+  /// with approximate location only.
   Future<bool> start() async {
     if (_started) return true;
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -96,6 +125,7 @@ class LocationService with WidgetsBindingObserver {
       p = await Geolocator.requestPermission();
     }
     if (p == LocationPermission.denied || p == LocationPermission.deniedForever) return false;
+    if (await Geolocator.getLocationAccuracy() == LocationAccuracyStatus.reduced) return false;
     _started = true;
     WidgetsBinding.instance.addObserver(this);
     unawaited(_checkSettings());
