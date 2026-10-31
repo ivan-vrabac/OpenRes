@@ -169,7 +169,7 @@ class MainActivity : FlutterFragmentActivity() {
     /** Unlocks the Play Games achievements with these names (no IDs to keep in step); answers how many were new. */
     private fun unlockByName(names: Set<String>, done: (Int) -> Unit) {
         val achievements = PlayGames.getAchievementsClient(this)
-        achievements.load(false).addOnCompleteListener { t ->
+        achievements.load(true).addOnCompleteListener { t ->       // from Google: the phone's copy can stay empty
             val list = if (t.isSuccessful) t.result.get() else null
             if (list == null) {
                 Log.w("OpenResGames", "achievements did not load", t.exception)
