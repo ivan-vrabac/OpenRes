@@ -38,7 +38,7 @@ import math
 import econ
 import gamedata as g
 import world
-from . import int_arg, float_arg
+from . import int_arg, float_arg, integrity
 
 START_CREDITS = 300_000
 BUILD_RANGE_M = 100           # build within this distance of where you stand
@@ -532,6 +532,7 @@ def install(api) -> None:
             row = collect(conn, hid)
             if row["campus_level"]:
                 raise econ.GameError("has_campus", "You already have a campus")
+            integrity.require(conn, hid)
             in_reach(lat, lng, plat, plng)
             for clat, clng in compound_cells(lat, lng):
                 place_check(conn, hid, clat, clng, allow_shared=False)
@@ -576,6 +577,7 @@ def install(api) -> None:
                 raise econ.GameError("moving", "Your Campus is already moving. Cancel that move first.")
             if st["nextMove"]:
                 raise econ.GameError("too_soon", f"Your Campus can move again on {st['nextMove'][:10]}")
+            integrity.require(conn, hid)
             in_reach(lat, lng, plat, plng)
             if dist_m(lat, lng, row["campus_lat"], row["campus_lng"]) < 1:
                 raise econ.GameError("same_place", "Your Campus is already here")
@@ -660,6 +662,7 @@ def install(api) -> None:
             row = collect(conn, hid)
             if not row["campus_level"]:
                 raise econ.GameError("no_campus", "Place your campus first")
+            integrity.require(conn, hid)
             tier = tier_of(op, item)
             if row["campus_level"] < g.TIER_UNLOCK[tier]:
                 raise econ.GameError("level", f"Unlocked at campus level {g.TIER_UNLOCK[tier]}")

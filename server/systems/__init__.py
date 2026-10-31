@@ -31,6 +31,7 @@ LIMITS = {
     "/api/v3/supervisors/unassign": (60, 60), "/api/v3/education/start": (30, 60),
     "/api/v3/campus/upgrade": (20, 60), "/api/v3/storage/upgrade": (20, 60),
     "/api/v1/quests/claim": (20, 60), "/api/v1/account/rename": (5, 3600),
+    "/api/v3/integrity/report": (6, 3600),
 }
 _recent: dict = collections.defaultdict(collections.deque)      # (hid, path): times of recent calls
 _recent_lock = threading.Lock()
@@ -103,7 +104,7 @@ def install_all(app, helpers) -> list[str]:
 
 
 # Order matters only for documentation; modules are independent.
-SYSTEMS = ["legal", "identity", "company", "production", "players", "notify", "moderation", "market", "quests", "rankings", "achievements", "account"]
+SYSTEMS = ["legal", "identity", "integrity", "company", "production", "players", "notify", "moderation", "market", "quests", "rankings", "achievements", "account"]
 
 
 def int_arg(form, name, default=None, lo=None, hi=None) -> int:

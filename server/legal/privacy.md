@@ -17,6 +17,7 @@ We use your data only to run the game. We don't use it for marketing or advertis
 - **Reports and moderation:** when a player reports another player (for example for an offensive company name or cheating), we keep the report and any ban that follows for up to 1 year, to keep the game safe (GDPR Art. 6(1)(f)).
 - **Notifications:** the notifications the game sends you, kept on the server (at most the last 200) so your phone can fetch them.
 - **Contact form:** what you write to us and the reply address you give, kept until your request is handled and at most 1 year.
+- **App and device check:** the app asks Google Play to confirm that it is the real app from Google Play on a genuine device, and our server keeps the result (for example whether the device passed and whether Play Protect found a problem), to keep the game fair (GDPR Art. 6(1)(f), legitimate interest).
 - **Device ID:** a one-way scrambled (hashed) form of Android's ID for this app on your phone, to recognise several companies played from the same phone (one person, one company; GDPR Art. 6(1)(f), preventing cheating). It is not used for ads and never shared. Kept as long as your account exists.
 - **Technical data:** IP address, device and app version and server logs, needed to run and protect the service (GDPR Art. 6(1)(f), legitimate interest).
 

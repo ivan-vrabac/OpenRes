@@ -13,6 +13,9 @@ import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.FileProvider
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.StandardIntegrityManager.PrepareIntegrityTokenRequest
+import com.google.android.play.core.integrity.StandardIntegrityManager.StandardIntegrityTokenRequest
 import java.io.File
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -72,6 +75,20 @@ class MainActivity : FlutterFragmentActivity() {
                     "noFpsLimit" -> result.success(setNoFpsLimit(call.argument<Boolean>("on") == true))
                     else -> result.notImplemented()
                 }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "openres/integrity")
+            .setMethodCallHandler { call, result ->
+                val project = call.argument<String>("project")?.toLongOrNull()
+                val hash = call.argument<String>("hash")
+                if (project == null || hash == null) { result.success(null); return@setMethodCallHandler }
+                IntegrityManagerFactory.createStandard(applicationContext)
+                    .prepareIntegrityToken(PrepareIntegrityTokenRequest.builder().setCloudProjectNumber(project).build())
+                    .addOnSuccessListener { provider ->
+                        provider.request(StandardIntegrityTokenRequest.builder().setRequestHash(hash).build())
+                            .addOnSuccessListener { result.success(it.token()) }
+                            .addOnFailureListener { result.success(null) }
+                    }
+                    .addOnFailureListener { result.success(null) }
             }
         // In-app updates (owner 2026-10-24): Android's DownloadManager fetches the APK into
         // updateDir, so the download goes on when the player leaves the screen or the app, resumes

@@ -14,6 +14,7 @@ import 'credits_screen.dart';
 import 'legal_screen.dart';
 import '../services/storage_service.dart';
 import '../widgets/async_view.dart' show TaIcon;
+import '../services/integrity.dart';
 import '../widgets/cards.dart';
 import '../widgets/glass.dart';
 import '../widgets/player_hud.dart';
@@ -118,6 +119,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       NotificationService.requestPermission().whenComplete(() => ChatBridge.configure(prov.sid));
       Legal.report(prov.sid);                     // the server keeps who accepted which terms
       ChatBridge.reportDevice(prov.sid);          // multi-account detection (hashed device ID)
+      IntegrityCheck.run(prov.sid);               // real app on a real device? (never stops the game)
       // offer a newer published build (once per build; Settings > Updates anytime)
       Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
       // the login streak: today's reward, once a day

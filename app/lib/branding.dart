@@ -25,6 +25,8 @@ class Branding {
 
   /// Optional logo asset shown above the title on the login screen. Empty = no logo.
   static const logoAsset = String.fromEnvironment('LOGO_ASSET');
+  /// The Cloud project linked in Play Console, for Play Integrity (empty: no check).
+  static const cloudProjectNumber = String.fromEnvironment('CLOUD_PROJECT_NUMBER');
 
   /// Where published builds live (`<url>/latest.json` + the APK). Empty = no in-app updates.
   static const updateUrl = String.fromEnvironment('UPDATE_URL');

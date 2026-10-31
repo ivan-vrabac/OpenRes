@@ -87,6 +87,7 @@ dependencies {
     // fused location, orientation (FOP) and Google's location-settings dialog (LocationBridge.kt)
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.activity:activity-ktx:1.9.3")   // enableEdgeToEdge
+    implementation("com.google.android.play:integrity:1.4.0")
 }
 
 flutter {
