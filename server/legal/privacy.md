@@ -25,7 +25,7 @@ We use your data only to run the game. We don't use it for marketing or advertis
 
 - **Other players** see your company name, level, country, public profile, rankings and the positions of your Campus and hexes on the map. Your own position is never shown to them.
 - **OpenStreetMap** (OpenStreetMap Foundation, United Kingdom) delivers the map pictures directly to your phone, so it receives your IP address and the map area you look at (see the OpenStreetMap privacy policy).
-- **Google** provides location services and app distribution on Android phones (see Google's privacy policy).
+- **Google** provides location services and app distribution on Android phones, and handles the purchase of the game and its payment; we never see your payment details (see Google's privacy policy).
 - **Our hosting:** the game server runs on our own hardware in the EU; no cloud provider receives your data.
 - **Authorities**, only where the law requires it.
 
