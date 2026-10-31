@@ -38,6 +38,10 @@ import '../../v3/hex_sheet.dart';
 import '../../app_colors.dart';
 import '../../widgets/popups.dart';
 
+part 'map_actions.dart';
+part 'map_buttons.dart';
+part 'map_gate.dart';
+part 'map_menus.dart';
 part 'map_painters.dart';
 part 'map_sheets.dart';
 // ── MapTab ─────────────────────────────────────────────────────────────────────
@@ -104,119 +108,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
         ],
       ];
 
-  /// A menu that grows upwards out of the button `key` (modal: only one menu at a time).
-  Future<T?> _anchoredMenu<T>(GlobalKey key, List<_MenuRow<T>> rows) {
-    final btn = key.currentContext?.findRenderObject() as RenderBox?;
-    final screen = MediaQuery.of(context).size;
-    final at = btn?.localToGlobal(Offset.zero) ?? Offset(screen.width - 60, screen.height - 90);
-    final topRoom = at.dy - MediaQuery.of(context).padding.top - 16;
-    final onLeft = at.dx < screen.width / 2;
-    return Navigator.of(context).push<T>(PageRouteBuilder(
-      opaque: false,
-      barrierDismissible: true,
-      barrierColor: Colors.black26,
-      transitionDuration: const Duration(milliseconds: 160),
-      pageBuilder: (ctx, anim, _) => Stack(children: [
-        Positioned(
-          left: onLeft ? math.max(4.0, at.dx) : null,
-          right: onLeft ? null : math.max(4.0, screen.width - at.dx - 52),
-          bottom: screen.height - at.dy + 6,
-          child: ScaleTransition(
-            alignment: onLeft ? Alignment.bottomLeft : Alignment.bottomRight,
-            scale: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(10),
-              color: Theme.of(ctx).colorScheme.surfaceContainerHigh,
-              clipBehavior: Clip.antiAlias,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: topRoom, maxWidth: screen.width - 24),
-                child: IntrinsicWidth(
-                  child: SingleChildScrollView(
-                    reverse: true,                       // the bottom row next to the button shows first
-                    child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      for (final row in rows)
-                        InkWell(
-                          onTap: row.locked ? null : () => popIfCurrent(ctx, row.value),
-                          child: Container(
-                            color: row.selected ? AppColors.accent.withValues(alpha: 0.15) : null,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            child: Row(children: [
-                              SizedBox(width: 28, height: 28, child: Opacity(opacity: row.locked ? 0.35 : 1, child: row.leading)),
-                              const SizedBox(width: 10),
-                              Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(row.label, style: TextStyle(
-                                    color: row.locked ? AppColors.t38 : row.selected ? AppColors.accent : null)),
-                                if (row.note != null)
-                                  Text(row.note!, style: const TextStyle(fontSize: 10, color: Colors.orange)),
-                              ]),
-                              if (row.locked) ...[
-                                const SizedBox(width: 8),
-                                Icon(Icons.lock_outline, size: 14, color: AppColors.t38),
-                              ],
-                            ]),
-                          ),
-                        ),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ]),
-    ));
-  }
-
-  /// Categories; one whose first resource your Campus hasn't unlocked yet is locked.
-  Future<void> _openCategoryMenu() async {
-    final level = math.max(1, _co.campusLevel);
-    final entries = _entries((_co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {});
-    final pick = await _anchoredMenu<String>(_categoryBtnKey, [
-      for (final c in _kCategories)
-        () {
-          final first = entries.where((e) => e.cat == c).map((e) => e.unlock).fold<int?>(null,
-              (a, u) => a == null || u < a ? u : a) ?? 1;
-          return _MenuRow(value: c, label: c, selected: c == _category, locked: first > level,
-              note: first > level ? 'Unlocks at Campus $first' : null,
-              leading: Icon(_kCategoryIcon[c], size: 22, color: c == _category ? AppColors.accent : AppColors.t70));
-        }(),
-    ]);
-    if (pick == null || !mounted) return;
-    final before = _category;
-    setState(() => _category = pick);
-    if (await _openResourceMenu() || !mounted) return;
-    // no resource picked: back to the category of the resource in use
-    setState(() => _category = entries.where((e) => e.key == _selectedMineType).firstOrNull?.cat ?? before);
-  }
-
-  /// The resources of the chosen category, highest unlock at the top (the cheapest next to the
-  /// button); locked ones say at which Campus level they unlock. True when one was picked.
-  Future<bool> _openResourceMenu() async {
-    final co = _co;
-    final level = math.max(1, co.campusLevel);
-    final list = _entries((co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {})
-        .where((e) => e.cat == _category).toList()
-      ..sort((a, b) {
-        final c = b.unlock.compareTo(a.unlock);
-        return c != 0 ? c : _entryName(co, a.key).compareTo(_entryName(co, b.key));
-      });
-    final pick = await _anchoredMenu<String>(_resourceBtnKey, [
-      for (final e in list)
-        _MenuRow(value: e.key, label: _entryName(co, e.key), selected: e.key == _selectedMineType,
-            locked: e.unlock > level, note: e.unlock > level ? 'Unlocks at Campus ${e.unlock}' : null,
-            leading: Center(child: HexPicture(_hexImage({'item': e.item, 'op': e.op}), size: 28))),
-    ]);
-    if (pick == null || !mounted) return false;
-    setState(() {
-      _selectedMineType = pick;
-      _rebuildHeatmapOverlays();
-    });
-    _saveLastMineType(pick);
-    _colorizeAndRebuild();
-    return true;
-  }
-
   /// What the survey heatmap shows for a picker key.
   static String _surveyLayer(String key) => key == 'solar_farm' ? 'sun' : key == 'wind_farm' ? 'wind' : key;
   Timer? _worldTimer;
@@ -230,6 +121,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   bool _scanInFlight = false;
 
   Company get _co => context.read<Company>();
+
+  /// setState for the parts of this screen in other files.
+  void _update(VoidCallback fn) => setState(fn);
 
   /// The far-zoom clouds follow the Icon & Symbol colour (remade when it changes, see build).
   Color? _puffColor;
@@ -309,45 +203,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     await p.setString('v3_last_category', _category);
   }
 
-  /// Survey settings: the radius (up to what the Campus allows), remembered.
-  Future<void> _surveySettings() async {
-    final maxR = _co.surveyMaxRadius.toDouble();
-    var radius = _surveyRadius.clamp(100.0, maxR);
-    final ok = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
-        title: const Text('Survey settings', textAlign: TextAlign.center),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // owner 2026-10-31: who makes the surveys and why they grow with the Campus
-          Text('Surveys are made by the Government. It looks at how advanced your company is and allows '
-              'bigger surveys as you grow; oddly enough, what it looks at is your Campus.',
-              style: TextStyle(color: AppColors.t70, fontSize: 13)),
-          const SizedBox(height: 14),
-          Text('Radius: ${radius.round()} m', style: const TextStyle(fontWeight: FontWeight.bold)),
-          if (maxR > 100)                    // at Campus 1 the survey is 100 m: nothing to choose
-            Slider(value: radius, min: 100, max: maxR, divisions: ((maxR - 100) / 100).round().clamp(1, 100),
-                onChanged: (v) => set(() => radius = v)),
-          Text('Survey tax: ꞓ${fmtNum(_co.surveyTax(radius))}', style: TextStyle(color: AppColors.t70)),
-          const SizedBox(height: 8),
-          Text('Your Campus allows up to ${maxR.round()} m: 100 m for every Campus level (5 km at Campus 50).',
-              style: TextStyle(color: AppColors.t54, fontSize: 12)),
-        ]),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        actions: [
-          Row(children: [
-            Expanded(child: OutlinedButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Cancel'))),
-            const SizedBox(width: 12),
-            Expanded(child: FilledButton(onPressed: () => popIfCurrent(ctx, true), child: const Text('Save'))),
-          ]),
-        ],
-      )),
-    );
-    if (ok != true || !mounted) return;
-    setState(() => _surveyRadius = radius);
-    final p = await SharedPreferences.getInstance();
-    await p.setDouble('v3_survey_radius', radius);
-  }
-
   /// Someone asked to see a place (the activity log): centre on it, close up, and stop following GPS.
   /// The Campus screen's "Choose place": back at your position, with the 7-hex ghost at the crosshair.
   void _onMoveAsked() {
@@ -421,11 +276,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     _onFix();
   }
 
-  Future<void> _checkGate() async {
-    final g = await LocationService.instance.gate();
-    if (mounted && g != _gate) setState(() => _gate = g);
-  }
-
   /// Back from Android's settings: the player may have turned precise location on or off.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -434,43 +284,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     _checkGate().then((_) {
       if (mounted && _gate == LocationGate.ok && was != LocationGate.ok) _initLocation();
     });
-  }
-
-  Future<void> _fixGate() async {
-    switch (_gate) {
-      case LocationGate.serviceOff:
-        await Geolocator.openLocationSettings();
-      case LocationGate.deniedForever:
-        await Geolocator.openAppSettings();
-      case LocationGate.approximate:
-        await LocationService.instance.askPrecise();
-        await _initLocation();
-      default:
-        await _initLocation();
-    }
-  }
-
-  /// Instead of the map while location is off, not allowed or only approximate.
-  Widget _gateScreen() {
-    final (title, text, button) = switch (_gate) {
-      LocationGate.serviceOff => ('Turn on location', 'OpenRes is played on the real map, so the phone\'s location has to be on.', 'Open location settings'),
-      LocationGate.approximate => ('Turn on precise location', 'OpenRes needs your exact position: hexes and surveys depend on where you really stand. Approximate location can be kilometres off.', 'Use precise location'),
-      LocationGate.deniedForever => ('Allow precise location', 'In the app\'s settings, open Permissions, Location, choose Allow only while using the app and turn on Use precise location.', 'Open app settings'),
-      _ => ('Allow precise location', 'OpenRes is played on the real map, so it needs your exact position while the app is open.', 'Allow location'),
-    };
-    return Positioned.fill(child: Container(
-      color: AppColors.bg,
-      padding: const EdgeInsets.all(32),
-      child: _gate == null ? const SizedBox.shrink() : Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.location_off, size: 56, color: AppColors.accent),
-        const SizedBox(height: 16),
-        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppColors.t70)),
-        const SizedBox(height: 22),
-        FilledButton(onPressed: _fixGate, child: Text(button)),
-      ])),
-    ));
   }
 
   void _onFix() {
@@ -623,65 +436,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     _cachedHeatmapOverlays = overlays;
   }
 
-  Future<void> _scan() async {
-    if (_scanning) return;
-    final scanCenter = _mapCenter ?? _pos;
-    if (scanCenter == null) return;
-    final radius = _surveyRadius.clamp(100.0, _co.surveyMaxRadius.toDouble());
-    _scanInFlight = true; // blocks GPS camera follow until the overlay is ready
-    setState(() => _scanning = true);
-    final res = await _co.call('/api/v3/survey',
-        {'lat': scanCenter.latitude, 'lng': scanCenter.longitude, 'radius': radius.round()});
-    if (!mounted) { _scanInFlight = false; return; }
-    if (!res.ok) {
-      _scanInFlight = false;
-      setState(() => _scanning = false);
-      _snack(res.message ?? 'Survey failed', error: true);
-      return;
-    }
-    final old = Map<String, ui.Image>.from(_colorizedImages);
-    setState(() => _colorizedImages = {});
-    for (final img in old.values) img.dispose();
-    try {
-      await _co.refresh();
-      await _loadSurvey();
-      // the map may have started loading it first: the slider waits for the picture either way
-      while (_surveyLoading && mounted) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-    } finally {
-      _scanInFlight = false;
-      if (mounted) setState(() => _scanning = false);   // only now the slider goes back
-    }
-    if (mounted) _refreshNearbyMines(scanCenter);
-  }
-
   // Reload mines (smoke and markers) after a scan, keeping the scan result,
   // heatmap, prospect token and last scan position.
   void _refreshNearbyMines(LatLng scanCenter) => _world.refresh();
-
-  Future<void> _buildMine(Map<String, dynamic> r,
-      {LatLng? buildAt, LatLng? curPos}) async {
-    if (_building) return;
-    final target = buildAt ?? _snapBuildPos(_mapCenter ?? _pos!);
-    setState(() { _building = true; });
-    final res = await _co.call('/api/v3/hex/build', {
-      'lat': target.latitude, 'lng': target.longitude,
-      'plat': curPos?.latitude ?? _pos?.latitude, 'plng': curPos?.longitude ?? _pos?.longitude,
-      'op': r['op'], 'item': r['item'],
-    });
-    if (!mounted) return;
-    setState(() { _building = false; });
-    if (!res.ok) {
-      _snack(res.message ?? 'Build failed', error: true);
-    } else {
-      _snack('${_co.itemName(r['item'] as String)} built!');
-      _world.addLocal({'lat': target.latitude, 'lng': target.longitude, 'type': 'mine', 'isMine': true,
-          'op': r['op'], 'item': r['item'], 'wip': true});
-      _co.refresh();
-      _world.refresh();
-    }
-  }
 
   void _snack(String msg, {bool error = false}) =>
       AppNotify.show(context, msg, isError: error);
@@ -1278,77 +1035,11 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     ]);
   }
 
-  /// The Campus goes on the ghost at the crosshair, like a hex.
-  Future<void> _placeCampus() async {
-    final me = _pos, c = _mapCenter ?? _pos;
-    if (me == null || c == null) { _snack('Waiting for your location…', error: true); return; }
-    final moving = _movingCampus;
-    final ok = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(moving ? 'Move your Campus here?' : 'Place your Campus here?'),
-        actionsAlignment: MainAxisAlignment.center,
-        content: Text(moving
-            ? 'Your Campus moves to these 7 hexes. The move takes 24 hours. Plants pause until it is '
-                'finished, hexes keep producing, and you can cancel it at any time before then. The next '
-                'move is possible 30 days after this one is finished.'
-            : 'Your Campus takes these 7 hexes. You can move it once a month.'),
-        actions: [
-          TextButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => popIfCurrent(ctx, true), child: Text(moving ? 'Move here' : 'Place it')),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final at = _snapCampus(c);
-    final r = await _co.call(moving ? '/api/v3/campus/move' : '/api/v3/campus/place',
-        {'lat': at.latitude, 'lng': at.longitude, 'plat': me.latitude, 'plng': me.longitude});
-    if (!mounted) return;
-    if (!r.ok) { _snack(r.message ?? 'Could not place it', error: true); return; }
-    _snack(moving ? 'Campus move started: 24 hours' : 'Campus placed. Welcome to OpenRes!');
-    setState(() => _movingCampus = false);
-    await _co.refresh();
-    _world.refresh();
-  }
-
   // ── Widgets ────────────────────────────────────────────────────────────────
 
   /// Corners of the buttons in the panels: round like the ends of the glass pills (owner 2026-10-31).
   static const double _btnR = 18;
   static const double _innerR = 10;
-
-  Widget _mapBtn(IconData icon, VoidCallback onTap, {bool active = false, String? tip}) {
-    final w = Material(
-      color: active ? AppColors.accentDark : Colors.white.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(_btnR),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(_btnR),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20,
-              color: active ? Colors.white : AppColors.accent),
-        ),
-      ),
-    );
-    return tip != null ? Tooltip(message: tip, child: w) : w;
-  }
-
-  Widget _mapBtnW(Widget iconWidget, VoidCallback onTap, {bool active = false, String? tip}) {
-    final w = Material(
-      color: active ? AppColors.accentDark : Colors.white.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(_btnR),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(_btnR),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: SizedBox(width: 20, height: 20, child: iconWidget),
-        ),
-      ),
-    );
-    return tip != null ? Tooltip(message: tip, child: w) : w;
-  }
 
 }
 

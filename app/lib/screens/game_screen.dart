@@ -372,33 +372,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 final id         = isMore ? null : _config.bottomTabs[i];
                 final meta       = isMore ? null : tabMeta[id]!;
                 final label      = isMore ? 'More' : tabMeta[id]!.label;
-                const unread     = 0;
-                const hasBadge   = false;
 
                 final iconColor = isSelected ? cs.primary : cs.onSurfaceVariant;
                 Widget iconWidget = meta == null ? Icon(Icons.menu, size: 22, color: iconColor)
                     : meta.iconWidget(color: iconColor, size: 22);
-                if (hasBadge) {
-                  iconWidget = Stack(clipBehavior: Clip.none, children: [
-                    iconWidget,
-                    Positioned(
-                      top: -4, right: unread > 0 ? -10 : -3,
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 9, minHeight: 9),
-                        padding: unread > 0 ? const EdgeInsets.symmetric(horizontal: 3) : EdgeInsets.zero,
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: cs.surface, width: 1.5),
-                        ),
-                        child: unread > 0
-                            ? Text(unread > 99 ? '99+' : '$unread',
-                                style: const TextStyle(fontSize: 9, color: Colors.white, height: 1.2))
-                            : null,
-                      ),
-                    ),
-                  ]);
-                }
 
                 return SizedBox(
                   width: tabW,
