@@ -277,7 +277,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
                     child: Text('Not enough credits yet', textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.redAccent.withValues(alpha: 0.8)))),
               const SizedBox(height: 4),
-              Center(child: TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close'))),
+              Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
             ]),
           ));
         }),
@@ -322,12 +322,12 @@ class _FactoryScreenState extends State<FactoryScreen> {
                   radius: 14,
                   enabled: !_busy && co.credits >= cost,
                   onConfirm: () {
-                    Navigator.of(ctx).pop();
+                    popIfCurrent(ctx);
                     _act('/api/v3/plants/build', {'key': p['key']}, '${p['name']} built');
                   },
                 ),
               const SizedBox(height: 4),
-              Center(child: TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close'))),
+              Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
             ]),
           ));
         },

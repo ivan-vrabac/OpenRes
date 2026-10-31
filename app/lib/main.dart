@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'branding.dart';
@@ -8,12 +9,32 @@ import 'services/notification_service.dart';
 import 'services/screen_mode.dart';
 import 'v3/company.dart';
 import 'widgets/glass.dart';
+import 'widgets/popups.dart';
 
 /// Keeps the navigator (and every open page) when the company provider is put around it.
 final _rootKey = GlobalKey();
 
+final _navigator = GlobalKey<NavigatorState>();
+
+/// A page that fails to build (owner 2026-10-31: never a blank page): says so, a tap starts over.
+Widget _failedPage(FlutterErrorDetails details) => GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _navigator.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute<void>(builder: (_) => const SplashScreen()), (_) => false),
+      child: const ColoredBox(
+        color: Color(0xFF1E1E1E),
+        child: Center(child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Something went wrong here. Tap to reload.', textAlign: TextAlign.center,
+              textDirection: TextDirection.ltr,
+              style: TextStyle(color: Colors.white, fontSize: 14, decoration: TextDecoration.none)),
+        )),
+      ),
+    );
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kReleaseMode) ErrorWidget.builder = _failedPage;
   await loadNumDecimalsPrefs();
   await NotificationService.init();
   await UiLook.load();                        // glass or classic panels, top bar shown
@@ -34,11 +55,12 @@ class OpenResApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeData>(
       valueListenable: appThemeNotifier,
       builder: (_, theme, __) => MaterialApp(
+        navigatorKey: _navigator,
         title: Branding.appTitle,
         debugShowCheckedModeBanner: false,
         theme: theme,
         home: const SplashScreen(),
-        navigatorObservers: [ScreenModeObserver()],
+        navigatorObservers: [ScreenModeObserver(), RootGuard((_) => const SplashScreen())],
         // The app draws edge to edge; keep every screen above Android's navigation bar (owner
         // 2026-10-25: chat and private messages from More had their input under it).
         builder: (ctx, child) => ValueListenableBuilder<Company?>(

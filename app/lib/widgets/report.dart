@@ -21,7 +21,7 @@ Future<void> reportPlayer(BuildContext context, String sid, String pid) async {
       const ListTile(title: Text('Report', style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text('A moderator will look at it. The player is not told who reported them.')),
       for (final e in reasons.entries)
-        ListTile(dense: true, title: Text(e.value), onTap: () => Navigator.pop(ctx, e.key)),
+        ListTile(dense: true, title: Text(e.value), onTap: () => popIfCurrent(ctx, e.key)),
     ])),
   );
   if (reason == null || !context.mounted) return;

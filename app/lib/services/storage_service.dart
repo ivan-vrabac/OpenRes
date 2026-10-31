@@ -6,6 +6,7 @@ class StorageService {
   static const _keyMuted          = 'chat_muted_hids';
   static const _keyBlocked        = 'chat_blocked_hids';
   static const _keyCloudOpacity   = 'res_cloud_opacity';
+  static const _keySignedOut      = 'signed_out';
 
   static Future<double> getCloudOpacity() async {
     final p = await SharedPreferences.getInstance();
@@ -27,6 +28,17 @@ class StorageService {
     final p = await SharedPreferences.getInstance();
     await p.setString(_keyHid, hid);
     await p.setString(_keySid, sid);
+  }
+
+  /// The player signed out: no sign-in without a tap until they sign in again.
+  static Future<bool> getSignedOut() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_keySignedOut) ?? false;
+  }
+
+  static Future<void> saveSignedOut(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_keySignedOut, v);
   }
 
   /// Signs out: forgets both the player ID and the session.

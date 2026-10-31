@@ -41,6 +41,10 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        resValues = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -55,6 +59,8 @@ android {
         versionName = flutter.versionName
         multiDexEnabled = true
         manifestPlaceholders["appLabel"] = appName
+        // Play Games project (empty: no Play Games sign-in, as in the dev build and forks)
+        resValue("string", "game_services_project_id", brand("PLAY_GAMES_APP_ID", ""))
         // Plain HTTP only when the configured server is http:// (local development).
         manifestPlaceholders["usesCleartextTraffic"] =
             brand("API_BASE_URL", "http://10.0.2.2:8000").startsWith("http://").toString()
@@ -92,6 +98,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.activity:activity-ktx:1.9.3")   // enableEdgeToEdge
     implementation("com.google.android.play:integrity:1.4.0")
+    implementation("com.google.android.gms:play-services-games-v2:22.1.0")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-messaging")
 }

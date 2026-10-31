@@ -157,7 +157,7 @@ extension _MapSheets on _MapTabState {
                 borderRadius: BorderRadius.circular(14),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: () => Navigator.of(ctx).pop(m),
+                  onTap: () => popIfCurrent(ctx, m),
                   child: Padding(
                     padding: const EdgeInsets.all(10),
                     child: Row(children: [
@@ -176,7 +176,7 @@ extension _MapSheets on _MapTabState {
               ),
             );
           }),
-          Center(child: TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close'))),
+          Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
         ]),
       )),
     );

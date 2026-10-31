@@ -38,7 +38,7 @@ class _HexSheetState extends State<_HexSheet> {
     final r = await co.call('/api/v3/hex/detail', {'id': widget.id});
     if (!mounted) return;
     if (!r.ok) {
-      Navigator.pop(context);
+      popIfCurrent(context);
       return AppNotify.show(context, r.message ?? 'Hex not found', isError: true);
     }
     setState(() => _hex = (r.data['hex'] as Map).cast<String, dynamic>());
@@ -53,7 +53,7 @@ class _HexSheetState extends State<_HexSheet> {
     AppNotify.show(context, done);
     await co.refresh();
     if (path == '/api/v3/hex/cancel') {
-      if (mounted) Navigator.pop(context);
+      if (mounted) popIfCurrent(context);
     } else {
       _load();
     }
@@ -68,8 +68,8 @@ class _HexSheetState extends State<_HexSheet> {
         content: Text('The hex is destroyed and the spot becomes free. You get back 30 % of the remaining lease: '
             '${fmtNum(h['cancelRefund'] as num)}.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep it')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel lease')),
+          TextButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Keep it')),
+          FilledButton(onPressed: () => popIfCurrent(ctx, true), child: const Text('Cancel lease')),
         ],
       ),
     );
@@ -93,7 +93,7 @@ class _HexSheetState extends State<_HexSheet> {
               leading: Image.asset(itemPictureOrEnergy(h['op'] as String, e.key), width: 36, height: 36),
               title: Text(co.itemName(e.key)),
               subtitle: Text('Quality ${e.value['quality']} % · ${fmtNum(e.value['lease'] as num)}'),
-              onTap: () => Navigator.pop(ctx, e.key),
+              onTap: () => popIfCurrent(ctx, e.key),
             ),
       ])),
     );

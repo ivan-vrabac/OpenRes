@@ -70,6 +70,7 @@ class PlayerProvider extends ChangeNotifier {
   void clear() {
     ChatBridge.logout();          // no more notifications for this account on this phone
     GoogleAuth.signOut();         // the next sign-in shows Google's account picker again
+    StorageService.saveSignedOut(true);    // and Play Games doesn't sign straight back in
     _player = null;
     _sid = null;
     _mines = null;

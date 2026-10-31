@@ -119,3 +119,30 @@ def test_fresh_token_from_a_clock_slightly_ahead_is_accepted(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_IDS", "web-client-id")
     monkeypatch.setattr(identity, "_google_certs", lambda: {"k1": cert.public_bytes(serialization.Encoding.PEM).decode()})
     assert identity.verify_google(token)["sub"] == "skew"
+
+
+def test_play_games_code_becomes_an_id_token(google, monkeypatch):
+    seen = {}
+
+    class Answer:
+        status_code = 200
+
+        def json(self):
+            return {"id_token": "sub-pg:p@x.org"}
+
+    def post(url, data, timeout):
+        seen.update(data)
+        return Answer()
+
+    import httpx
+    monkeypatch.setattr(httpx, "post", post)
+    pg = lambda **f: call("/api/v1/auth/play_games", "", **f)
+    assert pg(code="c", client_id="web-client-id")["code"] == "disabled"             # no secret on this server
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "s")
+    assert pg(code="c", client_id="someone-else")["code"] == "disabled"
+    r = pg(code="c", client_id="web-client-id")
+    assert seen["code"] == "c" and seen["client_secret"] == "s"
+    made = g(r["id_token"], name="Games Co")                                         # the normal Google sign-in
+    assert made["created"] and g(r["id_token"])["hID"] == made["hID"]
+    monkeypatch.setattr(Answer, "json", lambda self: {})                             # openid scope refused
+    assert pg(code="c", client_id="web-client-id")["code"] == "bad_token"

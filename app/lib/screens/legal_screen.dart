@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_colors.dart';
 import '../services/game_api.dart';
+import '../widgets/popups.dart';
 
 /// Terms of use and privacy policy (owner 2026-10-25). The texts come from the server
 /// (server/legal/*.md) so they can change without an app update. When their version is new to
@@ -84,10 +85,10 @@ class _AcceptScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(children: [
                   Expanded(child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false), child: const Text("I don't agree"))),
+                      onPressed: () => popIfCurrent(context, false), child: const Text("I don't agree"))),
                   const SizedBox(width: 12),
                   Expanded(child: FilledButton(
-                      onPressed: () => Navigator.pop(context, true), child: const Text('I agree'))),
+                      onPressed: () => popIfCurrent(context, true), child: const Text('I agree'))),
                 ]),
               ]),
             ),

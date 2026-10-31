@@ -10,6 +10,10 @@ The app (and the website's account-deletion page) send the ID token Google gave 
 GOOGLE_CLIENT_IDS (environment, comma separated): the OAuth client IDs tokens may be issued for (the
 Web client ID the app and the website ask Google for). Without it Google sign-in is off and the old
 password sign-in stays as it was.
+
+Play Games gives the app a one-time code instead; with GOOGLE_CLIENT_SECRET (of the game server client,
+one of GOOGLE_CLIENT_IDS) we swap it for an ID token of the same Google account, and the app signs in
+with that as above, so a company keeps working whichever way its player comes in.
 """
 from __future__ import annotations
 
@@ -19,6 +23,7 @@ import time
 import econ
 
 CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
 ISSUERS = ("accounts.google.com", "https://accounts.google.com")
 
 _certs = {"at": 0.0, "certs": {}}
@@ -57,6 +62,25 @@ def verify_google(token: str) -> dict:
     if claims.get("iss") not in ISSUERS or not claims.get("sub"):
         raise econ.GameError("bad_token", "Google sign-in failed. Please try again.")
     return claims
+
+
+def play_games_token(code: str, client_id: str) -> str:
+    """The ID token for a Play Games one-time code, or GameError (also when the player kept back the
+    openid scope: then the app just offers the Google button)."""
+    secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    if not secret or client_id not in google_client_ids():
+        raise econ.GameError("disabled", "Play Games sign-in is not set up on this server")
+    import httpx
+    try:
+        r = httpx.post(TOKEN_URL, timeout=10, data={"code": code, "client_id": client_id, "client_secret": secret,
+                                                    "grant_type": "authorization_code", "redirect_uri": ""})
+        token = r.json().get("id_token") if r.status_code == 200 else None
+    except Exception as e:
+        print(f"play games code exchange failed: {type(e).__name__}", flush=True)
+        token = None
+    if not token:
+        raise econ.GameError("bad_token", "Play Games sign-in failed. Please try again.")
+    return token
 
 
 def init_schema(conn) -> None:
@@ -117,6 +141,12 @@ def install(api) -> None:
             conn.execute("UPDATE players SET delete_at=NULL WHERE hID=?", (hid2,))
             p = conn.execute("SELECT company_name FROM players WHERE hID=?", (hid2,)).fetchone()
         return {"err": 0, "hID": hid2, "sid": h.make_sid(hid2), "created": created, "name": p[0] if p else ""}
+
+    @api.endpoint("/api/v1/auth/play_games", auth=False)
+    def play_games(conn, hid, form):
+        """code + client_id from Play Games: returns the id_token for /api/v1/auth/google."""
+        return {"err": 0, "id_token": play_games_token((form.get("code") or "").strip(),
+                                                       (form.get("client_id") or "").strip())}
 
     @api.endpoint("/api/v1/auth/status")
     def status(conn, hid, form):

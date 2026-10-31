@@ -137,7 +137,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       for (final row in rows)
                         InkWell(
-                          onTap: row.locked ? null : () => Navigator.of(ctx).pop(row.value),
+                          onTap: row.locked ? null : () => popIfCurrent(ctx, row.value),
                           child: Container(
                             color: row.selected ? AppColors.accent.withValues(alpha: 0.15) : null,
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -335,9 +335,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
           Row(children: [
-            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel'))),
+            Expanded(child: OutlinedButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Cancel'))),
             const SizedBox(width: 12),
-            Expanded(child: FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save'))),
+            Expanded(child: FilledButton(onPressed: () => popIfCurrent(ctx, true), child: const Text('Save'))),
           ]),
         ],
       )),
@@ -406,8 +406,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                   'hexes and campuses you place, not where you are.\n\n'
                   'More in More › Privacy policy.'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Continue')),
+                TextButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Not now')),
+                FilledButton(onPressed: () => popIfCurrent(ctx, true), child: const Text('Continue')),
               ],
             ),
           ),
@@ -1294,8 +1294,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                 'move is possible 30 days after this one is finished.'
             : 'Your Campus takes these 7 hexes. You can move it once a month.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(moving ? 'Move here' : 'Place it')),
+          TextButton(onPressed: () => popIfCurrent(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => popIfCurrent(ctx, true), child: Text(moving ? 'Move here' : 'Place it')),
         ],
       ),
     );

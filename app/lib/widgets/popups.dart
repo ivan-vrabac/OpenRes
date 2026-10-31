@@ -41,6 +41,7 @@ void popIfCurrent<T extends Object?>(BuildContext context, [T? result]) {
       _uncoveredRoute = null;
       return;
     }
+    if (route.isFirst) return;                         // the last page: closing it leaves a black screen
     Navigator.of(context).pop(result);
     return;
   }
@@ -48,4 +49,17 @@ void popIfCurrent<T extends Object?>(BuildContext context, [T? result]) {
   _uncoveredRoute = route;
   _uncoveredAt = DateTime.now();
   Navigator.of(context).pop(result);
+}
+
+/// The last resort against the black screen (owner 2026-10-31): whatever closed the last page, the
+/// app starts over from [home] instead of showing nothing.
+class RootGuard extends NavigatorObserver {
+  RootGuard(this.home);
+  final WidgetBuilder home;
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    if (previousRoute != null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => navigator?.push(MaterialPageRoute<void>(builder: home)));
+  }
 }

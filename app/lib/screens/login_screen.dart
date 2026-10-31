@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import '../branding.dart';
 import '../services/api_service.dart';
 import '../services/google_auth.dart';
+import '../services/play_games.dart';
 import '../services/storage_service.dart';
 import '../models/player_provider.dart';
 import 'game_screen.dart';
 
 import '../app_colors.dart';
 import '../widgets/top_banner.dart';
+import '../widgets/popups.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,6 +28,26 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _showPw = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (PlayGames.enabled) _playGames();
+  }
+
+  /// Signed in to Play Games and not signed out here: straight in, no tap. Anything else leaves the
+  /// normal screen.
+  Future<void> _playGames() async {
+    if (await StorageService.getSignedOut() || !mounted) return;
+    setState(() => _loading = true);
+    final token = await PlayGames.idToken().timeout(const Duration(minutes: 2), onTimeout: () => null);
+    if (!mounted) return;
+    if (token == null || _form) {
+      setState(() => _loading = false);
+      return;
+    }
+    await _withToken(token);
+  }
 
   @override
   void dispose() {
@@ -82,6 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Signed in (password or Google): remember the session and open the game.
   Future<void> _enter(String hid, String sid, {bool deletionCancelled = false}) async {
     await StorageService.saveSession(hid, sid);
+    await StorageService.saveSignedOut(false);
     final player = await ApiService.getPlayerData(sid);
     if (!mounted) return;
     if (player != null) {
@@ -104,6 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _loading = false);
         return;
       }
+      await _withToken(token);
+    } on TimeoutException {
+      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      setState(() { _error = GoogleAuth.errorText(e); _loading = false; });
+    }
+  }
+
+  /// A Google ID token (from the button or Play Games) into a company.
+  Future<void> _withToken(String token) async {
+    try {
       var r = await GoogleAuth.signIn(token);
       while (r.code == 'need_name' || r.code == 'name_taken' || r.code == 'invalid_name' ||
           r.code == 'wrong_password' || r.code == 'already_linked' || r.code == 'rate_limited') {
@@ -124,8 +158,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (r.data['created'] == true && mounted) AppNotify.show(context, 'Welcome, ${r.data['name']}!');
       await _enter(r.data['hID'] as String, r.data['sid'] as String);
-    } on TimeoutException {
-      if (mounted) setState(() => _loading = false);
     } catch (e) {
       setState(() { _error = GoogleAuth.errorText(e); _loading = false; });
     }
@@ -169,12 +201,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               final n = name.text.trim();
               if (n.isEmpty || !_validName.hasMatch(n)) return;
-              Navigator.pop(ctx, (link: link, name: n, password: link ? pw.text : null));
+              popIfCurrent(ctx, (link: link, name: n, password: link ? pw.text : null));
             },
             child: Text(link ? 'Link' : 'Create'),
           ),

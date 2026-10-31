@@ -34,6 +34,9 @@ class Branding {
   /// OAuth Web client ID: with it, players sign in with Google only (owner 2026-10-25).
   static const googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
 
+  /// OAuth client of the Play Games "Game server" credential; empty = no Play Games sign-in.
+  static const playGamesClientId = String.fromEnvironment('PLAY_GAMES_CLIENT_ID');
+
   /// 'play' for the Google Play build: no self-updates, no battery-exemption request (Play policy).
   static const store = String.fromEnvironment('STORE');
   static bool get isPlay => store == 'play';

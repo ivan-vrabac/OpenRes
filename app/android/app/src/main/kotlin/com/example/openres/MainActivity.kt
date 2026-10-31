@@ -13,6 +13,9 @@ import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.FileProvider
+import com.google.android.gms.games.PlayGames
+import com.google.android.gms.games.PlayGamesSdk
+import com.google.android.gms.games.gamessignin.AuthScope
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.StandardIntegrityManager.PrepareIntegrityTokenRequest
 import com.google.android.play.core.integrity.StandardIntegrityManager.StandardIntegrityTokenRequest
@@ -31,6 +34,7 @@ class MainActivity : FlutterFragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         keepUprightOnPhones()
+        if (getString(R.string.game_services_project_id).isNotEmpty()) PlayGamesSdk.initialize(this)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -89,6 +93,21 @@ class MainActivity : FlutterFragmentActivity() {
                             .addOnFailureListener { result.success(null) }
                     }
                     .addOnFailureListener { result.success(null) }
+            }
+        // Play Games sign-in: a one-time code for our server, or null when the player isn't signed in
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "openres/playgames")
+            .setMethodCallHandler { call, result ->
+                val client = call.argument<String>("client")
+                if (client == null) { result.success(null); return@setMethodCallHandler }
+                val games = PlayGames.getGamesSignInClient(this)
+                games.isAuthenticated.addOnCompleteListener { signedIn ->
+                    if (!signedIn.isSuccessful || !signedIn.result.isAuthenticated) {
+                        result.success(null)
+                    } else {
+                        games.requestServerSideAccess(client, false, listOf(AuthScope.OPEN_ID, AuthScope.EMAIL))
+                            .addOnCompleteListener { result.success(if (it.isSuccessful) it.result.authCode else null) }
+                    }
+                }
             }
         // In-app updates (owner 2026-10-24): Android's DownloadManager fetches the APK into
         // updateDir, so the download goes on when the player leaves the screen or the app, resumes
