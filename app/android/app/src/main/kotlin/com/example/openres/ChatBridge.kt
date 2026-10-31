@@ -13,6 +13,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
@@ -38,11 +39,15 @@ class ChatBridge(private val activity: Activity, messenger: BinaryMessenger) {
                         .putString("sid", call.argument<String>("sid"))
                         .apply()
                     Poller.start(ctx)
+                    Poller.registerPush(ctx)
+                    // the first check only notes where the inbox is: do it now, not after what comes next
+                    Thread { try { Poller.pollOnce(ctx, 0) } catch (_: Exception) {} }.start()
                     result.success(true)
                 }
                 "logout" -> {
                     Poller.prefs(ctx).edit().remove("sid").remove("after").apply()
                     Poller.start(ctx)
+                    Poller.dropPush()
                     result.success(true)
                 }
                 "clear" -> {
@@ -84,6 +89,41 @@ object Poller {
     val lines = HashMap<String, ArrayList<String>>()
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences("chat_notify", Context.MODE_PRIVATE)
+
+    /** Hands this phone's push token to the server (no Firebase in this build: nothing happens). */
+    fun registerPush(ctx: Context) {
+        try {
+            FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+                Thread { sendPushToken(ctx, token) }.start()
+            }
+        } catch (_: Exception) {}
+    }
+
+    /** Signed out: this phone stops being woken for that company. */
+    fun dropPush() {
+        try { FirebaseMessaging.getInstance().deleteToken() } catch (_: Exception) {}
+    }
+
+    fun sendPushToken(ctx: Context, token: String) {
+        val p = prefs(ctx)
+        val base = p.getString("base", null) ?: return
+        val sid = p.getString("sid", null) ?: return
+        try {
+            val c = URL("$base/api/game/push/register").openConnection() as HttpURLConnection
+            try {
+                c.requestMethod = "POST"
+                c.connectTimeout = 15_000
+                c.readTimeout = 15_000
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                val body = "sid=${URLEncoder.encode(sid, "UTF-8")}&token=${URLEncoder.encode(token, "UTF-8")}"
+                c.outputStream.use { it.write(body.toByteArray()) }
+                c.responseCode
+            } finally {
+                c.disconnect()
+            }
+        } catch (_: Exception) {}
+    }
 
     /** Start or stop the 15-minute check to match the sign-in. */
     fun start(ctx: Context) {

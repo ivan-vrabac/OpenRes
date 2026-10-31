@@ -6,6 +6,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Push notifications need this private file; without it the app builds and simply has none.
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+
 // Branding: read the same values the Dart code sees. Flutter passes every
 // --dart-define / --dart-define-from-file entry to Gradle as base64 in "dart-defines".
 val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
@@ -89,6 +92,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.activity:activity-ktx:1.9.3")   // enableEdgeToEdge
     implementation("com.google.android.play:integrity:1.4.0")
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+    implementation("com.google.firebase:firebase-messaging")
 }
 
 flutter {

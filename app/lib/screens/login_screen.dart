@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../branding.dart';
 import '../services/api_service.dart';
-import '../services/fcm_service.dart';
 import '../services/google_auth.dart';
 import '../services/storage_service.dart';
 import '../models/player_provider.dart';
@@ -87,7 +86,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     if (player != null) {
       context.read<PlayerProvider>().setPlayer(player, sid: sid);
-      FcmService.init(context.read<PlayerProvider>().sid);
     }
     if (deletionCancelled) {
       AppNotify.show(context, 'Welcome back! The deletion of your company was cancelled.');

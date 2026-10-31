@@ -829,40 +829,37 @@ def _get_fcm_token() -> str:
     except Exception:
         return ""
 
-def _send_fcm(token: str, title: str, body: str) -> bool:
-    """Send a push notification via FCM HTTP v1 API. Returns True on success."""
+def fcm_message(token: str) -> dict:
+    """A push that only says "check now": the phone fetches the notification from its inbox, so
+    nothing is shown twice and the text doesn't pass through Google."""
+    return {"message": {"token": token, "data": {"poll": "1"}, "android": {"priority": "HIGH"}}}
+
+def _send_fcm(token: str) -> str:
+    """Send one push through the FCM HTTP v1 API: "ok", "gone" (the phone no longer has this token)
+    or "failed"."""
     bearer = _get_fcm_token()
     if not bearer:
-        return False
+        return "failed"
+    import urllib.error
+    import urllib.request
+    url = f"https://fcm.googleapis.com/v1/projects/{_FIREBASE_PROJECT_ID}/messages:send"
+    req = urllib.request.Request(url, data=json.dumps(fcm_message(token)).encode("utf-8"), method="POST",
+                                 headers={"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"})
     try:
-        import urllib.request
-        url = f"https://fcm.googleapis.com/v1/projects/{_FIREBASE_PROJECT_ID}/messages:send"
-        payload = json.dumps({
-            "message": {
-                "token": token,
-                "notification": {"title": title, "body": body},
-                "android": {"priority": "HIGH"},
-            }
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {bearer}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status == 200
+            return "ok" if resp.status == 200 else "failed"
+    except urllib.error.HTTPError as e:
+        return "gone" if e.code == 404 else "failed"
     except Exception:
-        return False
+        return "failed"
 
 def _push_to_player(conn, hid: str, title: str, body: str):
-    """Send FCM push to all registered tokens for a player."""
+    """Wake every phone of a player (title and body stay in the inbox the phone fetches)."""
     rows = conn.execute("SELECT token FROM fcm_tokens WHERE hid=?", (hid,)).fetchall()
     for row in rows:
-        _send_fcm(row["token"], title, body)
+        if _send_fcm(row["token"]) == "gone":
+            conn.execute("DELETE FROM fcm_tokens WHERE hid=? AND token=?", (hid, row["token"]))
+            conn.commit()
 
 # ── Server-side notification sweeper (runs every 30 min) ─────────────────────────
 

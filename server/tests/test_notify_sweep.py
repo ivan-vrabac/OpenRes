@@ -90,3 +90,23 @@ def test_changing_the_limit_keeps_the_threshold():
     call("/api/v3/state", sid)
     call("/api/v1/notify/storage_high", sid, percent=90)
     assert call("/api/v1/notify/set", sid, kind="storage_high", enabled=1, maxPerDay=5)["storageHigh"] == 90
+
+
+def test_a_push_carries_no_text():
+    msg = main.fcm_message("tok")["message"]
+    assert msg["data"] == {"poll": "1"} and msg["token"] == "tok" and "notification" not in msg
+    assert msg["android"]["priority"] == "HIGH"
+
+
+def test_every_new_notification_wakes_the_phone_and_a_dead_token_is_dropped(monkeypatch):
+    hid, sid, _ = new_player("nsw6")
+    sent = []
+    monkeypatch.setattr(main, "_send_fcm", lambda t: sent.append(t) or ("gone" if t == "old" else "ok"))
+    with main.get_db() as conn:
+        for t in ("old", "new"):
+            conn.execute("INSERT INTO fcm_tokens(hid, token, platform, updated_at) VALUES(?,?,?,?)",
+                         (hid, t, "android", econ.utcnow_iso()))
+        conn.commit()
+        main._push_to_player(conn, hid, "t", "b")
+        left = [r[0] for r in conn.execute("SELECT token FROM fcm_tokens WHERE hid=?", (hid,))]
+    assert sorted(sent) == ["new", "old"] and left == ["new"]

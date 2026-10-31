@@ -1,7 +1,8 @@
 # Push notifications (optional)
 
-Without Firebase the app still shows local notifications (scheduled on-device). Server
-push via Firebase Cloud Messaging is optional and disabled by default.
+Notifications always work through a check every 15 minutes. Firebase Cloud Messaging makes them
+arrive within seconds: the server sends a push with no text, which wakes the app to fetch the
+notification from its inbox. It is optional.
 
 ## Server
 
@@ -18,6 +19,5 @@ push via Firebase Cloud Messaging is optional and disabled by default.
 
 ## App
 
-Follow the checklist at the top of `app/lib/services/fcm_service.dart`: register an
-Android app with your `APP_ID`, put `google-services.json` in `app/android/app/`
-(gitignored), add the Google Services Gradle plugin, and enable the Firebase packages.
+Register an Android app with your `APP_ID` in the same Firebase project and put its
+`google-services.json` in `app/android/app/` (gitignored). The build uses it when it is there.

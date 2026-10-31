@@ -50,6 +50,11 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".NotifyAlarm" android:exported="false"/>
+        <service android:name=".PushService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
         <receiver android:name=".NotifyBootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

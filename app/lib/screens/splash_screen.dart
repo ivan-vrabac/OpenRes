@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../branding.dart';
 import '../services/storage_service.dart';
 import '../services/api_service.dart';
-import '../services/fcm_service.dart';
 import '../services/update_service.dart';
 import '../models/player_provider.dart';
 import 'login_screen.dart';
@@ -40,7 +39,6 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
     context.read<PlayerProvider>().setPlayer(player, sid: sid);
-    FcmService.init(context.read<PlayerProvider>().sid);
     _go(const GameScreen());
   }
 
