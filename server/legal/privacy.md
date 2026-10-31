@@ -10,7 +10,7 @@ We use your data only to run the game. We don't use it for marketing or advertis
 
 ## What we process and why
 
-- **Account:** your company name, a securely hashed password, your country if you choose one, and sign-in sessions. Needed to give you an account (GDPR Art. 6(1)(b), performing our agreement with you).
+- **Account:** your company name, your Google account ID and email address if you sign in with Google (never shown to other players), a securely hashed password if your account has one, your country if you choose one, and sign-in sessions. Needed to give you an account (GDPR Art. 6(1)(b), performing our agreement with you).
 - **Game data:** your Campus, hexes, plants, supervisors, stored items, credits, market orders, quests, achievements, rankings and your activity log. The positions of your Campus and hexes are places on the map that you chose; other players see them.
 - **Your location (precise):** the game is played on a real map. The app uses your phone's location only while the app is open, to show the map around you. When you do something that depends on where you are (place or move your Campus, visit it, build a hex), your position at that moment is sent to the server to check the distance, and your last position is kept to detect impossible jumps (cheating). We don't collect your location while the app is closed and we don't build a location history. The app explains this before Android asks for the permission. On Android the position comes from Google Play services. The app does not use activity recognition or any other health or fitness data.
 - **Activity log:** a list of what your company did (for example building a hex or selling items), with the place where it happened, kept for 7 days so you can look it up in the app.
