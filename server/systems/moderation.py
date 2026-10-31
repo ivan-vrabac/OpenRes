@@ -51,6 +51,13 @@ def init_schema(conn) -> None:
             PRIMARY KEY (hid, device)
         );
         CREATE INDEX IF NOT EXISTS idx_player_devices ON player_devices(device);
+        CREATE TABLE IF NOT EXISTS mod_log (
+            id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts     TEXT NOT NULL,
+            action TEXT NOT NULL,
+            target TEXT,                          -- company name or what the action was about
+            detail TEXT
+        );
     """)
 
 
@@ -171,6 +178,16 @@ def install(api) -> None:
                         "targetPid": social.pid_of(conn, r["target_hid"]), "targetBan": b})
         contact = [dict(c) for c in conn.execute("SELECT id, ts, topic, reply_to, company, message, handled FROM contact_messages "
                                                  "WHERE handled=0 ORDER BY id DESC LIMIT 100")] if social._has_table(conn, "contact_messages") else []
+        done_contact = [dict(c) for c in conn.execute("SELECT id, ts, topic, reply_to, message FROM contact_messages "
+                                                      "WHERE handled=1 ORDER BY id DESC LIMIT 30")] if social._has_table(conn, "contact_messages") else []
+        done_reports = [{"id": r["id"], "ts": r["ts"], "reason": r["reason"], "status": r["status"], "action": r["action"],
+                         "target": name_of(conn, r["target_hid"])}
+                        for r in conn.execute("SELECT * FROM reports WHERE status!='open' ORDER BY id DESC LIMIT 30")]
+        q = (form.get("q") or "").strip()
+        companies = [{"name": c[0], "pid": social.pid_of(conn, c[1]), "created": c[2], "banned": active_ban(conn, c[1]) is not None}
+                     for c in conn.execute("SELECT company_name, hID, created_at FROM players WHERE company_name LIKE ? "
+                                           "ORDER BY created_at DESC LIMIT 200", (f"%{q}%",)).fetchall()]
+        log = [dict(x) for x in conn.execute("SELECT ts, action, target, detail FROM mod_log ORDER BY id DESC LIMIT 100")]
         bans = [{"target": name_of(conn, b[0]), "pid": social.pid_of(conn, b[0]), "kind": b[1], "until": b[2], "reason": b[3]}
                 for b in conn.execute("SELECT hid, kind, until, reason FROM player_bans WHERE until IS NULL OR until > ? "
                                       "ORDER BY ts DESC", (econ.utcnow_iso(),))]
@@ -182,13 +199,14 @@ def install(api) -> None:
                 {"name": name_of(conn, r[0]), "pid": social.pid_of(conn, r[0]), "lastSeen": r[1]}
                 for r in conn.execute("SELECT hid, last_seen FROM player_devices WHERE device=? ORDER BY last_seen DESC", (dev,))]})
         conn.commit()
-        return {"err": 0, "reports": out, "contact": contact, "bans": bans, "sharedDevices": shared}
+        return {"err": 0, "reports": out, "contact": contact, "bans": bans, "sharedDevices": shared,
+                "companies": companies, "doneContact": done_contact, "doneReports": done_reports, "log": log}
 
     @api.endpoint("/api/v1/mod/act", auth=False)
     @mod
     def mod_act(conn, form):
-        """action: dismiss | ban | unban | contact_done; report id and/or pid;
-        hours (empty = forever); reason."""
+        """action: dismiss | ban | unban | contact_done | contact_reopen | report_reopen; report id and/or
+        pid; hours (empty = forever); reason. Everything is kept in mod_log (one year)."""
         action = form.get("action", "")
         rid = int(form.get("report") or 0)
         r = conn.execute("SELECT * FROM reports WHERE id=?", (rid,)).fetchone() if rid else None
@@ -203,10 +221,21 @@ def install(api) -> None:
                 _ban_cache.clear()
             elif action == "contact_done":
                 conn.execute("UPDATE contact_messages SET handled=1 WHERE id=?", (int(form.get("contact") or 0),))
+            elif action == "contact_reopen":
+                conn.execute("UPDATE contact_messages SET handled=0 WHERE id=?", (int(form.get("contact") or 0),))
+            elif action == "report_reopen" and r:
+                conn.execute("UPDATE reports SET status='open', action=NULL, handled_at=NULL WHERE id=?", (rid,))
             elif action != "dismiss":
                 raise econ.GameError("bad_input", "Unknown action")
-            if r:
+            if r and action != "report_reopen":
                 status = "dismissed" if action == "dismiss" else "actioned"
                 conn.execute("UPDATE reports SET status=?, action=?, handled_at=? WHERE id=? AND status='open'",
                              (status, action, econ.utcnow_iso(), rid))
+            what = name_of(conn, target) if target else f"message #{form.get('contact')}" if form.get("contact") else ""
+            detail = " ".join(x for x in (f"report #{rid}" if rid else "", f"{hours} hours" if hours else "",
+                                          "forever" if action == "ban" and not hours else "", reason) if x)
+            conn.execute("INSERT INTO mod_log(ts, action, target, detail) VALUES(?,?,?,?)",
+                         (econ.utcnow_iso(), action, what, detail))
+            year = (econ.utcnow() - datetime.timedelta(days=365)).isoformat()
+            conn.execute("DELETE FROM mod_log WHERE ts < ?", (year,))
         return {"err": 0}
