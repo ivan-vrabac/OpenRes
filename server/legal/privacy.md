@@ -44,7 +44,7 @@ We don't sell or rent personal data and we don't share it for marketing ("we do 
 - Account and game data: as long as your account exists.
 - Activity log: 7 days. Reports and bans: up to 1 year.
 - Server logs and backups: at most 30 days.
-- When you delete your account (in the app: Settings › Delete account, or on https://resources.vrabac.eu/delete.html), your company and all its game data are deleted. Accounts younger than 30 days are deleted at once; older accounts are deleted after a 30-day waiting period, during which signing in cancels the deletion (this protects against mistakes and stolen passwords). After deletion, copies in logs and backups disappear within 30 days. We keep nothing else about deleted accounts.
+- When you delete your account (in the app: Settings › Account › Delete account, or on https://resources.vrabac.eu/delete.html), your company and all its game data are deleted. Accounts younger than 30 days are deleted at once; older accounts are deleted after a 30-day waiting period, during which signing in cancels the deletion (this protects against mistakes and stolen passwords). After deletion, copies in logs and backups disappear within 30 days. We keep nothing else about deleted accounts.
 
 ## Your rights
 

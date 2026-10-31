@@ -12,6 +12,8 @@ import '../services/screen_mode.dart';
 import 'login_screen.dart';
 import '../widgets/hold_button.dart';
 import '../services/game_api.dart';
+import '../services/google_auth.dart';
+import '../services/play_games.dart';
 import '../branding.dart';
 import '../models/player_provider.dart';
 import '../models/tab_config.dart';
@@ -159,8 +161,135 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
         const SectionLabel('Account'),
         RowGroup([
-          _tile(Icons.badge_outlined, 'Change company name', 'First change free, then credits',
-              () => showAppDialog(context: context, builder: (_) => const _RenameDialog())),
+          _tile(Icons.manage_accounts_outlined, 'Account', 'Company name · connected accounts · delete',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _AccountPage()))),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _tile(IconData icon, String title, String subtitle, VoidCallback onTap) =>
+      NavRow(icon: Icon(icon, color: AppColors.accent), title: title, subtitle: subtitle, onTap: onTap);
+}
+
+// ── Account ────────────────────────────────────────────────────────────────────
+
+/// Company name, how the company signs in, deletion. Connections all end in one Google identity on the
+/// server (auth_identities has a provider column, so Sign in with Apple can join them on iOS). There is
+/// no disconnect: it would lock the player out of the company.
+class _AccountPage extends StatefulWidget {
+  const _AccountPage();
+  @override
+  State<_AccountPage> createState() => _AccountPageState();
+}
+
+class _AccountPageState extends State<_AccountPage> {
+  Map<String, dynamic>? _status;
+  bool _games = false;
+  bool _busy = false;
+
+  String get _sid => context.read<PlayerProvider>().sid;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final r = await GameApi.call('/api/v1/auth/status', _sid, {});
+    if (!mounted || !r.ok) return;
+    setState(() => _status = r.data);
+    final token = await PlayGames.idToken();
+    if (token != null) await _checkGames(token);
+  }
+
+  /// Is the phone's Play Games profile the Google account of this company?
+  Future<bool> _checkGames(String token) async {
+    final r = await GameApi.call('/api/v1/auth/status', _sid, {'id_token': token});
+    final same = r.ok && r.data['match'] == true;
+    if (mounted) setState(() => _games = same);
+    return same;
+  }
+
+  /// A company with a password: the password once, then this Google account signs it in.
+  Future<void> _link(String token) async {
+    final ctl = TextEditingController();
+    final password = await showAppDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Your password'),
+        content: TextField(controller: ctl, obscureText: true, autofocus: true,
+            decoration: const InputDecoration(labelText: 'Password', helperText: 'Not needed any more after this',
+                border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => popIfCurrent(ctx, ctl.text), child: const Text('Connect')),
+        ],
+      ),
+    );
+    if (password == null || password.isEmpty || !mounted) return;
+    final r = await GameApi.call('/api/v1/auth/google/link', _sid, {'id_token': token, 'password': password});
+    if (!mounted) return;
+    AppNotify.show(context, r.ok ? 'Connected' : r.message ?? 'Failed', isError: !r.ok);
+    if (r.ok) _load();
+  }
+
+  Future<void> _connect(Future<String?> Function() token, String failed, {bool games = false}) async {
+    setState(() => _busy = true);
+    try {
+      final t = await token();
+      if (!mounted) return;
+      if (t == null) {
+        AppNotify.show(context, failed, isError: true);
+      } else if (_status?['google'] != true) {
+        await _link(t);
+      } else if (games && !await _checkGames(t) && mounted) {
+        AppNotify.show(context, 'This Play Games profile uses a different Google account than your company.', isError: true);
+      }
+    } catch (e) {
+      if (mounted) AppNotify.show(context, GoogleAuth.errorText(e), isError: true);
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Widget _connection(IconData icon, String title, bool on, String off, VoidCallback onConnect) => NavRow(
+        icon: Icon(icon, color: on ? Colors.greenAccent : AppColors.accent),
+        title: title,
+        subtitle: on ? 'Connected' : off,
+        arrow: !on,
+        onTap: on || _busy ? () {} : onConnect,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _status;
+    final email = (s?['email'] as String?) ?? '';
+    return Scaffold(
+      appBar: AppBar(toolbarHeight: 36, title: const Text('Account')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 16), children: [
+        const SectionLabel('Company'),
+        RowGroup([
+          NavRow(icon: Icon(Icons.badge_outlined, color: AppColors.accent), title: 'Change company name',
+              subtitle: 'First change free, then credits',
+              onTap: () => showAppDialog(context: context, builder: (_) => const _RenameDialog())),
+        ]),
+        const SizedBox(height: 16),
+        const SectionLabel('Connected accounts'),
+        if (s == null)
+          const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+        else
+          RowGroup([
+            if (GoogleAuth.enabled)
+              _connection(Icons.account_circle, s['google'] == true && email.isNotEmpty ? 'Google: $email' : 'Google',
+                  s['google'] == true, 'Sign in with your Google account',
+                  () => _connect(() => GoogleAuth.idToken(pick: true), 'Google sign-in was cancelled')),
+            if (PlayGames.enabled)
+              _connection(Icons.sports_esports, 'Google Play Games', _games, 'Achievements and quick sign-in',
+                  () => _connect(() => PlayGames.idToken(ask: true), 'Play Games sign-in did not work', games: true)),
+          ]),
+        const SizedBox(height: 16),
+        RowGroup([
           NavRow(
             icon: const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
             title: 'Delete account',
@@ -172,9 +301,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ]),
     );
   }
-
-  Widget _tile(IconData icon, String title, String subtitle, VoidCallback onTap) =>
-      NavRow(icon: Icon(icon, color: AppColors.accent), title: title, subtitle: subtitle, onTap: onTap);
 }
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────

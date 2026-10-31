@@ -4,9 +4,9 @@ The phone asks for a challenge, gets a token for it from Google Play and hands i
 Google decode it and keeps the verdict. Once per player per CHECK_HOURS, so the 10,000 requests a day
 last (a check costs one token and one decryption).
 
-Report only by default: verdicts are stored and nobody is blocked. INTEGRITY_ENFORCE=1 makes
-`require` refuse building and placing without a good, recent verdict; look at the stored verdicts
-first, honest players on odd phones can fail too.
+Report only by default: verdicts are stored and nobody is blocked. INTEGRITY_ENFORCE=1 (production since
+2026-10-31) refuses building, placing and everything in GUARDED without a good, recent verdict. With the
+app itself proven genuine, its refusal of mock locations and the travel check can be trusted too.
 
 Needs a service account key of the Cloud project linked in Play Console (INTEGRITY_CREDENTIALS, the
 path of its JSON file). Without one the check is simply skipped ("not_configured").
@@ -26,11 +26,16 @@ import econ
 
 PACKAGE = os.environ.get("INTEGRITY_PACKAGE", "resources.vrabac.eu")
 CHECK_HOURS = 24
+RETRY_HOURS = 1                 # after a failed verdict: a hiccup shouldn't lock a player out for a day
 VALID_HOURS = 72                # enforcing: how long a good verdict lasts
 NONCE_S = 300
 TOKEN_AGE_S = 300               # a token older than this is refused
 EXEMPT = {"PlayReview"}         # Google's reviewers test on emulators
 SCOPE = "https://www.googleapis.com/auth/playintegrity"
+
+# what moves the game on, besides building and placing (those call `require` themselves)
+GUARDED = {"/api/v3/survey", "/api/v3/campus/visit", "/api/v3/sell", "/api/v1/market/order", "/api/v1/market/edit",
+           "/api/v1/market/take", "/api/v1/market/system"}
 
 _credentials = None
 
@@ -97,6 +102,8 @@ def evaluate(payload: dict, nonce: str, now_ms: float) -> tuple[list, dict]:
         problems.append("device_integrity")
     if account.get("appLicensingVerdict") != "LICENSED":
         problems.append("not_licensed")
+    if env.get("playProtectVerdict") == "HIGH_RISK":     # the others (and app access risk) are only kept
+        problems.append("play_protect")
     return problems, {
         "app": app.get("appRecognitionVerdict"), "device": labels, "license": account.get("appLicensingVerdict"),
         "playProtect": env.get("playProtectVerdict"), "accessRisk": env.get("appAccessRiskVerdict"),
@@ -125,9 +132,10 @@ def install(api) -> None:
 
     @api.endpoint("/api/v3/integrity/challenge")
     def challenge(conn, hid, form):
-        r = conn.execute("SELECT checked_at FROM co_integrity WHERE hid=?", (hid,)).fetchone()
+        r = conn.execute("SELECT ok, checked_at FROM co_integrity WHERE hid=?", (hid,)).fetchone()
+        wait = (CHECK_HOURS if r and r["ok"] else RETRY_HOURS) * 3600
         due = configured() and _name(conn, hid) not in EXEMPT and not (r and r["checked_at"] and (
-            econ.utcnow() - datetime.datetime.fromisoformat(r["checked_at"])).total_seconds() < CHECK_HOURS * 3600)
+            econ.utcnow() - datetime.datetime.fromisoformat(r["checked_at"])).total_seconds() < wait)
         if not due:
             return {"err": 0, "due": False}
         nonce = secrets.token_urlsafe(32)

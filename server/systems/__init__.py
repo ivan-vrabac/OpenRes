@@ -18,6 +18,8 @@ from starlette.concurrency import run_in_threadpool
 
 import econ
 
+from . import integrity
+
 
 # Actions that change the game: at most N per player in a window of S seconds (a script can't hammer
 # them; a person never gets near). path: (N, S)
@@ -76,6 +78,8 @@ class Api:
                 def work():
                     with h.get_db() as conn:
                         try:
+                            if path in integrity.GUARDED:
+                                integrity.require(conn, hid)
                             out = fn(conn, hid, form)
                             if conn.in_transaction:
                                 conn.commit()

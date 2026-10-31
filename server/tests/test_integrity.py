@@ -121,3 +121,40 @@ def test_the_play_review_account_is_never_blocked(monkeypatch):
         conn.commit()
     call("/api/v3/state", sid)
     assert place(sid, 23.0)["err"] == 0
+
+
+def test_guarded_actions_need_a_verdict_when_enforcing(monkeypatch):
+    sid = new_player("Guarded Co")[1]
+    assert call("/api/v3/survey", sid, lat=45.0, lng=16.0).get("code") != "integrity"
+    monkeypatch.setenv("INTEGRITY_ENFORCE", "1")
+    assert call("/api/v3/survey", sid, lat=45.0, lng=16.0)["code"] == "integrity"
+    assert call("/api/v1/market/take", sid)["code"] == "integrity"
+    assert call("/api/v1/market/overview", sid).get("code") != "integrity"      # looking is free
+
+
+def test_a_failed_verdict_is_retried_soon_a_good_one_tomorrow(monkeypatch):
+    monkeypatch.setenv("INTEGRITY_CREDENTIALS", "/x.json")
+    sid = new_player("Retry Co")[1]
+    import auth
+    hid = auth.hid_from_sid(sid)
+
+    def checked(ok, hours):
+        import datetime
+        with main.get_db() as conn:
+            at = (it.econ.utcnow() - datetime.timedelta(hours=hours)).isoformat()
+            conn.execute("INSERT INTO co_integrity(hid, ok, checked_at) VALUES(?,?,?) ON CONFLICT(hid) "
+                         "DO UPDATE SET ok=excluded.ok, checked_at=excluded.checked_at", (hid, ok, at))
+            conn.commit()
+
+    checked(0, 2)
+    assert call(C, sid)["due"] is True
+    checked(1, 2)
+    assert call(C, sid)["due"] is False
+
+
+def test_play_protect_high_risk_fails():
+    p = good("n")
+    p["environmentDetails"]["playProtectVerdict"] = "HIGH_RISK"
+    assert "play_protect" in it.evaluate(p, "n", time.time() * 1000)[0]
+    p["environmentDetails"]["playProtectVerdict"] = "MEDIUM_RISK"
+    assert "play_protect" not in it.evaluate(p, "n", time.time() * 1000)[0]

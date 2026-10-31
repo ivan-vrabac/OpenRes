@@ -150,11 +150,16 @@ def install(api) -> None:
 
     @api.endpoint("/api/v1/auth/status")
     def status(conn, hid, form):
-        """How this company signs in (Settings › Sign-in)."""
-        row = conn.execute("SELECT email FROM auth_identities WHERE hid=? AND provider='google'", (hid,)).fetchone()
+        """How this company signs in (Settings › Account). With id_token (Play Games): `match`, whether
+        that is the Google account of this company."""
+        row = conn.execute("SELECT email, subject FROM auth_identities WHERE hid=? AND provider='google'", (hid,)).fetchone()
         pw = conn.execute("SELECT 1 FROM player_auth WHERE hid=?", (hid,)).fetchone() is not None
-        return {"err": 0, "google": row is not None, "email": (row[0] or "") if row else "", "password": pw,
-                "googleAvailable": bool(google_client_ids())}
+        out = {"err": 0, "google": row is not None, "email": (row[0] or "") if row else "", "password": pw,
+               "googleAvailable": bool(google_client_ids())}
+        token = (form.get("id_token") or "").strip()
+        if token:
+            out["match"] = row is not None and str(verify_google(token)["sub"]) == row[1]
+        return out
 
     @api.endpoint("/api/v1/auth/google/link")
     def google_link(conn, hid, form):

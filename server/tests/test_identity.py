@@ -121,6 +121,13 @@ def test_fresh_token_from_a_clock_slightly_ahead_is_accepted(monkeypatch):
     assert identity.verify_google(token)["sub"] == "skew"
 
 
+def test_status_tells_if_a_token_is_this_company(google):
+    sid = g("sub-mine:m@x.org", name="Mine Co")["sid"]
+    assert call("/api/v1/auth/status", sid, id_token="sub-mine:m@x.org")["match"] is True
+    assert call("/api/v1/auth/status", sid, id_token="sub-other2:o@x.org")["match"] is False
+    assert "match" not in call("/api/v1/auth/status", sid)
+
+
 def test_play_games_code_becomes_an_id_token(google, monkeypatch):
     seen = {}
 

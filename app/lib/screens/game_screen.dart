@@ -121,7 +121,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       NotificationService.requestPermission().whenComplete(() => ChatBridge.configure(prov.sid));
       Legal.report(prov.sid);                     // the server keeps who accepted which terms
       ChatBridge.reportDevice(prov.sid);          // multi-account detection (hashed device ID)
-      IntegrityCheck.run(prov.sid);               // real app on a real device? (never stops the game)
+      IntegrityCheck.start(prov.sid);             // real app on a real device?
       PlayGames.start(prov.sid);                  // achievements recorded, and on to Play Games
       // offer a newer published build (once per build; Settings > Updates anytime)
       Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
@@ -145,6 +145,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (Company.active.value == co) Company.active.value = null;
     });
     PlayGames.stop();
+    IntegrityCheck.stop();
     mapFocus.removeListener(_toMap);
     campusMoveAsked.removeListener(_toMap);
     WidgetsBinding.instance.removeObserver(this);
