@@ -196,7 +196,7 @@ class Player:
                 if self.rng.random() < TIER_FIND[t]:
                     tier = t
                     break
-            cost = g.TIER_INCOME[tier] * g.HEX_BUILD_HOURS
+            cost = g.TIER_INCOME[tier] * g.HEX_BUILD_HOURS * g.hex_price_share(self.campus)
             if self.credits < cost * 1.5:
                 return
             quality = self.rng.uniform(0.5, 0.95)

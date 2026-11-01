@@ -173,7 +173,6 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         private var sensor: SensorEventListener? = null
         private val exec = Executors.newSingleThreadExecutor()
         private var lastSent = 0L
-        private var lastLogged = 0L
         private var declination = 0.0
         private var lastTrusted = 0L             // the last reading of the provider good enough to use
 
@@ -182,12 +181,10 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
                 val now = System.currentTimeMillis()
                 if (now - lastSent < 50) return          // 20 per second is plenty for the marker
                 lastSent = now
-                if (now - lastLogged > 3000) { lastLogged = now; android.util.Log.i("OpenResHeading", "heading $deg err $err") }
                 main.post { sink.success(mapOf("heading" to deg, "err" to err)) }
             }
             // owner 2026-11-01: the provider may send one reading "off by up to 180 degrees" and then
             // nothing, so the phone's own compass always runs and the provider overrides it when it's sure
-            android.util.Log.i("OpenResHeading", "listen")
             startSensor(::send)
             if (playServices()) {
                 try {
@@ -279,7 +276,6 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         }
 
         override fun onCancel(args: Any?) {
-            android.util.Log.i("OpenResHeading", "cancel")
             fop?.let { LocationServices.getFusedOrientationProviderClient(ctx).removeOrientationUpdates(it) }
             fop = null
             sensor?.let { (ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager).unregisterListener(it) }

@@ -218,6 +218,10 @@ def factory_upgrade_cost(fkey: str, level: int) -> int:
 
 # ── Hexes: build and lease ─────────────────────────────────────────────────────────────────────
 HEX_BUILD_HOURS = 96               # a hex costs 4 days of its own output (at 100 % quality)
+# owner 2026-11-01: the start money bought about 10 hexes, then nothing happened for two weeks. New companies
+# build cheaply and learn the game: a quarter of the price at Campus 1, the full price from Campus 10.
+HEX_EARLY_SHARE = 0.25
+HEX_FULL_PRICE_LEVEL = 10
 LEASE_DAYS = 90                    # the most a lease can run; renewing sets it back to 90 days
 LEASE_HOURS = 24                   # a full renewal costs one day of the hex's output
 LEASE_FULL_PRICE_DAYS = 30         # the renewal price grows with the days used, full from 30 on:
@@ -246,8 +250,13 @@ def hex_income(item: str) -> float:
     return TIER_INCOME[raw_items()[item][1]]
 
 
-def hex_build_cost(item: str) -> int:
-    return int(round(hex_income(item) * HEX_BUILD_HOURS, -2))
+def hex_price_share(campus_level: int) -> float:
+    """Share of the full build price a company pays at this Campus level."""
+    return min(1.0, HEX_EARLY_SHARE + (1 - HEX_EARLY_SHARE) * (max(1, campus_level) - 1) / (HEX_FULL_PRICE_LEVEL - 1))
+
+
+def hex_build_cost(item: str, campus_level: int = HEX_FULL_PRICE_LEVEL) -> int:
+    return int(round(hex_income(item) * HEX_BUILD_HOURS * hex_price_share(campus_level), -2))
 
 
 def lease_cost(item: str) -> int:

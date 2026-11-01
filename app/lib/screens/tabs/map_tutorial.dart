@@ -26,7 +26,7 @@ extension _MapTutorial on _MapTabState {
             'A lease lasts 2,160 hours, so aim well below that, because sales tax takes a part when you sell.'),
         const TutorialStep('Hexes',
             'The Hexes tab lists everything you lease. Keep enough credits to renew: a hex is gone when its lease ends. '
-            'Cancelling a lease destroys the hex and gives back 30 % of the lease that is left.', null, GameTabId.mines),
+            'Cancelling a lease destroys the hex and gives back 30 % of the lease that is left. New hexes are cheap at first and reach the full price at Campus 10, so build plenty early.', null, GameTabId.mines),
         const TutorialStep('Storage',
             'Hexes work around the clock and fill Central Storage. It has one total for all items, so upgrade it as you grow. '
             'When it is full, production stops. You can sell from here too.', null, GameTabId.warehouse),

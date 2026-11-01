@@ -440,8 +440,10 @@ def hex_detail(r, now) -> dict:
                                  * (1 + (g.EDUCATION[r["edu"]][1] if r["edu"] is not None else 0)), 2)}
 
 
-def build_price(op: str, item: str) -> int:
-    return g.hex_build_cost(item) if item != g.ENERGY else int(round(g.TIER_INCOME[tier_of(op, item)] * g.HEX_BUILD_HOURS, -2))
+def build_price(op: str, item: str, campus_level: int) -> int:
+    if item != g.ENERGY:
+        return g.hex_build_cost(item, campus_level)
+    return int(round(g.TIER_INCOME[tier_of(op, item)] * g.HEX_BUILD_HOURS * g.hex_price_share(campus_level), -2))
 
 
 # ── endpoints ──────────────────────────────────────────────────────────────────────────────────
@@ -645,7 +647,7 @@ def install(api) -> None:
             for item, q in items.items():
                 tier = tier_of(op, item)
                 out.setdefault(op, {})[item] = {"quality": q, "tier": tier, "unlocked": tier in unlocked,
-                                                "unlockLevel": g.TIER_UNLOCK[tier], "build": build_price(op, item),
+                                                "unlockLevel": g.TIER_UNLOCK[tier], "build": build_price(op, item, row["campus_level"]),
                                                 "lease": lease_price(op, item),
                                                 # without a supervisor (electricity in kWh)
                                                 "perHour": round(rate_per_hour(op, item, q) / (1000 if item == g.ENERGY else 1), 1),
@@ -675,13 +677,13 @@ def install(api) -> None:
             if n >= g.MAX_HEXES:
                 raise econ.GameError("max_hexes", f"You have the maximum of {g.MAX_HEXES:,} hexes")
             place_check(conn, hid, lat, lng)
-            pay(conn, hid, build_price(op, item), "hex")
+            pay(conn, hid, build_price(op, item, row["campus_level"]), "hex")
             now = utcnow()
             cur = conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
                                "VALUES(?,?,?,?,?,?,?,?)", (hid, lat, lng, op, item, q, iso(now),
                                                            iso(now + datetime.timedelta(days=g.LEASE_DAYS))))
             econ.emit(conn, "hex_built", hid, {"op": op, "item": item}, public=False)
-            log(conn, hid, "hex_built", lat=lat, lng=lng, name=g.ITEM_NAMES[item], quality=q, cost=build_price(op, item))
+            log(conn, hid, "hex_built", lat=lat, lng=lng, name=g.ITEM_NAMES[item], quality=q, cost=build_price(op, item, row["campus_level"]))
         return {"err": 0, "id": cur.lastrowid, "quality": q}
 
     @api.endpoint("/api/v3/hex/renew")

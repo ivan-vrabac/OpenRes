@@ -83,7 +83,10 @@ def test_build_produce_sell_and_rules():
     assert far["code"] == "range"
     r = call("/api/v3/hex/build", sid, lat=spot[0], lng=spot[1], plat=spot[0], plng=spot[1], op="logging_camp", item="wood")
     assert r["err"] == 0 and r["quality"] > 20
-    assert call("/api/v3/state", sid)["credits"] == co.START_CREDITS - g.hex_build_cost("wood")
+    assert call("/api/v3/state", sid)["credits"] == co.START_CREDITS - g.hex_build_cost("wood", 1)
+    assert g.hex_build_cost("wood", 1) == round(g.hex_build_cost("wood") * g.HEX_EARLY_SHARE, -2)
+    assert g.hex_build_cost("wood", 10) == g.hex_build_cost("wood", 40) == g.hex_build_cost("wood")
+    assert g.hex_build_cost("wood", 1) < g.hex_build_cost("wood", 5) < g.hex_build_cost("wood", 9) < g.hex_build_cost("wood")
     # no wheat in a forest, iron needs Campus level 5, and you can't stack two of your own hexes
     assert call("/api/v3/hex/build", sid, lat=spot[0], lng=spot[1], plat=spot[0], plng=spot[1],
                 op="farm", item="wheat")["code"] in ("no_resource", "overlap")
