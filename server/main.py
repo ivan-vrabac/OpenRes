@@ -345,9 +345,19 @@ HQ_BOOST_FACTORS[1] = 1.9
 
 # ── DB ─────────────────────────────────────────────────────────────────────────
 
+class _Connection(sqlite3.Connection):
+    """`with get_db() as conn` also closes it (sqlite3 only commits): a connection left open until
+    the garbage collector comes keeps its locks (owner 2026-11-01: logins failed on "database is locked")."""
+
+    def __exit__(self, *exc):
+        out = super().__exit__(*exc)
+        self.close()
+        return out
+
+
 def get_db() -> sqlite3.Connection:
     # Requests run concurrently in threads; wait for a busy writer instead of failing fast.
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = sqlite3.connect(DB_PATH, timeout=30, factory=_Connection)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -381,6 +391,7 @@ def record_daily_activity(conn, hid: str):
 
 def init_db():
     with get_db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")        # readers never block a writer, or the other way round
         conn.execute("""
             CREATE TABLE IF NOT EXISTS players (
                 hID           TEXT PRIMARY KEY,
