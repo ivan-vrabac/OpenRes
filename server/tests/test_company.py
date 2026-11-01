@@ -287,19 +287,19 @@ def test_heatmap_and_build_check_agree():
 def test_login_streak_grows_and_resets():
     hid, sid = setup_hq("streak", at=(45.80, 16.20))
     s = call("/api/v3/streak", sid)
-    assert s["day"] == 1 and not s["claimed"] and s["credits"] == g.streak_reward(1)
+    assert s["day"] == 1 and not s["claimed"] and s["credits"] == g.streak_reward(1, 1)
     before = call("/api/v3/state", sid)["credits"]
     r = call("/api/v3/streak/claim", sid)
     assert r["day"] == 1 and r["materials"] == {"books": 10}
     st = call("/api/v3/state", sid)
-    assert st["credits"] == before + g.streak_reward(1) and st["stock"]["books"] == 10
+    assert st["credits"] == before + g.streak_reward(1, 1) and st["stock"]["books"] == 10
     assert call("/api/v3/streak/claim", sid)["code"] == "claimed"
     yesterday = (co.utcnow() - datetime.timedelta(days=1)).date().isoformat()
     with main.get_db() as conn:                      # claimed yesterday as day 6: today is day 7
         conn.execute("UPDATE co_state SET streak_day=6, streak_last=? WHERE hid=?", (yesterday, hid))
         conn.commit()
     s = call("/api/v3/streak", sid)
-    assert s["day"] == 7 and s["credits"] == g.streak_reward(7) and s["materials"] == {"books": 50}
+    assert s["day"] == 7 and s["credits"] == g.streak_reward(7, 1) and s["materials"] == {"books": 50}
     one = (co.utcnow() - datetime.timedelta(days=2)).date().isoformat()
     with main.get_db() as conn:                      # one missed day is forgiven
         conn.execute("UPDATE co_state SET streak_day=20, streak_last=? WHERE hid=?", (one, hid))

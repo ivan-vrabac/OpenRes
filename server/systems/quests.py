@@ -35,13 +35,7 @@ import gamedata as g
 from . import int_arg
 
 DAILY_COUNT = 3
-QUEST_CAMPUS_SHARE = 0.002     # of the credits the next Campus level costs
-QUEST_MIN_CREDITS = 5000
-
-
-def quest_credits(campus_level: int) -> int:
-    nxt = g.campus_upgrade(min(max(1, campus_level), g.CAMPUS_MAX - 1))["credits"]
-    return max(QUEST_MIN_CREDITS, int(round(nxt * QUEST_CAMPUS_SHARE, -2)))
+quest_credits, QUEST_MIN_CREDITS, QUEST_CAMPUS_SHARE = g.quest_credits, g.QUEST_MIN_CREDITS, g.QUEST_CAMPUS_SHARE
 
 
 def campus_level(conn, hid) -> int:

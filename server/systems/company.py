@@ -1042,12 +1042,13 @@ def streak_status(row, now=None) -> dict:
     going = last in {(today - datetime.timedelta(days=d)).isoformat() for d in range(3)}
     current = row["streak_day"] if going else 0
     day = current if claimed else current + 1
-    return {"day": day, "current": current, "claimed": claimed, "credits": g.streak_reward(day),
+    return {"day": day, "current": current, "claimed": claimed,
+            "credits": g.streak_reward(day, row["campus_level"]),
             "materials": g.streak_materials(day)}
 
 
 def install_streak(api) -> None:
-    """Login streak (plan section 10): credits + books every day you claim; it grows at days 7, 14
+    """Login streak (plan section 10): quest rewards + books every day you claim; it grows at days 7, 14
     and 30 and stays at the day-30 reward; two missed days in a row reset it."""
 
     @api.endpoint("/api/v3/streak")
@@ -1055,7 +1056,8 @@ def install_streak(api) -> None:
         with econ.tx(conn):
             row = collect(conn, hid)
         return {"err": 0, **streak_status(row),
-                "table": [{"from": d, "credits": c, "materials": g.streak_materials(d)} for d, c in g.STREAK_REWARD]}
+                "table": [{"from": d, "credits": g.streak_reward(d, row["campus_level"]), "materials": g.streak_materials(d)}
+                          for d, _ in g.STREAK_REWARD]}
 
     @api.endpoint("/api/v3/streak/claim")
     def streak_claim(conn, hid, form):

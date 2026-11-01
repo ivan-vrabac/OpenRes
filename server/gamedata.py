@@ -368,13 +368,21 @@ def dark_matter_cost_mg(level: int) -> int:
 
 
 # ── Login streak ───────────────────────────────────────────────────────────────────────────────
-STREAK_REWARD = [(1, 20_000), (7, 60_000), (14, 150_000), (30, 400_000)]   # day reached -> credits a day
+# owner 2026-11-01: quest rewards instead of fixed credits, so it's worth the same at every Campus level
+STREAK_REWARD = [(1, 1), (7, 1.25), (14, 1.5), (30, 2)]   # day reached -> quest rewards a day
+QUEST_CAMPUS_SHARE = 0.002                           # a quest reward: this share of the next Campus level
+QUEST_MIN_CREDITS = 5000
 # ... and materials (plan: "credits + materials"): books, which supervisor education needs
 STREAK_MATERIALS = [(1, {"books": 10}), (7, {"books": 50}), (14, {"books": 150}), (30, {"books": 500})]
 
 
-def streak_reward(day: int) -> int:
-    return [c for d, c in STREAK_REWARD if day >= d][-1]
+def quest_credits(campus_level: int) -> int:
+    nxt = campus_upgrade(min(max(1, campus_level), CAMPUS_MAX - 1))["credits"]
+    return max(QUEST_MIN_CREDITS, int(round(nxt * QUEST_CAMPUS_SHARE, -2)))
+
+
+def streak_reward(day: int, campus_level: int) -> int:
+    return int(quest_credits(campus_level) * [c for d, c in STREAK_REWARD if day >= d][-1])
 
 
 def streak_materials(day: int) -> dict:

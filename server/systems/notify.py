@@ -96,19 +96,19 @@ def due(conn, now) -> list:
     out = []
     for r in conn.execute("SELECT id, hid, to_step FROM co_education WHERE finish_at<=? AND finish_at>?", (nowi, day_ago)):
         name = g.EDUCATION.get(r["to_step"], ("education",))[0]
-        out.append((f"edu:{r['id']}", r["hid"], "education_done", "Education finished",
-                    f"A supervisor finished the {name}. Put them on a good hex."))
+        out.append((f"edu:{r['id']}", r["hid"], "education_done", "Supervisor trained",
+                    f"A supervisor finished the {name}. Appoint them on your best hex."))
     soon = (now + datetime.timedelta(days=LEASE_WARN_DAYS)).isoformat()
     for hid, n in conn.execute("SELECT hid, COUNT(*) FROM co_hexes WHERE op!='campus' AND lease_until>? AND lease_until<=? "
                                "GROUP BY hid", (nowi, soon)):
         out.append((f"lease:{hid}:{today}", hid, "lease_ending", "Leases ending soon",
-                    f"{n} hex lease{'s end' if n > 1 else ' ends'} within {LEASE_WARN_DAYS} days. Renew in Hexes "
-                    "or the hexes are lost."))
+                    f"{n} hex lease{'s end' if n > 1 else ' ends'} within {LEASE_WARN_DAYS} days. "
+                    "Renew in Hexes to keep them."))
     for r in conn.execute("SELECT hid, started_at FROM co_moves"):
         arrived = co.parse(r["started_at"]) + datetime.timedelta(hours=g.MOVE_HOURS)
         if now - datetime.timedelta(days=1) < arrived <= now:
-            out.append((f"move:{r['hid']}:{r['started_at']}", r["hid"], "campus_arrived", "Your Campus moved",
-                        "Your Campus is at its new place and your plants are working again."))
+            out.append((f"move:{r['hid']}:{r['started_at']}", r["hid"], "campus_arrived", "Your Campus has moved",
+                        "It's at its new place and your plants are running again."))
     levels = dict(conn.execute("SELECT hid, storage_level FROM co_state"))
     high = dict(conn.execute("SELECT hid, threshold FROM notif_kinds WHERE kind='storage_high' AND threshold IS NOT NULL"))
     for hid, used in conn.execute("SELECT hid, SUM(CASE item WHEN 'electricity' THEN qty / 1000.0 WHEN 'ta180m' THEN 0 "
@@ -118,10 +118,10 @@ def due(conn, now) -> list:
         cap = g.storage_capacity(levels[hid])
         if used >= cap - 0.5:
             out.append((f"full:{hid}:{today}", hid, "storage_full", "Central Storage is full",
-                        "Hexes and plants can't add to it. Sell something or upgrade the storage."))
+                        "Your hexes and plants have stopped. Sell something or upgrade it."))
         elif used >= cap * high.get(hid, STORAGE_HIGH_DEFAULT) / 100:
             out.append((f"high:{hid}:{today}", hid, "storage_high", "Central Storage is filling up",
-                        f"It is {int(used * 100 / cap)} % full. Sell something or upgrade the storage."))
+                        f"It's {int(used * 100 / cap)} % full. Sell something or upgrade it soon."))
     return out
 
 

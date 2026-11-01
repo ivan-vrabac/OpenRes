@@ -577,13 +577,11 @@ class _PerformancePageState extends State<_PerformancePage> {
       body: ListView(children: [
         _settingsSectionHeader('Display'),
         SwitchListTile(
-          dense: true,
           title: const Text('No FPS limit'),
           subtitle: Text('Run at the fastest refresh rate of the screen'
               '${_maxHz == null ? '' : ' (${_maxHz!.round()} Hz)'}. Smoother, uses more battery.',
-              style: TextStyle(fontSize: 11, color: AppColors.t38)),
+              style: TextStyle(fontSize: 12, color: AppColors.t54)),
           value: kNoFpsLimit,
-          activeColor: AppColors.accent,
           onChanged: _setNoFpsLimit,
         ),
         _settingsSectionHeader('GPS'),
@@ -625,7 +623,7 @@ class _PerformancePageState extends State<_PerformancePage> {
               title: const Text('Activity recognition (best accuracy)', style: TextStyle(fontSize: 13)),
               subtitle: Text('Knows when you stand, walk or ride a bus or car and tunes the GPS for it. '
                   'Asks for the "Physical activity" permission.',
-                  style: TextStyle(fontSize: 11, color: AppColors.t38)),
+                  style: TextStyle(fontSize: 12, color: AppColors.t54)),
               value: LocationService.instance.useActivity,
               onChanged: _setActivity,
             ),
@@ -967,12 +965,10 @@ class _NotificationsPageState extends State<_NotificationsPage> {
       appBar: AppBar(toolbarHeight: 36, title: const Text('Notifications')),
       body: ListView(children: [
         SwitchListTile(
-          dense: true,
           title: const Text('Enable notifications'),
           subtitle: Text('Master on/off for all game alerts',
-              style: TextStyle(fontSize: 11, color: AppColors.t38)),
+              style: TextStyle(fontSize: 12, color: AppColors.t54)),
           value: _enabled,
-          activeColor: AppColors.accent,
           onChanged: (v) async {
             setState(() { _enabled = v; kNotifEnabled = v; });
             await _set('notif_enabled', v);

@@ -105,7 +105,7 @@ class Player:
     # ── once a day when playing ──
     def play(self, hour: int, day: int) -> None:
         self.streak += 1
-        self.credits += g.streak_reward(self.streak)
+        self.credits += g.streak_reward(self.streak, self.campus)
         if day % self.p["visit_every"] == 0:
             self.last_visit = hour
         for _ in range(self.p["surveys_per_play"]):

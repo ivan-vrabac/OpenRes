@@ -216,7 +216,7 @@ def install(api) -> None:
             conn.execute("UPDATE market_orders SET qty_open=0, escrow=0, status='filled' WHERE id=?", (o["id"],))
             if getattr(h, "notify", None):
                 h.notify(o["hid"], "order_filled", "Buy order filled",
-                         f"Your buy order for {int(o['qty_total']):,} {g.ITEM_NAMES[o['item']].lower()} was filled.")
+                         f"You bought {int(o['qty_total']):,} {g.ITEM_NAMES[o['item']].lower()}. It's in Central Storage.")
         else:
             conn.execute("UPDATE market_orders SET qty_open=?, escrow=? WHERE id=?", (new_open, new_escrow, o["id"]))
         record(conn, "player", o["item"], qty, o["price"], o["hid"], seller_hid, tax + sales_tax, buy_order=o["id"],
