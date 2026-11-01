@@ -95,7 +95,8 @@ extension _MapSheets on _MapTabState {
                     style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
               ),
             const SizedBox(height: 14),
-            SlideToConfirm(
+            // half as wide, in the middle (owner 2026-11-01): a long swipe for every hex wears players out
+            Center(child: FractionallySizedBox(widthFactor: 0.5, child: SlideToConfirm(
               label: 'Build here',
               sublabel: 'ꞓ${fmtNum(cost)}',
               icon: Icons.construction,
@@ -111,7 +112,7 @@ extension _MapSheets on _MapTabState {
                 }
                 _buildMine({'item': item, 'op': op}, buildAt: target, curPos: freshPos);
               },
-            ),
+            ))),
             const SizedBox(height: 4),
             Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel'))),
           ]),
