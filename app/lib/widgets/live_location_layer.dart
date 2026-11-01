@@ -14,7 +14,7 @@ class LiveLocationLayer extends StatefulWidget {
   final Widget Function(double? heading) marker;
   final double size;
   final void Function(LatLng pos)? onFrame;
-  const LiveLocationLayer({super.key, required this.marker, this.size = 96, this.onFrame});
+  const LiveLocationLayer({super.key, required this.marker, this.size = 44, this.onFrame});
 
   @override
   State<LiveLocationLayer> createState() => _LiveLocationLayerState();

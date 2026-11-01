@@ -88,18 +88,13 @@ class _PosCrosshairPainter extends CustomPainter {
         smallPaint,
       );
     }
-    // the way you face: a beam fading out from the marker, like Google Maps
+    // White heading tick — slightly longer, drawn on top
     if (headingDeg != null) {
       final a = headingDeg! * math.pi / 180 - math.pi / 2;
-      const half = 0.45, r = 46.0;
-      final c = Offset(cx, cy);
-      canvas.drawPath(
-        Path()
-          ..moveTo(cx, cy)
-          ..arcTo(Rect.fromCircle(center: c, radius: r), a - half, half * 2, false)
-          ..close(),
-        Paint()..shader = RadialGradient(colors: [Colors.white.withValues(alpha: 0.75), Colors.white.withValues(alpha: 0)])
-            .createShader(Rect.fromCircle(center: c, radius: r)),
+      canvas.drawLine(
+        Offset(cx + innerR * math.cos(a), cy + innerR * math.sin(a)),
+        Offset(cx + (outerR + 3) * math.cos(a), cy + (outerR + 3) * math.sin(a)),
+        Paint()..color = Colors.white..strokeWidth = 1.5..style = PaintingStyle.stroke,
       );
     }
     // Yellow center dot
