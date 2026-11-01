@@ -121,9 +121,9 @@ def pick(hid: str, day: str, codes) -> list:
 def can_renew(conn, hid, now) -> bool:
     """Could this company renew a lease before today's quests end? (owner 2026-11-01: a company with
     no hex, or only freshly renewed ones, must not get a quest it can't do)"""
-    from .company import renew_wait_hours
+    from .company import parse, renew_wait_hours
     left = (_midnight_after(now) - now).total_seconds() / 3600
-    return any(renew_wait_hours(r[0], now) <= left for r in conn.execute(
+    return any(renew_wait_hours(parse(r[0]), now) <= left for r in conn.execute(
         "SELECT lease_until FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)))
 
 

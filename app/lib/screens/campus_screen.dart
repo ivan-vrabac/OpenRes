@@ -414,7 +414,8 @@ class _CampusScreenState extends State<CampusScreen> {
     return out;
   }
 
-  // ── Supervisors: one ladder, how many on each step and the education to the next ──
+  // ── Supervisors: only the steps that mean something now (owner 2026-11-01: seeing all of them was too
+  // much), the whole ladder behind the info button ──
   Widget _supervisorsCard(Company co) {
     final s = _sups;
     if (s == null) {
@@ -461,22 +462,24 @@ class _CampusScreenState extends State<CampusScreen> {
       );
     }
 
+    int count(int k) => k < byStep.length ? byStep[k] : 0;
+    int ready(int k) => k == 0 ? 0 : count(k - 1) - (queuedFor[k] ?? 0);
+
     Widget rung(int k) {
       final st = steps[k];
       final boost = ((st['boost'] as num) * 100).round();
-      final count = k < byStep.length ? byStep[k] : 0;
-      String? detail, why;
+      final n = count(k);
+      final trainable = ready(k) > 0;
+      String? line;                        // what it costs, or why it can't start yet
       var can = false;
-      if (k > 0) {
-        final ready = byStep[k - 1] - (queuedFor[k] ?? 0);
+      if (trainable) {
         final needBooks = (st['books'] as num).toDouble();
         final cost = (st['credits'] as num).toDouble();
-        detail = '${_hours(st['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)}';
-        why = ready <= 0 ? 'No one ready for this'
-            : queue.length >= slots ? 'Education queue is full'
+        final why = queue.length >= slots ? 'Education queue is full'
             : books < needBooks ? 'Needs ${fmtNum(needBooks)} books, you have ${fmtNum(books)}'
-            : co.credits < cost ? 'Not enough credits'
+            : co.credits < cost ? 'Needs ${fmtCredits(cost)}'
             : null;
+        line = why ?? '${_hours(st['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)}';
         can = why == null && !_busy;
       }
       return Padding(
@@ -485,19 +488,18 @@ class _CampusScreenState extends State<CampusScreen> {
           Container(
             width: 34, height: 34, alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: count > 0 ? AppColors.accent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
+              color: n > 0 ? AppColors.accent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
               shape: BoxShape.circle,
             ),
-            child: Text('$count', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
-                color: count > 0 ? AppColors.accent : AppColors.t38)),
+            child: Text('$n', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
+                color: n > 0 ? AppColors.accent : AppColors.t38)),
           ),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${st['name']}  +$boost %', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            if (detail != null) Text(detail, style: TextStyle(fontSize: 11, color: AppColors.t54)),
-            if (why != null) Text(why, style: TextStyle(fontSize: 11, color: AppColors.t38)),
+            if (line != null) Text(line, style: TextStyle(fontSize: 11, color: AppColors.t54)),
           ])),
-          if (k > 0)
+          if (trainable)
             OutlinedButton(
               onPressed: can ? () => _educate(k) : null,
               style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -508,13 +510,51 @@ class _CampusScreenState extends State<CampusScreen> {
     }
 
     return _panel(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('A supervisor on a hex makes it produce more, and education makes them better. Every Campus '
-          'level brings 10 more. Appoint them from a hex or the Hexes list.',
-          style: TextStyle(fontSize: 11, color: AppColors.t38)),
-      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: Text('Appoint them from a hex or the Hexes list.', style: TextStyle(fontSize: 12, color: AppColors.t54))),
+        IconButton(
+          icon: Icon(Icons.info_outline, size: 20, color: AppColors.accent),
+          tooltip: 'How education works',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _supervisorInfo(steps),
+        ),
+      ]),
+      const SizedBox(height: 6),
       for (var i = 0; i < queue.length; i++) learning(queue[i], i == 0),
-      for (var k = 0; k < steps.length; k++) rung(k),
+      for (var k = 0; k < steps.length; k++)
+        if (count(k) > 0 || ready(k) > 0) rung(k),
     ]));
+  }
+
+  /// The whole ladder, for whoever wants to plan ahead.
+  void _supervisorInfo(List<Map<String, dynamic>> steps) {
+    showAppSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Supervisors', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          const SizedBox(height: 8),
+          Text('A supervisor on a hex makes it produce more, and education makes them better. Every Campus level '
+              'brings 10 more. Education needs books and credits, and each step starts from the one before.',
+              style: TextStyle(fontSize: 13, color: AppColors.t60)),
+          const SizedBox(height: 12),
+          for (var k = 0; k < steps.length; k++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(child: Text('${steps[k]['name']}  +${((steps[k]['boost'] as num) * 100).round()} %',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                if (k > 0) Text('${_hours(steps[k]['hours'] as num)} · ${fmtNum(steps[k]['books'] as num)} books · '
+                    '${fmtCredits((steps[k]['credits'] as num).toDouble())}',
+                    style: TextStyle(fontSize: 11, color: AppColors.t54)),
+              ]),
+            ),
+          Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
+        ]),
+      )),
+    );
   }
 
   // ── Dark matter research: the endgame, once every supervisor is fully educated ──

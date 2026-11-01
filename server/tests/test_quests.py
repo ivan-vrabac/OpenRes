@@ -209,6 +209,9 @@ def test_quests_of_an_older_list_are_dealt_again():
     assert all(q["code"] in quests.POOL for q in r["quests"])
 
 
+Q_PATH = "/api/v1/quests"
+
+
 def test_no_renew_quest_without_a_hex_to_renew():
     from systems import quests as Q
     import econ
@@ -236,4 +239,20 @@ def test_a_stuck_renew_quest_becomes_another_quest():
         codes = [r[0] for r in conn.execute("SELECT code FROM daily_quests WHERE hid=? AND day=?", (hid, day))]
         assert "renew" not in codes and len(set(codes)) == Q.DAILY_COUNT
         conn.rollback()
+
+
+def test_renew_quest_needs_a_lease_that_can_be_renewed_today():
+    from systems import quests as Q
+    hid, sid = new_player("HasHex")[:2]
+    now = econ.utcnow().replace(hour=12)
+    far = (now + datetime.timedelta(days=89, hours=23)).isoformat()         # renewed a moment ago
+    old = (now + datetime.timedelta(days=60)).isoformat()                   # renewable for a long time
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                     "VALUES(?,1,1,'farm','wheat',50,?,?)", (hid, now.isoformat(), old))
+        assert "renew" in Q.available(conn, hid, now)
+        conn.execute("UPDATE co_hexes SET lease_until=? WHERE hid=?", (far, hid))
+        assert Q.can_renew(conn, hid, now) is False
+        conn.rollback()
+    assert "err" in call(Q_PATH, sid)                                       # the quest list itself answers
 

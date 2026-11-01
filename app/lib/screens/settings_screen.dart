@@ -153,11 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         RowGroup([
           _tile(Icons.notifications_outlined, 'Notifications', 'What the game tells you about',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _NotificationsPage()))),
-          _tile(Icons.school_outlined, 'Tutorial', 'See the first steps again', () {
-            tutorialAsked.value = true;
-            popIfCurrent(context);
-            AppNotify.show(context, 'The tutorial opens on the map');
-          }),
+          _tile(Icons.school_outlined, 'Tutorial', 'See the first steps again', () => tutorialAsked.value = true),
           _tile(Icons.speed, 'Performance', 'Frame rate · GPS',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _PerformancePage()))),
           if (UpdateService.supported)

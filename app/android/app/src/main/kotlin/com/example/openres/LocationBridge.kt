@@ -166,12 +166,16 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         return o
     }
 
+    private val TRUSTED_DEGREES = 45.0
+
     private inner class HeadingStream : EventChannel.StreamHandler {
         private var fop: DeviceOrientationListener? = null
         private var sensor: SensorEventListener? = null
         private val exec = Executors.newSingleThreadExecutor()
         private var lastSent = 0L
         private var lastLogged = 0L
+        private var lastTrusted = 0L             // the last reading of the provider good enough to use
+        private var watch: Runnable? = null
 
         override fun onListen(args: Any?, sink: EventChannel.EventSink) {
             fun send(deg: Double, err: Double) {
@@ -184,17 +188,26 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             if (playServices()) {
                 try {
                     val l = DeviceOrientationListener { o ->
-                        send(o.headingDegrees.toDouble(),
-                            if (o.hasConservativeHeadingErrorDegrees()) o.conservativeHeadingErrorDegrees.toDouble()
-                            else o.headingErrorDegrees.toDouble())
+                        val err = if (o.hasConservativeHeadingErrorDegrees()) o.conservativeHeadingErrorDegrees.toDouble()
+                            else o.headingErrorDegrees.toDouble()
+                        if (err <= TRUSTED_DEGREES) lastTrusted = System.currentTimeMillis()
+                        // a bad reading must not overwrite the phone's compass
+                        if (err <= TRUSTED_DEGREES || sensor == null) send(o.headingDegrees.toDouble(), err)
                     }
                     LocationServices.getFusedOrientationProviderClient(ctx).requestOrientationUpdates(
                         DeviceOrientationRequest.Builder(DeviceOrientationRequest.OUTPUT_PERIOD_DEFAULT).build(), exec, l)
                         .addOnFailureListener { startSensor(::send) }
                     fop = l
-                    // owner 2026-11-01: the provider accepted the request and never sent one reading:
-                    // without a reading soon, the phone's own compass takes over
-                    main.postDelayed({ if (fop === l && lastSent == 0L) startSensor(::send) }, 3000)
+                    // owner 2026-11-01: the provider sent one reading "off by up to 180 degrees" and then
+                    // nothing: while it has nothing usable, the phone's own compass takes over
+                    watch = object : Runnable {
+                        override fun run() {
+                            if (fop !== l) return
+                            if (sensor == null && System.currentTimeMillis() - lastTrusted > 3000) startSensor(::send)
+                            main.postDelayed(this, 3000)
+                        }
+                    }
+                    main.postDelayed(watch!!, 3000)
                     return
                 } catch (_: Exception) { }
             }
@@ -210,7 +223,10 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
                 override fun onSensorChanged(e: SensorEvent) {
                     SensorManager.getRotationMatrixFromVector(rot, e.values)
                     SensorManager.getOrientation(rot, ori)
-                    send((Math.toDegrees(ori[0].toDouble()) + 360) % 360, 30.0)   // magnetic north
+                    if (System.currentTimeMillis() - lastTrusted < 3000) return    // the provider is doing fine
+                    // its own estimate of the error, in radians, when it has one (-1: it has none)
+                    val err = if (e.values.size > 4 && e.values[4] >= 0) Math.toDegrees(e.values[4].toDouble()) else 30.0
+                    send((Math.toDegrees(ori[0].toDouble()) + 360) % 360, err)    // magnetic north
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
@@ -218,6 +234,8 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         }
 
         override fun onCancel(args: Any?) {
+            watch?.let { main.removeCallbacks(it) }
+            watch = null
             fop?.let { LocationServices.getFusedOrientationProviderClient(ctx).removeOrientationUpdates(it) }
             fop = null
             sensor?.let { (ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager).unregisterListener(it) }

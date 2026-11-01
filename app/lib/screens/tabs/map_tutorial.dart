@@ -26,49 +26,47 @@ extension _MapTutorial on _MapTabState {
             'A lease lasts 2,160 hours, so aim well below that, because sales tax takes a part when you sell.'),
         const TutorialStep('Hexes',
             'The Hexes tab lists everything you lease. Keep enough credits to renew: a hex is gone when its lease ends. '
-            'Cancelling a lease destroys the hex and gives back 30 % of the lease that is left.'),
+            'Cancelling a lease destroys the hex and gives back 30 % of the lease that is left.', null, GameTabId.mines),
         const TutorialStep('Storage',
             'Hexes work around the clock and fill Central Storage. It has one total for all items, so upgrade it as you grow. '
-            'When it is full, production stops. You can sell from here too.'),
+            'When it is full, production stops. You can sell from here too.', null, GameTabId.warehouse),
         const TutorialStep('Market',
             'Sell to the best buy orders or to the system, or place your own buy orders. The seller pays 5 to 25 % sales tax, '
-            'lowest on items few companies make, so a rare resource can pay better than a popular one. Buying is tax-free.'),
+            'lowest on items few companies make, so a rare resource can pay better than a popular one. Buying is tax-free.', null, GameTabId.market),
         const TutorialStep('Campus',
             'Your Campus has 50 levels. Each one costs credits and materials from Storage, and unlocks new resources and plants. '
-            'Visit it once a week, standing within 200 m: every missed week lowers your output by 10 %, down to 30 %.'),
+            'Visit it once a week, standing within 200 m: every missed week lowers your output by 10 %, down to 30 %.', null, GameTabId.specialBuildings),
         const TutorialStep('Supervisors',
-            'Every Campus level gives 10 supervisors. Appoint one on a hex to make it produce more, and educate them with books and credits to raise it further. Put the best ones on your best hexes.'),
+            'Every Campus level gives 10 supervisors. Appoint one on a hex to make it produce more, and educate them with books and credits to raise it further. Put the best ones on your best hexes.', null, GameTabId.specialBuildings),
         const TutorialStep('Production',
             'Plants sit inside your Campus and turn raw materials into goods worth more, like wood into lumber into furniture. '
-            'They need their inputs and electricity in Storage, so make power with solar farms, wind farms or a power plant.'),
+            'They need their inputs and electricity in Storage, so make power with solar farms, wind farms or a power plant.', null, GameTabId.factories),
         const TutorialStep('Quests',
             'You get 3 quests a day. Finish all of them every day for a streak, with bonuses every 7 and 30 days. One missed day is forgiven, two end it. '
-            'The daily reward works the same way.'),
+            'The daily reward works the same way.', null, GameTabId.quests),
         const TutorialStep('Leaderboards',
-            'Open them from your profile card in More. Compete on company value, Campus, hexes, output, countries and Tantalum. Value and Campus count how active you are, so a company that stops playing slides down.'),
+            'Open them from your profile card in More. Compete on company value, Campus, hexes, output, countries and Tantalum. Value and Campus count how active you are, so a company that stops playing slides down.', null, GameTabId.leaderboard),
         const TutorialStep('Tantalum-180m',
             'The endgame, from Campus level 40: an Isotope lab turns tantalum and supercomputers into Tantalum-180m. It cannot be sold. '
-            'Put it into dark matter research: every level adds 1 % output to everything.'),
+            'Put it into dark matter research: every level adds 1 % output to everything.', null, GameTabId.luxury),
         const TutorialStep('More',
-            'The More tab holds every other page, plus Settings. In Settings you can pin your favourite tabs to the bottom bar, and see this tutorial again.'),
+            'The More tab holds every other page, plus Settings. In Settings you can pin your favourite tabs to the bottom bar, and see this tutorial again.', null, null, true),
       ];
 
-  void _onTutorialAsked() {
-    if (!tutorialAsked.value || !mounted) return;
-    tutorialAsked.value = false;
-    StorageService.saveTutorial(0).then((_) => _maybeTutorial());
+  void _onTutorialStart() {
+    if (mounted) StorageService.saveTutorial(0).then((_) => _maybeTutorial());
   }
 
   Future<void> _maybeTutorial() async {
-    if (!mounted || _tutorial != null) return;
+    if (!mounted || tutorialRun.value != null) return;
     final seen = await StorageService.getTutorial();
     if (!mounted) return;
     final steps = !_co.hasCampus ? (seen < 1 ? _welcomeSteps : null) : (seen < 2 ? _gameSteps : null);
-    if (steps != null) _update(() => _tutorial = steps);
+    if (steps != null) tutorialRun.value = TutorialRun(steps, _tutorialDone);
   }
 
   void _tutorialDone() {
     StorageService.saveTutorial(_co.hasCampus ? 2 : 1);
-    _update(() => _tutorial = null);
+    tutorialRun.value = null;
   }
 }

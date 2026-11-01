@@ -1,22 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
+import '../models/tab_config.dart';
 
-/// Settings › Tutorial: show it again.
+/// Settings › Tutorial: show it again (the game screen goes back to the map, then says [tutorialStart]).
 final tutorialAsked = ValueNotifier<bool>(false);
+final tutorialStart = ValueNotifier<int>(0);
+
+/// The tutorial running now. The map writes the steps, the game screen shows them over all the tabs.
+final tutorialRun = ValueNotifier<TutorialRun?>(null);
+
+class TutorialRun {
+  final List<TutorialStep> steps;
+  final VoidCallback onDone;
+  const TutorialRun(this.steps, this.onDone);
+}
 
 class TutorialStep {
   final String title, text;
   final GlobalKey? target;                 // what this step is about, lit up on the darkened screen
-  const TutorialStep(this.title, this.text, [this.target]);
+  final GameTabId? tab;                    // the tab it talks about (none: the map)
+  final bool more;                         // the More tab, which has no id
+  const TutorialStep(this.title, this.text, [this.target, this.tab, this.more = false]);
 }
 
-/// The first steps for a new player (owner 2026-11-01), one card at a time over the map. It can always be
-/// skipped, and the map underneath waits: this explains, the player then does it for real.
+/// The first steps for a new player (owner 2026-11-01), one card at a time. It can always be skipped. It
+/// covers the whole game, tab bar too: the tabs change with the cards, and only with the cards.
 class TutorialOverlay extends StatefulWidget {
   final List<TutorialStep> steps;
   final VoidCallback onDone;
-  const TutorialOverlay({super.key, required this.steps, required this.onDone});
+  final void Function(TutorialStep step)? onStep;
+  const TutorialOverlay({super.key, required this.steps, required this.onDone, this.onStep});
 
   @override
   State<TutorialOverlay> createState() => _TutorialOverlayState();
@@ -36,12 +50,20 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });   // the hole needs layout
+    _show();
   }
 
   void _go(int to) {
     if (to >= widget.steps.length) return widget.onDone();
     setState(() => _i = to);
+    _show();
+  }
+
+  void _show() {
+    widget.onStep?.call(widget.steps[_i]);
+    // the hole needs the layout, and a tab change has to finish first
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
+    Future.delayed(const Duration(milliseconds: 350), () { if (mounted) setState(() {}); });
   }
 
   @override

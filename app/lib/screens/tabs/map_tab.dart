@@ -38,6 +38,7 @@ import '../../v3/hex_sheet.dart';
 import '../../app_colors.dart';
 import '../../widgets/popups.dart';
 import '../../services/storage_service.dart';
+import '../../models/tab_config.dart';
 import '../../widgets/tutorial.dart';
 
 part 'map_actions.dart';
@@ -87,7 +88,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   final _resourceBtnKey = GlobalKey();
   final _surveyBtnKey = GlobalKey();
   final _buildBtnKey = GlobalKey();
-  List<TutorialStep>? _tutorial;
   double _surveyRadius = 5000;         // chosen in the survey settings (clamped by the Campus level)
 
   static const _kCategories = ['Raw ores', 'Forestry', 'Agriculture', 'Livestock', 'Fish', 'Power'];
@@ -156,7 +156,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    tutorialAsked.addListener(_onTutorialAsked);
+    tutorialStart.addListener(_onTutorialStart);
     WidgetsBinding.instance.addObserver(this);
     _makePuff();
     _initLocation();
@@ -249,7 +249,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    tutorialAsked.removeListener(_onTutorialAsked);
+    tutorialStart.removeListener(_onTutorialStart);
     WidgetsBinding.instance.removeObserver(this);
     mapFocus.removeListener(_onMapFocus);
     campusMoveAsked.removeListener(_onMoveAsked);
@@ -1055,7 +1055,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
             ),
           ),
         ),
-      if (_tutorial != null) TutorialOverlay(steps: _tutorial!, onDone: _tutorialDone),
     ]);
   }
 

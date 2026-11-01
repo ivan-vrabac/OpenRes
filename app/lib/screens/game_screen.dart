@@ -18,6 +18,7 @@ import '../services/integrity.dart';
 import '../widgets/cards.dart';
 import '../widgets/glass.dart';
 import '../widgets/player_hud.dart';
+import '../widgets/tutorial.dart';
 import 'tabs/map_tab.dart';
 import 'tabs/hexes_tab.dart';
 import 'tabs/warehouse_tab.dart';
@@ -107,6 +108,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     ScreenMode.apply();
     _pageCtrl = PageController(initialPage: 1);
+    tutorialAsked.addListener(_onTutorialAsked);
     mapFocus.addListener(_toMap);
     campusMoveAsked.addListener(_toMap);
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) Company.active.value = _company; });
@@ -146,6 +148,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     });
     PlayGames.stop();
     IntegrityCheck.stop();
+    tutorialAsked.removeListener(_onTutorialAsked);
+    WidgetsBinding.instance.addPostFrameCallback((_) => tutorialRun.value = null);
     mapFocus.removeListener(_toMap);
     campusMoveAsked.removeListener(_toMap);
     WidgetsBinding.instance.removeObserver(this);
@@ -260,6 +264,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _syncGps();
   }
 
+  /// The tab a tutorial card talks about; one that isn't on the bar is under More.
+  void _tutorialTab(TutorialStep step) {
+    if (step.more) {
+      _goToTab(_totalTabs - 1);
+    } else {
+      _toTab(step.tab ?? GameTabId.map);
+    }
+  }
+
+  void _toTab(GameTabId id) {
+    final i = _config.bottomTabs.indexOf(id);
+    _goToTab(i >= 0 ? i : _totalTabs - 1);
+  }
+
+  /// Settings › Tutorial: back on the map, whatever was open, and it starts there.
+  void _onTutorialAsked() {
+    if (!tutorialAsked.value || !mounted) return;
+    tutorialAsked.value = false;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    _toTab(GameTabId.map);
+    tutorialStart.value++;
+  }
+
   void _goToTab(int index) {
     if (index == _currentIndex) return;
     _pageCtrl.animateToPage(
@@ -315,7 +342,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     return AnimatedBuilder(
       animation: Listenable.merge([UiLook.all, ScreenMode.changed]),
-      builder: (context, _) => _scaffold(context, cs),
+      builder: (context, _) => Stack(children: [
+        Positioned.fill(child: _scaffold(context, cs)),
+        // over everything, tab bar too: while it runs only its cards change the tab
+        ValueListenableBuilder<TutorialRun?>(valueListenable: tutorialRun, builder: (_, run, __) => run == null
+            ? const SizedBox.shrink()
+            : TutorialOverlay(steps: run.steps, onStep: _tutorialTab, onDone: () {
+                _toTab(GameTabId.map);
+                run.onDone();
+              })),
+      ]),
     );
   }
 
