@@ -11,7 +11,7 @@ import '../services/location_service.dart';
 /// Provider) and turns smoothly (no accuracy circle, owner 2026-10-25). [onFrame] gets the shown
 /// position every frame it changes, so the map can follow it just as smoothly.
 class LiveLocationLayer extends StatefulWidget {
-  final Widget Function(double? heading) marker;
+  final Widget Function(double? heading, bool sure) marker;
   final double size;
   final void Function(LatLng pos)? onFrame;
   const LiveLocationLayer({super.key, required this.marker, this.size = 44, this.onFrame});
@@ -27,6 +27,7 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
   late final Ticker _ticker = createTicker(_tick);
   LatLng? _shown;
   double? _head;
+  bool _sure = true;
   Duration _last = Duration.zero;
 
   @override
@@ -61,12 +62,15 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
         moved = true;
       }
     }
-    // the compass while Google trusts it, else the direction of travel, else no direction: an
-    // uncalibrated compass points anywhere (owner 2026-11-01), and no tick beats a wrong one
-    final h = (_svc.headingError <= _kCompassMaxError ? _svc.heading.value : null) ?? f.course;
+    // the compass while it's sure, else the direction of travel, else the compass anyway, shown faded:
+    // an uncalibrated compass can be far off, but a direction that vanishes looks broken (owner 2026-11-01)
+    final compass = _svc.heading.value;
+    final sure = compass != null && _svc.headingError <= _kCompassMaxError;
+    final h = sure ? compass : f.course ?? compass;
     var turned = false;
-    if (h == null && _head != null) {
-      _head = null;
+    final trusted = sure || (h != null && f.course != null);
+    if (trusted != _sure) {
+      _sure = trusted;
       turned = true;
     }
     if (h != null) {
@@ -88,7 +92,7 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
     if (p == null || _svc.fix.value == null) return const SizedBox.shrink();
     // no accuracy circle (owner 2026-10-25: not needed)
     return MarkerLayer(markers: [
-      Marker(point: p, width: widget.size, height: widget.size, child: widget.marker(_head)),
+      Marker(point: p, width: widget.size, height: widget.size, child: widget.marker(_head, _sure)),
     ]);
   }
 }

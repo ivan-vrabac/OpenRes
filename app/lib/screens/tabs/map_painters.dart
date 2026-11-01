@@ -53,7 +53,8 @@ class _HexOutlinePainter extends CustomPainter {
 
 class _PosCrosshairPainter extends CustomPainter {
   final double? headingDeg;
-  const _PosCrosshairPainter({this.headingDeg});
+  final bool sure;                         // false: an uncalibrated compass, drawn faded
+  const _PosCrosshairPainter({this.headingDeg, this.sure = true});
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
@@ -94,7 +95,7 @@ class _PosCrosshairPainter extends CustomPainter {
       canvas.drawLine(
         Offset(cx + innerR * math.cos(a), cy + innerR * math.sin(a)),
         Offset(cx + (outerR + 3) * math.cos(a), cy + (outerR + 3) * math.sin(a)),
-        Paint()..color = Colors.white..strokeWidth = 1.5..style = PaintingStyle.stroke,
+        Paint()..color = Colors.white.withValues(alpha: sure ? 1 : 0.4)..strokeWidth = 1.5..style = PaintingStyle.stroke,
       );
     }
     // Yellow center dot
@@ -102,7 +103,7 @@ class _PosCrosshairPainter extends CustomPainter {
         Paint()..color = Colors.yellow..style = PaintingStyle.fill);
   }
   @override
-  bool shouldRepaint(_PosCrosshairPainter old) => old.headingDeg != headingDeg;
+  bool shouldRepaint(_PosCrosshairPainter old) => old.headingDeg != headingDeg || old.sure != sure;
 }
 
 // ── Thin red crosshair painter ────────────────────────────────────────────────
