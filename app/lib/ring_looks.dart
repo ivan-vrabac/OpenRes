@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_colors.dart';
+
 /// How a map ring looks (owner 2026-10-24): shown or hidden, colour, opacity, filled or not.
 /// Rings are always plain circles (owner: no dotted/dashed lines).
 class RingLook {
@@ -63,12 +65,13 @@ Future<void> saveRingLook(String key) async {
 /// line-style experiment), filled or not.
 CircleMarker ringCircle(LatLng c, double radiusM, String key) {
   final look = kRingLooks[key]!;
+  final color = key == 'local' ? AppColors.accent : look.color;    // the build range: the App Appearance colour
   return CircleMarker(
     point: c,
     radius: radiusM,
     useRadiusInMeter: true,
-    color: look.fill ? look.color.withValues(alpha: look.opacity * 0.12) : Colors.transparent,
-    borderColor: look.color.withValues(alpha: look.opacity.clamp(0.15, 1.0)),
+    color: look.fill ? color.withValues(alpha: look.opacity * 0.12) : Colors.transparent,
+    borderColor: color.withValues(alpha: look.opacity.clamp(0.15, 1.0)),
     borderStrokeWidth: 1.6,
   );
 }

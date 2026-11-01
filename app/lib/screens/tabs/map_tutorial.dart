@@ -7,7 +7,7 @@ extension _MapTutorial on _MapTabState {
         const TutorialStep('Welcome to OpenRes',
             'The real world is your map. You run a company: find good land, lease hexes on it and sell what they make.'),
         TutorialStep('Place your Campus',
-            'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the Build range circle around you, then slide here.',
+            'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here.',
             _surveyBtnKey),
       ];
 
@@ -18,7 +18,7 @@ extension _MapTutorial on _MapTabState {
             'Slide to survey the land around the crosshair. The map fills with colours: hotter colours mean better quality for the resource you picked. Every place is different, so look around before you build.',
             _surveyBtnKey),
         TutorialStep('Build in range',
-            'Put the crosshair on a hot spot inside the Build range circle. This button lights up when the hex is in range.',
+            'Put the crosshair on a hot spot inside the circle around you. This button lights up when the hex is in range.',
             _buildBtnKey),
         const TutorialStep('Is it worth it?',
             'Before you build you see the quality, the Worth / hour, the build price and the 90 day lease. '

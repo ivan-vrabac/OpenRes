@@ -30,6 +30,7 @@ class _CampusScreenState extends State<CampusScreen> {
   Map<String, dynamic>? _sups;          // /api/v3/supervisors
   Map<String, dynamic>? _dm;            // /api/v3/darkmatter, once every supervisor is fully educated
   bool _busy = false;
+  String? _acting;                         // the action running now: only its own slider shows it
   bool _locating = false;                  // only the Visit button waits for this
   Timer? _tick;
 
@@ -75,10 +76,10 @@ class _CampusScreenState extends State<CampusScreen> {
   void _snack(String msg, {bool error = false}) => AppNotify.show(context, msg, isError: error);
 
   Future<void> _act(String path, [Map<String, Object?> params = const {}, String? done]) async {
-    setState(() => _busy = true);
+    setState(() { _busy = true; _acting = path; });
     final r = await _co.call(path, params);
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() { _busy = false; _acting = null; });
     if (!r.ok) {
       _snack(r.message ?? 'Something went wrong', error: true);
       return;
@@ -392,7 +393,7 @@ class _CampusScreenState extends State<CampusScreen> {
         sublabel: fmtCredits(credits),
         icon: Icons.upgrade,
         enabled: ready && !_busy,
-        busy: _busy,
+        busy: _acting == '/api/v3/campus/upgrade',
         radius: 14,
         onConfirm: _upgrade,
       ),
@@ -594,7 +595,7 @@ class _CampusScreenState extends State<CampusScreen> {
         sublabel: fmtMass(next),
         icon: Icons.science_outlined,
         enabled: held >= next && !_busy,
-        busy: _busy,
+        busy: _acting == '/api/v3/darkmatter/invest',
         radius: 14,
         onConfirm: () => _act('/api/v3/darkmatter/invest', const {}, 'Dark matter research level ${level + 1}'),
       ),

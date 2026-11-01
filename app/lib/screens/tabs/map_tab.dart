@@ -14,7 +14,6 @@ import '../../constants.dart';
 import '../../models/player_provider.dart';
 import '../../ring_looks.dart';
 import '../../screens/settings_screen.dart' show kCloudOpacity,
-    kShowRingLabels,
     kGpsIntervalSeconds,
     kHeatmapScheme,
     kMapPanelOpacity,
@@ -614,43 +613,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
           // (show, colour, opacity, fill); building rings only with the building.
           if (_pos != null) ...[
             ValueListenableBuilder<LatLng?>(valueListenable: _live, builder: (ctx, live, _) {
-              final me = live ?? _pos!;
-              final rings = <(String, double, String)>[
-                ('local', _kBuildRange, 'Build range'),
-              ];
-              rings.removeWhere((r) => !kRingLooks[r.$1]!.show);
-              final refLat = me.latitude * math.pi / 180;
-              // the live camera zoom (the tab's own copy can lag while pinching)
-              final ppm = (256 * math.pow(2, MapCamera.of(ctx).zoom)) /
-                  (40075017.0 * math.cos(refLat).abs().clamp(0.001, 1.0));
-              // labels never overlap (owner 2026-10-24): each one sits on its ring at the first angle
-              // (top, bottom, the diagonals, the sides) where it doesn't touch a label already placed
-              final placed = <Rect>[];
-              final labels = <Marker>[];
-              const angles = [90.0, 270.0, 60.0, 120.0, 240.0, 300.0, 30.0, 150.0, 210.0, 330.0, 0.0, 180.0];
-              for (final r in [...rings]..sort((a, b) => a.$2.compareTo(b.$2))) {
-                final rpx = r.$2 * ppm;
-                if (!kShowRingLabels || rpx <= 40) continue;
-                final w = r.$3.length * 5.2 + 8, h = 13.0;
-                for (final deg in angles) {
-                  final a = deg * math.pi / 180;
-                  final rect = Rect.fromCenter(center: Offset(rpx * math.cos(a), -rpx * math.sin(a)), width: w, height: h);
-                  if (placed.any((p) => p.inflate(2).overlaps(rect))) continue;
-                  placed.add(rect);
-                  labels.add(Marker(
-                    point: LatLng(me.latitude + r.$2 * math.sin(a) / 111320.0,
-                        me.longitude + r.$2 * math.cos(a) / (111320.0 * math.cos(refLat).abs().clamp(0.001, 1.0))),
-                    width: w, height: h,
-                    child: Center(child: Text(r.$3, maxLines: 1, style: TextStyle(color: kRingLooks[r.$1]!.color, fontSize: 9,
-                        shadows: const [Shadow(color: Colors.black, blurRadius: 2)]))),
-                  ));
-                  break;
-                }
-              }
-              return Stack(children: [
-                CircleLayer(circles: [for (final r in rings) ringCircle(me, r.$2, r.$1)]),
-                if (labels.isNotEmpty) MarkerLayer(markers: labels),
-              ]);
+              if (!kRingLooks['local']!.show) return const SizedBox.shrink();
+              return CircleLayer(circles: [ringCircle(live ?? _pos!, _kBuildRange, 'local')]);
             }),
             // TC scan ring around the crosshair: reads the live camera every frame (plain pans
             // don't rebuild the map tab, so a ring placed from _mapCenter would stay behind)

@@ -20,15 +20,32 @@ class HexPicture extends StatelessWidget {
   const HexPicture(this.asset, {super.key, this.size = 28});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => CustomPaint(
+        foregroundPainter: const _HexOutline(),
+        child: SizedBox(
         width: size, height: size * 0.866,
         child: ClipPath(
           clipper: const HexClipper(),
           child: Transform.scale(scale: 1.1, child: Image.asset(asset, fit: BoxFit.cover, gaplessPlayback: true,
               errorBuilder: (_, __, ___) => Icon(Icons.hexagon_outlined, size: size * 0.8, color: AppColors.t38))),
         ),
+      ),
       );
 }
+/// A thin edge around a hex: on a pure black background dark pictures would melt into it.
+class _HexOutline extends CustomPainter {
+  const _HexOutline();
+
+  @override
+  void paint(Canvas canvas, Size size) => canvas.drawPath(const HexClipper().getClip(size), Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1
+    ..color = Colors.white30);
+
+  @override
+  bool shouldRepaint(_HexOutline old) => false;
+}
+
 /// Consistent loading / error / empty states for screens backed by a server call.
 class AsyncView extends StatelessWidget {
   final bool loading;

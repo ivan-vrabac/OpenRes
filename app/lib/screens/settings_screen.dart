@@ -113,7 +113,6 @@ class SettingsScreen extends StatefulWidget {
 
 double kCloudOpacity = 0.55;
 
-bool   kShowRingLabels   = true;   // ring looks live in ring_looks.dart
 
 const List<String> kHeatmapSchemes      = ['classic', 'cold', 'contrast'];
 const List<String> kHeatmapSchemeLabels = ['Classic', 'Cold', 'Contrast'];
@@ -1026,7 +1025,6 @@ Future<void> loadNumDecimalsPrefs() async {
   if (kNoFpsLimit) await applyNoFpsLimit(true);
   kInvertAskBid = prefs.getBool('invert_ask_bid') ?? false;
   kCloudOpacity = (prefs.getDouble('res_cloud_opacity') ?? 0.35).clamp(0.10, 0.90);
-  kShowRingLabels = prefs.getBool('show_ring_labels') ?? true;
   await loadRingLooks();
   final raw = prefs.getString('heatmap_scheme') ?? 'classic';
   kHeatmapScheme = kHeatmapSchemes.contains(raw) ? raw : 'classic';
