@@ -174,6 +174,7 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         private val exec = Executors.newSingleThreadExecutor()
         private var lastSent = 0L
         private var lastLogged = 0L
+        private var declination = 0.0
         private var lastTrusted = 0L             // the last reading of the provider good enough to use
 
         override fun onListen(args: Any?, sink: EventChannel.EventSink) {
@@ -203,24 +204,56 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             }
         }
 
+        /** The compass from the raw sensors (owner 2026-11-01: on a Pixel 9a both the provider and the rotation
+         *  vector sensor stopped reporting while the magnetometer and accelerometer worked fine). */
         private fun startSensor(send: (Double, Double) -> Unit) {
-            val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             if (sensor != null) return
-            val rv = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return
+            val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+            val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) ?: return
+            val acc = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+            val gravity = FloatArray(3)
+            val field = FloatArray(3)
+            var hasGravity = false
+            var quality = SensorManager.SENSOR_STATUS_ACCURACY_LOW
             val rot = FloatArray(9)
+            val upright = FloatArray(9)
             val ori = FloatArray(3)
             sensor = object : SensorEventListener {
                 override fun onSensorChanged(e: SensorEvent) {
-                    SensorManager.getRotationMatrixFromVector(rot, e.values)
-                    SensorManager.getOrientation(rot, ori)
+                    if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                        e.values.copyInto(gravity, 0, 0, 3)
+                        hasGravity = true
+                        return
+                    }
+                    e.values.copyInto(field, 0, 0, 3)
+                    quality = e.accuracy
+                    if (!hasGravity || !SensorManager.getRotationMatrix(rot, null, gravity, field)) return
                     if (System.currentTimeMillis() - lastTrusted < 3000) return    // the provider is doing fine
-                    // its own estimate of the error, in radians, when it has one (-1: it has none)
-                    val err = if (e.values.size > 4 && e.values[4] >= 0) Math.toDegrees(e.values[4].toDouble()) else 30.0
-                    send((Math.toDegrees(ori[0].toDouble()) + 360) % 360, err)    // magnetic north
+                    SensorManager.getOrientation(rot, ori)
+                    // held upright the usual angles flip over: read them against the back of the phone
+                    if (Math.abs(ori[1]) > 1.1f) {
+                        SensorManager.remapCoordinateSystem(rot, SensorManager.AXIS_X, SensorManager.AXIS_Z, upright)
+                        SensorManager.getOrientation(upright, ori)
+                    }
+                    val err = when (quality) {
+                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 15.0
+                        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 30.0
+                        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 60.0
+                        else -> 90.0
+                    }
+                    send((Math.toDegrees(ori[0].toDouble()) + declination + 360) % 360, err)
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
-            sm.registerListener(sensor, rv, SensorManager.SENSOR_DELAY_UI)
+            sm.registerListener(sensor, mag, SensorManager.SENSOR_DELAY_GAME)
+            sm.registerListener(sensor, acc, SensorManager.SENSOR_DELAY_GAME)
+            try {
+                // magnetic north to true north, about 5 degrees in Croatia
+                LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { l ->
+                    if (l != null) declination = android.hardware.GeomagneticField(l.latitude.toFloat(),
+                        l.longitude.toFloat(), l.altitude.toFloat(), System.currentTimeMillis()).declination.toDouble()
+                }
+            } catch (_: SecurityException) { }
         }
 
         override fun onCancel(args: Any?) {
