@@ -20,12 +20,10 @@ class GoogleAuth {
   }
 
   /// The server's answer: {sid, hID, created, name}, or the code need_name for a new Google account.
-  static Future<ApiResult> signIn(String token, {String? name, String? linkName, String? linkPassword}) =>
+  static Future<ApiResult> signIn(String token, {String? name}) =>
       GameApi.call('/api/v1/auth/google', '', {
         'id_token': token,
         if (name != null) 'name': name,
-        if (linkName != null) 'link_name': linkName,
-        if (linkPassword != null) 'link_password': linkPassword,
       });
 
   /// A failed sign-in for the player, with Google's error code (owner 2026-10-25: "oauth not

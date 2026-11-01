@@ -37,6 +37,8 @@ import '../../v3/hex_sheet.dart';
 
 import '../../app_colors.dart';
 import '../../widgets/popups.dart';
+import '../../services/storage_service.dart';
+import '../../widgets/tutorial.dart';
 
 part 'map_actions.dart';
 part 'map_buttons.dart';
@@ -44,6 +46,7 @@ part 'map_gate.dart';
 part 'map_menus.dart';
 part 'map_painters.dart';
 part 'map_sheets.dart';
+part 'map_tutorial.dart';
 // ── MapTab ─────────────────────────────────────────────────────────────────────
 
 /// The map (crosshair, ghost hex, snapping, ranges, follow, zoom levels, rings, toggles, resource
@@ -82,6 +85,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   String _category = 'Raw ores';       // the picker's category
   final _categoryBtnKey = GlobalKey();
   final _resourceBtnKey = GlobalKey();
+  final _surveyBtnKey = GlobalKey();
+  final _buildBtnKey = GlobalKey();
+  List<TutorialStep>? _tutorial;
   double _surveyRadius = 5000;         // chosen in the survey settings (clamped by the Campus level)
 
   static const _kCategories = ['Raw ores', 'Forestry', 'Agriculture', 'Livestock', 'Fish', 'Power'];
@@ -150,6 +156,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    tutorialAsked.addListener(_onTutorialAsked);
     WidgetsBinding.instance.addObserver(this);
     _makePuff();
     _initLocation();
@@ -242,6 +249,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    tutorialAsked.removeListener(_onTutorialAsked);
     WidgetsBinding.instance.removeObserver(this);
     mapFocus.removeListener(_onMapFocus);
     campusMoveAsked.removeListener(_onMoveAsked);
@@ -286,6 +294,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     if (!started || !mounted) return;
     LocationService.instance.fix.removeListener(_onFix);
     LocationService.instance.fix.addListener(_onFix);
+    Future.delayed(const Duration(seconds: 3), _maybeTutorial);
     _onFix();
   }
 
@@ -891,6 +900,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
               // ── Center: scan button ───────────────────────────────────────
               Expanded(
+                key: _surveyBtnKey,
                 child: ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
                   // the Campus goes down like a hex: the ghost at the crosshair, within 100 m of you
                   final c = _mapCenter ?? _pos;
@@ -979,7 +989,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 4),
                     // Build icon: in range is checked live as the crosshair moves
-                    ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, __, ___) {
+                    ValueListenableBuilder<double>(key: _buildBtnKey, valueListenable: _crosshairDist, builder: (_, __, ___) {
                     final c = _mapCenter ?? _pos;
                     final buildReady = co.hasCampus && !_movingCampus && _showMines && selectedResult != null &&
                         c != null && _inBuildRange(_snapBuildPos(c));
@@ -1045,6 +1055,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
             ),
           ),
         ),
+      if (_tutorial != null) TutorialOverlay(steps: _tutorial!, onDone: _tutorialDone),
     ]);
   }
 

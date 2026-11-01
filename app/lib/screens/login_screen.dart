@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// Sign in with Google (owner 2026-10-25: the only way). A Google account we don't know yet
-  /// names a new company, or links an existing one once with its old name and password.
+  /// names a new company.
   Future<void> _google() async {
     setState(() { _loading = true; _error = null; });
     try {
@@ -142,18 +142,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _withToken(String token) async {
     try {
       var r = await GoogleAuth.signIn(token);
-      while (r.code == 'need_name' || r.code == 'name_taken' || r.code == 'invalid_name' ||
-          r.code == 'wrong_password' || r.code == 'already_linked' || r.code == 'rate_limited') {
+      while (r.code == 'need_name' || r.code == 'name_taken' || r.code == 'invalid_name' || r.code == 'rate_limited') {
         if (!mounted) return;
-        final note = r.code == 'need_name' ? null : r.message;
-        final choice = await _newOrLink(note);
-        if (choice == null) {
+        final name = await _chooseName(r.code == 'need_name' ? null : r.message);
+        if (name == null) {
           setState(() => _loading = false);
           return;
         }
-        r = choice.link
-            ? await GoogleAuth.signIn(token, linkName: choice.name, linkPassword: choice.password)
-            : await GoogleAuth.signIn(token, name: choice.name);
+        r = await GoogleAuth.signIn(token, name: name);
       }
       if (!r.ok) {
         setState(() { _error = r.message; _loading = false; });
@@ -166,55 +162,36 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// New Google account: a new company (name), or an existing one (name + its old password).
-  Future<({bool link, String name, String? password})?> _newOrLink(String? note) async {
-    final name = TextEditingController(), pw = TextEditingController();
-    var link = false;
-    return showDialog<({bool link, String name, String? password})>(
+  /// A new Google account names its company.
+  Future<String?> _chooseName(String? note) async {
+    final name = TextEditingController();
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) => AlertDialog(
-        title: Text(link ? 'Your company' : 'Name your company'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('New company')),
-              ButtonSegment(value: true, label: Text('I have one')),
-            ],
-            selected: {link},
-            onSelectionChanged: (v) => setD(() => link = v.first),
-          ),
-          const SizedBox(height: 12),
-          Text(link
-              ? 'Played before with a password? Enter your company name and password once. From then on '
-                'you sign in with Google and the password is no longer used.'
-              : '3-20 letters, digits, spaces and . , [ ] ( ) -',
-              style: TextStyle(fontSize: 12, color: AppColors.t54)),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Name your company'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('3-20 letters, digits, spaces and . , [ ] ( ) -', style: TextStyle(fontSize: 12, color: AppColors.t54)),
           const SizedBox(height: 8),
           TextField(controller: name, maxLength: 20, autofocus: true,
               decoration: const InputDecoration(labelText: 'Company name', border: OutlineInputBorder(), counterText: '')),
-          if (link) ...[
-            const SizedBox(height: 8),
-            TextField(controller: pw, obscureText: true,
-                decoration: const InputDecoration(labelText: 'Old password', border: OutlineInputBorder())),
-          ],
           if (note != null) ...[
             const SizedBox(height: 8),
             Text(note, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
           ],
-        ])),
+        ]),
         actions: [
           TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               final n = name.text.trim();
               if (n.isEmpty || !_validName.hasMatch(n)) return;
-              popIfCurrent(ctx, (link: link, name: n, password: link ? pw.text : null));
+              popIfCurrent(ctx, n);
             },
-            child: Text(link ? 'Link' : 'Create'),
+            child: const Text('Create'),
           ),
         ],
-      )),
+      ),
     );
   }
 
@@ -275,8 +252,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     Image.asset(Branding.logoAsset, height: 96),
                     const SizedBox(height: 16),
                   ],
-                  // tapping the title 5 times opens the log in form (the Google Play review account; old
-                  // companies not switched to Google yet), 5 more go back to Google
+                  // tapping the title 5 times opens the log in form (only for the Google Play review
+                  // account), 5 more go back to Google
                   GestureDetector(
                     onTap: () => setState(() {
                       if (++_titleTaps < 5) return;

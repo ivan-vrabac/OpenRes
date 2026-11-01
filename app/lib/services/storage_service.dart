@@ -7,6 +7,7 @@ class StorageService {
   static const _keyBlocked        = 'chat_blocked_hids';
   static const _keyCloudOpacity   = 'res_cloud_opacity';
   static const _keySignedOut      = 'signed_out';
+  static const _keyTutorial       = 'tutorial_step';
 
   static Future<double> getCloudOpacity() async {
     final p = await SharedPreferences.getInstance();
@@ -28,6 +29,17 @@ class StorageService {
     final p = await SharedPreferences.getInstance();
     await p.setString(_keyHid, hid);
     await p.setString(_keySid, sid);
+  }
+
+  /// The tutorial: 0 not seen, 1 the welcome before the Campus, 2 all of it.
+  static Future<int> getTutorial() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getInt(_keyTutorial) ?? 0;
+  }
+
+  static Future<void> saveTutorial(int v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(_keyTutorial, v);
   }
 
   /// The player signed out: no sign-in without a tap until they sign in again.

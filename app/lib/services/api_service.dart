@@ -15,9 +15,9 @@ class SignInResult {
 }
 
 class ApiService {
-  /// Signs in, or creates the account if the company name is free.
+  /// Logs in with a company name and password (the app only uses this for the Google Play review account).
   /// Returns the server-signed session; on failure [SignInResult.error] is set.
-  /// [register]: true = create a new account (fails if the name is taken),
+  /// [register]: only for the tests against a dev server: true = create a new account,
   /// false = log in to an existing one.
   static Future<SignInResult> signIn(String companyName, String password,
       {bool register = false}) async {
