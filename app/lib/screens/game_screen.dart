@@ -100,6 +100,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final Company _company = Company(context.read<PlayerProvider>().sid,
       onCredits: context.read<PlayerProvider>().setCredits)..start();
   late PageController _pageCtrl;
+  final _tabBar = ScrollController();     // the bottom tabs, when they don't all fit
   int _currentIndex = 0;
 
   @override
@@ -155,6 +156,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     ScreenMode.apply();
     _pageCtrl.dispose();
+    _tabBar.dispose();
     super.dispose();
   }
 
@@ -296,6 +298,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
     setState(() => _currentIndex = index);
     _syncGps();
+    // the bar keeps the open tab in view (it stayed scrolled to More after the tutorial)
+    if (_tabBar.hasClients && _totalTabs > 1) {
+      _tabBar.animateTo(_tabBar.position.maxScrollExtent * index / (_totalTabs - 1),
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
   }
 
   void _onConfigSaved(TabConfig cfg) {
@@ -437,6 +444,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               final tabs = List.generate(n, buildTab);
               if (scrollable) {
                 return SingleChildScrollView(
+                  controller: _tabBar,
                   scrollDirection: Axis.horizontal,
                   child: Row(children: tabs),
                 );
