@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
@@ -38,6 +40,13 @@ class TutorialOverlay extends StatefulWidget {
 
 class _TutorialOverlayState extends State<TutorialOverlay> {
   int _i = 0;
+  Timer? _settled;
+
+  @override
+  void dispose() {
+    _settled?.cancel();
+    super.dispose();
+  }
 
   /// Where the step's target is, in this overlay's own coordinates.
   Rect? _hole() {
@@ -63,7 +72,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     widget.onStep?.call(widget.steps[_i]);
     // the hole needs the layout, and a tab change has to finish first
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
-    Future.delayed(const Duration(milliseconds: 350), () { if (mounted) setState(() {}); });
+    _settled?.cancel();
+    _settled = Timer(const Duration(milliseconds: 350), () { if (mounted) setState(() {}); });
   }
 
   @override
