@@ -7,6 +7,8 @@ Lifecycle (documented assumptions):
   recorded game events (game_events), so it is server-side and survives restarts.
 - A quest ends at the midnight (UTC) after its day (owner 2026-10-31: quests can't be done
   afterwards). What wasn't completed and claimed by then is gone; the next day starts from zero.
+- "Renew a lease" is dealt only to a company that can renew one that day, and turns into another quest if
+  its hexes go (owner 2026-11-01).
 - Claiming is atomic and happens at most once per quest (conditional UPDATE + unique keys).
   Reward: credits = 0.2 % of what the next Campus level costs (owner 2026-10-31: no player level any
   more, and lower rewards), at least QUEST_MIN_CREDITS.
@@ -116,6 +118,19 @@ def pick(hid: str, day: str, codes) -> list:
     return ranked[:DAILY_COUNT]
 
 
+def can_renew(conn, hid, now) -> bool:
+    """Could this company renew a lease before today's quests end? (owner 2026-11-01: a company with
+    no hex, or only freshly renewed ones, must not get a quest it can't do)"""
+    from .company import renew_wait_hours
+    left = (_midnight_after(now) - now).total_seconds() / 3600
+    return any(renew_wait_hours(r[0], now) <= left for r in conn.execute(
+        "SELECT lease_until FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)))
+
+
+def available(conn, hid, now) -> list:
+    return [c for c in POOL if c != "renew" or can_renew(conn, hid, now)]
+
+
 def assign_today(conn, hid, now=None) -> None:
     now = now or econ.utcnow()
     day = _day(now)
@@ -128,9 +143,18 @@ def assign_today(conn, hid, now=None) -> None:
     if gone and not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=? AND claimed_at IS NOT NULL",
                                  (hid, day)).fetchone():
         conn.execute("DELETE FROM daily_quests WHERE hid=? AND day=?", (hid, day))
-    if conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (hid, day)).fetchone():
+    have = {r[0]: r for r in conn.execute("SELECT code, id, claimed_at FROM daily_quests WHERE hid=? AND day=?", (hid, day))}
+    if have:
+        # a renew quest that can't be done any more (the hexes are gone) becomes another quest
+        r = have.get("renew")
+        if r and not r[2] and not can_renew(conn, hid, now):
+            spare = [c for c in available(conn, hid, now) if c not in have]
+            if spare:
+                code = pick(hid, day, spare)[0]
+                conn.execute("UPDATE daily_quests SET code=?, assigned_at=?, target=? WHERE id=?",
+                             (code, now.isoformat(), target_of(code, hid, day), r[1]))
         return
-    for code in pick(hid, day, list(POOL)):
+    for code in pick(hid, day, available(conn, hid, now)):
         conn.execute("INSERT OR IGNORE INTO daily_quests(hid, day, code, assigned_at, expires_at, target) "
                      "VALUES(?,?,?,?,?,?)", (hid, day, code, now.isoformat(),
                                              _midnight_after(now).isoformat(),

@@ -122,6 +122,19 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
   Company get _co => context.read<Company>();
 
+  /// Where you are for every range decision: the same gliding position the range circle is drawn around
+  /// (owner 2026-11-01: the circle, the ghost hex and the build check each used their own position, and
+  /// _pos only moves at the GPS interval, so they disagreed while walking).
+  LatLng? get _here => _live.value ?? _pos;
+
+  /// A hex is in range when its centre is inside the circle: the one rule for ghost, button and build.
+  bool _inBuildRange(LatLng hex) {
+    final me = _here;
+    return me != null && _distM(me, hex) <= _kBuildRange;
+  }
+
+  static const double _kBuildRange = 100;
+
   /// setState for the parts of this screen in other files.
   void _update(VoidCallback fn) => setState(fn);
 
@@ -315,6 +328,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   LatLng? _camAt;
   void _followFrame(LatLng p) {
     _live.value = p;
+    if (_mapCenter != null) _crosshairDist.value = _distM(p, _mapCenter!);   // walking moves the range too
     if (!_following || _scanInFlight || !mounted) return;
     if (_camAt != null && _distM(_camAt!, p) < 0.2) return;
     _camAt = p;
@@ -551,7 +565,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
             while (lng < -180) lng += 360;
             _mapCenter = LatLng(lat, lng);
             if (_pos != null) {
-              _crosshairDist.value = _distM(_pos!, _mapCenter!);
+              _crosshairDist.value = _distM(_here!, _mapCenter!);
             }
             // the map layers read the camera themselves: a pan or a pinch rebuilds only them
             if (hasGesture && _following && mounted) setState(() => _following = false);
@@ -593,7 +607,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
             ValueListenableBuilder<LatLng?>(valueListenable: _live, builder: (ctx, live, _) {
               final me = live ?? _pos!;
               final rings = <(String, double, String)>[
-                ('local', 100.0, 'Build range'),
+                ('local', _kBuildRange, 'Build range'),
               ];
               rings.removeWhere((r) => !kRingLooks[r.$1]!.show);
               final refLat = me.latitude * math.pi / 180;
@@ -661,16 +675,15 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
           // Ghost hex — uses live MapCamera so position and size stay correct during pan/zoom.
           if (_showMines || _placingCampus)
-            Builder(builder: (ghCtx) {
+            ValueListenableBuilder<LatLng?>(valueListenable: _live, builder: (ghCtx, _, __) {
               final cam = MapCamera.of(ghCtx);
               if (cam.zoom < kHexZoom) return const SizedBox.shrink();
               // Recompute browse position from current camera centre (not stale _mapCenter).
               final camCenter = cam.center;
-              final distCam = _pos != null ? _distM(_pos!, camCenter) : double.infinity;
-              // the hex you would build on: within 100 m of you
+              // the hex you would build on: shown exactly while its centre is inside the range circle
               final placing = _placingCampus;
-              final browseSnapLive = distCam > 100 ? null : placing ? _snapCampus(camCenter) : _snapBuildPos(camCenter);
-              if (browseSnapLive == null) return const SizedBox.shrink();
+              final browseSnapLive = placing ? _snapCampus(camCenter) : _snapBuildPos(camCenter);
+              if (!_inBuildRange(browseSnapLive)) return const SizedBox.shrink();
               final refLat = camCenter.latitude * math.pi / 180;
               final ppm = (256 * math.pow(2, cam.zoom)) /
                   (40075017.0 * math.cos(refLat).abs().clamp(0.001, 1.0));
@@ -883,7 +896,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                   final c = _mapCenter ?? _pos;
                   if (_placingCampus) {
                     final at = c == null ? null : _snapCampus(c);
-                    final inReach = _pos != null && at != null && _distM(_pos!, at) <= 100;
+                    final inReach = at != null && _inBuildRange(at);
                     final now = co.campus;
                     final same = _movingCampus && at != null && now != null &&
                         _distM(at, LatLng((now['lat'] as num).toDouble(), (now['lng'] as num).toDouble())) < 1;
@@ -968,8 +981,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     // Build icon: in range is checked live as the crosshair moves
                     ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, __, ___) {
                     final c = _mapCenter ?? _pos;
-                    final liveDist = (_pos != null && c != null) ? _distM(_pos!, _snapBuildPos(c)) : double.infinity;
-                    final buildReady = co.hasCampus && !_movingCampus && _showMines && selectedResult != null && liveDist <= 100;
+                    final buildReady = co.hasCampus && !_movingCampus && _showMines && selectedResult != null &&
+                        c != null && _inBuildRange(_snapBuildPos(c));
                     return GestureDetector(
                       onTap: buildReady ? () => _showBuildDialog(selectedResult) : null,
                       child: Container(

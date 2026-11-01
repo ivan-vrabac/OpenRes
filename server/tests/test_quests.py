@@ -137,10 +137,10 @@ def test_seven_and_thirty_day_streak_milestones_paid_once():
                 conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
                              "VALUES(?,?,?,?,?,?)", (hid, d, c, d, d, d))
         conn.commit()
-    _force_quests(hid, ["plant", "survey", "renew"])
+    _force_quests(hid, ["plant", "survey", "visit"])
     _events(hid, "plant_upgraded", 2)
     _events(hid, "survey", 5)
-    _events(hid, "hex_renewed", 3)
+    _events(hid, "campus_visit", 1)
     paid = []
     for q in call(Q, sid)["quests"]:
         paid += call(Q + "/claim", sid, id=q["id"])["milestones"]
@@ -207,3 +207,33 @@ def test_quests_of_an_older_list_are_dealt_again():
     r = call(Q, sid)
     assert r["err"] == 0 and len(r["quests"]) == quests.DAILY_COUNT
     assert all(q["code"] in quests.POOL for q in r["quests"])
+
+
+def test_no_renew_quest_without_a_hex_to_renew():
+    from systems import quests as Q
+    import econ
+    hid = new_player("NoHex")[0]
+    with main.get_db() as conn:
+        for d in range(40):
+            day = econ.utcnow() + datetime.timedelta(days=d)
+            assert "renew" not in Q.available(conn, hid, day)
+            Q.assign_today(conn, hid, day)
+        assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND code='renew'", (hid,)).fetchone()
+        conn.rollback()
+
+
+def test_a_stuck_renew_quest_becomes_another_quest():
+    from systems import quests as Q
+    import econ
+    hid = new_player("Stuck")[0]
+    now = econ.utcnow()
+    day = Q._day(now)
+    with main.get_db() as conn:
+        Q.assign_today(conn, hid, now)
+        conn.execute("UPDATE daily_quests SET code='renew' WHERE id=(SELECT MIN(id) FROM daily_quests WHERE hid=? AND day=?)",
+                     (hid, day))
+        Q.assign_today(conn, hid, now)
+        codes = [r[0] for r in conn.execute("SELECT code FROM daily_quests WHERE hid=? AND day=?", (hid, day))]
+        assert "renew" not in codes and len(set(codes)) == Q.DAILY_COUNT
+        conn.rollback()
+

@@ -96,7 +96,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
     final nextCost = (st['nextCost'] as num?)?.toDouble() ?? 0;
     final entries = co.stock.entries
         .map((e) => MapEntry(e.key, (e.value as num).toDouble()))
-        .where((e) => _shown(e.key, e.value) >= 0.01)
+        .where((e) => _shown(e.key, e.value) >= 1)        // owner 2026-11-01: no leftovers below one unit
         .toList()
       ..sort((a, b) => _worth(co, b).compareTo(_worth(co, a)));
     final value = entries.fold<double>(0, (a, e) => a + _worth(co, e));

@@ -300,9 +300,14 @@ def test_login_streak_grows_and_resets():
         conn.commit()
     s = call("/api/v3/streak", sid)
     assert s["day"] == 7 and s["credits"] == g.streak_reward(7) and s["materials"] == {"books": 50}
-    long_ago = (co.utcnow() - datetime.timedelta(days=2)).date().isoformat()
-    with main.get_db() as conn:                      # a missed day: back to day 1
-        conn.execute("UPDATE co_state SET streak_day=20, streak_last=? WHERE hid=?", (long_ago, hid))
+    one = (co.utcnow() - datetime.timedelta(days=2)).date().isoformat()
+    with main.get_db() as conn:                      # one missed day is forgiven
+        conn.execute("UPDATE co_state SET streak_day=20, streak_last=? WHERE hid=?", (one, hid))
+        conn.commit()
+    assert call("/api/v3/streak", sid)["day"] == 21
+    two = (co.utcnow() - datetime.timedelta(days=3)).date().isoformat()
+    with main.get_db() as conn:                      # two in a row: back to day 1
+        conn.execute("UPDATE co_state SET streak_day=20, streak_last=? WHERE hid=?", (two, hid))
         conn.commit()
     assert call("/api/v3/streak", sid)["day"] == 1
 

@@ -153,7 +153,7 @@ class _MapObjectsPainter extends CustomPainter {
         final o = Offset(sx, sy);
         canvas.drawCircle(o, r, Paint()..style = PaintingStyle.stroke..strokeWidth = sw..color = Colors.black38);
         canvas.drawArc(Rect.fromCircle(center: o, radius: r), -math.pi / 2, 2 * math.pi * left, false,
-            Paint()..style = PaintingStyle.stroke..strokeWidth = sw..color = Colors.yellowAccent);
+            Paint()..style = PaintingStyle.stroke..strokeWidth = sw..color = accent);
       }
       if (m.leaseDays != null && px >= 14) {  // the lease's last days, in red
         _chip(canvas, '${m.leaseDays!.ceil()}d', (px * 0.16).clamp(8.0, 13.0), Colors.redAccent, Offset(sx, sy + ph * 0.3));

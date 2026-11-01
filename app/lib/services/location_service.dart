@@ -73,6 +73,9 @@ class LocationService with WidgetsBindingObserver {
   final fix = ValueNotifier<LiveFix?>(null);
   /// Compass heading in degrees (true north), ~20 per second.
   final heading = ValueNotifier<double?>(null);
+
+  /// How far off the compass may be, in degrees (Google's own estimate; large when uncalibrated).
+  double headingError = 0;
   /// Whether the phone is moving (accelerometer); null while unknown.
   bool? moving;
   /// still / walking / running / bicycle / vehicle (Activity Recognition, when enabled).
@@ -152,6 +155,7 @@ class LocationService with WidgetsBindingObserver {
           onError: (_) => _fallback());
       _headSub = _head.receiveBroadcastStream().listen((e) {
         final m = (e as Map).cast<String, dynamic>();
+        headingError = (m['err'] as num?)?.toDouble() ?? 0;
         heading.value = (m['heading'] as num).toDouble();
       }, onError: (_) {});
       _motionSub = _motion.receiveBroadcastStream().listen((e) => moving = e as bool, onError: (_) {});

@@ -20,6 +20,8 @@ class LiveLocationLayer extends StatefulWidget {
   State<LiveLocationLayer> createState() => _LiveLocationLayerState();
 }
 
+const double _kCompassMaxError = 45;
+
 class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTickerProviderStateMixin {
   final _svc = LocationService.instance;
   late final Ticker _ticker = createTicker(_tick);
@@ -59,9 +61,14 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
         moved = true;
       }
     }
-    // compass heading; the direction of travel when there is no compass
-    final h = _svc.heading.value ?? f.course;
+    // the compass while Google trusts it, else the direction of travel, else no direction: an
+    // uncalibrated compass points anywhere (owner 2026-11-01), and no tick beats a wrong one
+    final h = (_svc.headingError <= _kCompassMaxError ? _svc.heading.value : null) ?? f.course;
     var turned = false;
+    if (h == null && _head != null) {
+      _head = null;
+      turned = true;
+    }
     if (h != null) {
       final cur = _head ?? h;
       final diff = ((h - cur + 540) % 360) - 180;   // shortest way round

@@ -1038,7 +1038,8 @@ def streak_status(row, now=None) -> dict:
     today = (now or utcnow()).date()
     last = row["streak_last"]
     claimed = last == today.isoformat()
-    going = last in (today.isoformat(), (today - datetime.timedelta(days=1)).isoformat())
+    # one missed day is forgiven and adds nothing, two in a row reset (owner 2026-11-01, as the quest streak)
+    going = last in {(today - datetime.timedelta(days=d)).isoformat() for d in range(3)}
     current = row["streak_day"] if going else 0
     day = current if claimed else current + 1
     return {"day": day, "current": current, "claimed": claimed, "credits": g.streak_reward(day),
@@ -1047,7 +1048,7 @@ def streak_status(row, now=None) -> dict:
 
 def install_streak(api) -> None:
     """Login streak (plan section 10): credits + books every day you claim; it grows at days 7, 14
-    and 30 and stays at the day-30 reward; missing a day resets it."""
+    and 30 and stays at the day-30 reward; two missed days in a row reset it."""
 
     @api.endpoint("/api/v3/streak")
     def streak(conn, hid, form):

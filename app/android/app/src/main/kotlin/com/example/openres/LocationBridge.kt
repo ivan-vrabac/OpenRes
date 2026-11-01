@@ -151,12 +151,14 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         private var sensor: SensorEventListener? = null
         private val exec = Executors.newSingleThreadExecutor()
         private var lastSent = 0L
+        private var lastLogged = 0L
 
         override fun onListen(args: Any?, sink: EventChannel.EventSink) {
             fun send(deg: Double, err: Double) {
                 val now = System.currentTimeMillis()
                 if (now - lastSent < 50) return          // 20 per second is plenty for the marker
                 lastSent = now
+                if (now - lastLogged > 3000) { lastLogged = now; android.util.Log.i("OpenResHeading", "heading $deg err $err") }
                 main.post { sink.success(mapOf("heading" to deg, "err" to err)) }
             }
             if (playServices()) {

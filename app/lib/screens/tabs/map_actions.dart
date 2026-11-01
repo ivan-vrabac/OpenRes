@@ -42,7 +42,7 @@ extension _MapActions on _MapTabState {
     _update(() { _building = true; });
     final res = await _co.call('/api/v3/hex/build', {
       'lat': target.latitude, 'lng': target.longitude,
-      'plat': curPos?.latitude ?? _pos?.latitude, 'plng': curPos?.longitude ?? _pos?.longitude,
+      'plat': (curPos ?? _here)?.latitude, 'plng': (curPos ?? _here)?.longitude,
       'op': r['op'], 'item': r['item'],
     });
     if (!mounted) return;
@@ -60,7 +60,7 @@ extension _MapActions on _MapTabState {
 
   /// The Campus goes on the ghost at the crosshair, like a hex.
   Future<void> _placeCampus() async {
-    final me = _pos, c = _mapCenter ?? _pos;
+    final me = _here, c = _mapCenter ?? _here;
     if (me == null || c == null) { _snack('Waiting for your location…', error: true); return; }
     final moving = _movingCampus;
     final ok = await showAppDialog<bool>(

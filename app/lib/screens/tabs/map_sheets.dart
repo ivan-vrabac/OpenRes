@@ -6,7 +6,7 @@ extension _MapSheets on _MapTabState {
   // ── Build dialog ───────────────────────────────────────────────────────────
 
   Future<void> _showBuildDialog(Map<String, dynamic> r) async {
-    final pos = _pos;
+    final pos = _here;
     if (pos == null) { _snack('Waiting for your location…', error: true); return; }
     final target = _snapBuildPos(_mapCenter ?? pos);
     final distToTarget = _distM(pos, target);
@@ -104,8 +104,8 @@ extension _MapSheets on _MapTabState {
               enabled: inLocalRange && unlocked,
               onConfirm: () {
                 popIfCurrent(ctx);
-                final freshPos = _pos;
-                if (freshPos == null || _distM(freshPos, target) > 100) {
+                final freshPos = _here;
+                if (freshPos == null || !_inBuildRange(target)) {
                   _snack('Building failed: the hex is out of range.', error: true);
                   return;
                 }
