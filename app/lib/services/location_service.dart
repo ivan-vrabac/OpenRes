@@ -136,6 +136,16 @@ class LocationService with WidgetsBindingObserver {
     return true;
   }
 
+  /// Asks Android for a position right now, the way Google Maps does (owner 2026-11-01: a cold GPS gave
+  /// nothing until Maps had been opened). It arrives in [fix] like any other.
+  Future<void> askFix() async {
+    if (!_native) return;
+    try {
+      final m = await _ctl.invokeMethod<Map>('current');
+      if (m != null) _onNative(m.cast<String, dynamic>());
+    } catch (_) {}
+  }
+
   /// [away]: stop reading the location until a screen wants it again ([setAway] false).
   void setAway(bool away) {
     if (away == _away) return;
@@ -159,6 +169,7 @@ class LocationService with WidgetsBindingObserver {
         heading.value = (m['heading'] as num).toDouble();
       }, onError: (_) {});
       _motionSub = _motion.receiveBroadcastStream().listen((e) => moving = e as bool, onError: (_) {});
+      unawaited(askFix());
       if (useActivity) _listenActivity();
     } else {
       _fallback();

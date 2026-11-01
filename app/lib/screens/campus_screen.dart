@@ -30,6 +30,7 @@ class _CampusScreenState extends State<CampusScreen> {
   Map<String, dynamic>? _sups;          // /api/v3/supervisors
   Map<String, dynamic>? _dm;            // /api/v3/darkmatter, once every supervisor is fully educated
   bool _busy = false;
+  bool _locating = false;                  // only the Visit button waits for this
   Timer? _tick;
 
   Company get _co => context.read<Company>();
@@ -99,13 +100,14 @@ class _CampusScreenState extends State<CampusScreen> {
       _snack('This needs precise location', error: true);
       return null;
     }
-    setState(() => _busy = true);
+    setState(() => _locating = true);
     // the GPS may be off away from the Map tab: read it for this one position, a fresh one
     final wasAway = loc.away;
     loc.setAway(false);
     final asked = DateTime.now().subtract(const Duration(seconds: 5));
     bool good(LiveFix? f) => f != null && f.accuracy <= 30 && f.at.isAfter(asked);
-    final end = DateTime.now().add(const Duration(seconds: 10));
+    unawaited(loc.askFix());
+    final end = DateTime.now().add(const Duration(seconds: 30));      // a cold GPS needs a while
     while (DateTime.now().isBefore(end) && !good(loc.fix.value)) {
       await Future.delayed(const Duration(milliseconds: 250));
     }
@@ -113,7 +115,7 @@ class _CampusScreenState extends State<CampusScreen> {
     final pos = f != null && f.at.isAfter(asked) ? f.pos : null;
     loc.setAway(wasAway);
     if (!mounted) return null;
-    setState(() => _busy = false);
+    setState(() => _locating = false);
     if (pos == null) {
       _snack('Could not get your location', error: true);
       return null;
@@ -249,9 +251,11 @@ class _CampusScreenState extends State<CampusScreen> {
             ),
           ])),
           OutlinedButton.icon(
-            onPressed: _busy ? null : _visit,
-            icon: const Icon(Icons.directions_walk, size: 16),
-            label: const Text('Visit'),
+            onPressed: _busy || _locating ? null : _visit,
+            icon: _locating
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.directions_walk, size: 16),
+            label: Text(_locating ? 'Finding you' : 'Visit'),
           ),
         ]),
         if (dueIn != null) ...[

@@ -26,9 +26,11 @@ import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
 import com.google.android.gms.location.ActivityTransitionResult
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.DeviceOrientationListener
 import com.google.android.gms.location.DeviceOrientationRequest
+import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -68,6 +70,7 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             when (call.method) {
                 "playServices" -> result.success(playServices())
                 "checkSettings" -> checkSettings(result)
+                "current" -> currentFix(result)
                 "activityPermission" -> activityPermission(call.argument<Boolean>("ask") == true, result)
                 else -> result.notImplemented()
             }
@@ -76,6 +79,23 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
 
     private fun playServices() =
         GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ctx) == ConnectionResult.SUCCESS
+
+    /** One position now, asked for as Google Maps does: wakes the GPS instead of waiting for an update. */
+    private fun currentFix(result: MethodChannel.Result) {
+        try {
+            LocationServices.getFusedLocationProviderClient(ctx).getCurrentLocation(
+                CurrentLocationRequest.Builder()
+                    .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                    .setGranularity(Granularity.GRANULARITY_FINE)
+                    .setMaxUpdateAgeMillis(5000)
+                    .setDurationMillis(30_000)
+                    .build(), null)
+                .addOnSuccessListener { l -> result.success(if (l != null) toMap(l) + ("last" to true) else null) }
+                .addOnFailureListener { result.success(null) }
+        } catch (e: SecurityException) {
+            result.success(null)
+        }
+    }
 
     private fun request(intervalMs: Long = 1000): LocationRequest =
         LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
@@ -172,6 +192,9 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
                         DeviceOrientationRequest.Builder(DeviceOrientationRequest.OUTPUT_PERIOD_DEFAULT).build(), exec, l)
                         .addOnFailureListener { startSensor(::send) }
                     fop = l
+                    // owner 2026-11-01: the provider accepted the request and never sent one reading:
+                    // without a reading soon, the phone's own compass takes over
+                    main.postDelayed({ if (fop === l && lastSent == 0L) startSensor(::send) }, 3000)
                     return
                 } catch (_: Exception) { }
             }
