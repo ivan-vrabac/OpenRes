@@ -204,6 +204,13 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             }
         }
 
+        private fun errOf(quality: Int) = when (quality) {
+            SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 15.0
+            SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 30.0
+            SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 60.0
+            else -> 90.0
+        }
+
         /** The compass from the raw sensors (owner 2026-11-01: on a Pixel 9a both the provider and the rotation
          *  vector sensor stopped reporting while the magnetometer and accelerometer worked fine). */
         private fun startSensor(send: (Double, Double) -> Unit) {
@@ -211,7 +218,10 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) ?: return
             val acc = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+            val gyro = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
             val gravity = FloatArray(3)
+            var fused: Double? = null            // the gyroscope turns it at once, the magnetometer keeps it true
+            var lastGyro = 0L
             val field = FloatArray(3)
             var hasGravity = false
             var quality = SensorManager.SENSOR_STATUS_ACCURACY_LOW
@@ -221,8 +231,21 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             sensor = object : SensorEventListener {
                 override fun onSensorChanged(e: SensorEvent) {
                     if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-                        e.values.copyInto(gravity, 0, 0, 3)
+                        for (i in 0..2) gravity[i] = if (hasGravity) gravity[i] + (e.values[i] - gravity[i]) * 0.15f else e.values[i]
                         hasGravity = true
+                        return
+                    }
+                    if (e.sensor.type == Sensor.TYPE_GYROSCOPE) {
+                        val dt = (e.timestamp - lastGyro) * 1e-9
+                        lastGyro = e.timestamp
+                        val f = fused
+                        val g = Math.sqrt((gravity[0] * gravity[0] + gravity[1] * gravity[1] + gravity[2] * gravity[2]).toDouble())
+                        if (f == null || dt <= 0 || dt > 0.2 || g < 1) return
+                        // the turn around "up", whatever way the phone is held; counter-clockwise lowers the heading
+                        val up = (e.values[0] * gravity[0] + e.values[1] * gravity[1] + e.values[2] * gravity[2]) / g
+                        val now = (f - Math.toDegrees(up * dt) + 360) % 360
+                        fused = now
+                        if (System.currentTimeMillis() - lastTrusted >= 3000) send(now, errOf(quality))
                         return
                     }
                     e.values.copyInto(field, 0, 0, 3)
@@ -235,18 +258,17 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
                         SensorManager.remapCoordinateSystem(rot, SensorManager.AXIS_X, SensorManager.AXIS_Z, upright)
                         SensorManager.getOrientation(upright, ori)
                     }
-                    val err = when (quality) {
-                        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 15.0
-                        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 30.0
-                        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 60.0
-                        else -> 90.0
-                    }
-                    send((Math.toDegrees(ori[0].toDouble()) + declination + 360) % 360, err)
+                    val az = (Math.toDegrees(ori[0].toDouble()) + declination + 360) % 360
+                    val f = fused
+                    val now = if (f == null) az else (f + (((az - f + 540) % 360) - 180) * (if (gyro != null) 0.04 else 0.2) + 360) % 360
+                    fused = now
+                    if (gyro == null) send(now, errOf(quality))
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
             sm.registerListener(sensor, mag, SensorManager.SENSOR_DELAY_GAME)
             sm.registerListener(sensor, acc, SensorManager.SENSOR_DELAY_GAME)
+            if (gyro != null) sm.registerListener(sensor, gyro, SensorManager.SENSOR_DELAY_GAME)
             try {
                 // magnetic north to true north, about 5 degrees in Croatia
                 LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { l ->

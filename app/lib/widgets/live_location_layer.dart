@@ -11,10 +11,10 @@ import '../services/location_service.dart';
 /// Provider) and turns smoothly (no accuracy circle, owner 2026-10-25). [onFrame] gets the shown
 /// position every frame it changes, so the map can follow it just as smoothly.
 class LiveLocationLayer extends StatefulWidget {
-  final Widget Function(double? heading, bool sure) marker;
+  final Widget Function(double? heading) marker;
   final double size;
   final void Function(LatLng pos)? onFrame;
-  const LiveLocationLayer({super.key, required this.marker, this.size = 44, this.onFrame});
+  const LiveLocationLayer({super.key, required this.marker, this.size = 96, this.onFrame});
 
   @override
   State<LiveLocationLayer> createState() => _LiveLocationLayerState();
@@ -27,7 +27,6 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
   late final Ticker _ticker = createTicker(_tick);
   LatLng? _shown;
   double? _head;
-  bool _sure = true;
   Duration _last = Duration.zero;
 
   @override
@@ -62,17 +61,10 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
         moved = true;
       }
     }
-    // the compass while it's sure, else the direction of travel, else the compass anyway, shown faded:
-    // an uncalibrated compass can be far off, but a direction that vanishes looks broken (owner 2026-11-01)
+    // the compass while it's sure, else the direction of travel, else the compass anyway
     final compass = _svc.heading.value;
-    final sure = compass != null && _svc.headingError <= _kCompassMaxError;
-    final h = sure ? compass : f.course ?? compass;
+    final h = compass != null && _svc.headingError <= _kCompassMaxError ? compass : f.course ?? compass;
     var turned = false;
-    final trusted = sure || (h != null && f.course != null);
-    if (trusted != _sure) {
-      _sure = trusted;
-      turned = true;
-    }
     if (h != null) {
       final cur = _head ?? h;
       final diff = ((h - cur + 540) % 360) - 180;   // shortest way round
@@ -92,7 +84,7 @@ class _LiveLocationLayerState extends State<LiveLocationLayer> with SingleTicker
     if (p == null || _svc.fix.value == null) return const SizedBox.shrink();
     // no accuracy circle (owner 2026-10-25: not needed)
     return MarkerLayer(markers: [
-      Marker(point: p, width: widget.size, height: widget.size, child: widget.marker(_head, _sure)),
+      Marker(point: p, width: widget.size, height: widget.size, child: widget.marker(_head)),
     ]);
   }
 }

@@ -53,8 +53,7 @@ class _HexOutlinePainter extends CustomPainter {
 
 class _PosCrosshairPainter extends CustomPainter {
   final double? headingDeg;
-  final bool sure;                         // false: an uncalibrated compass, drawn faded
-  const _PosCrosshairPainter({this.headingDeg, this.sure = true});
+  const _PosCrosshairPainter({this.headingDeg});
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
@@ -89,13 +88,18 @@ class _PosCrosshairPainter extends CustomPainter {
         smallPaint,
       );
     }
-    // White heading tick — slightly longer, drawn on top
+    // the way you face: a beam fading out from the marker, like Google Maps
     if (headingDeg != null) {
       final a = headingDeg! * math.pi / 180 - math.pi / 2;
-      canvas.drawLine(
-        Offset(cx + innerR * math.cos(a), cy + innerR * math.sin(a)),
-        Offset(cx + (outerR + 3) * math.cos(a), cy + (outerR + 3) * math.sin(a)),
-        Paint()..color = Colors.white.withValues(alpha: sure ? 1 : 0.4)..strokeWidth = 1.5..style = PaintingStyle.stroke,
+      const half = 0.45, r = 46.0;
+      final c = Offset(cx, cy);
+      canvas.drawPath(
+        Path()
+          ..moveTo(cx, cy)
+          ..arcTo(Rect.fromCircle(center: c, radius: r), a - half, half * 2, false)
+          ..close(),
+        Paint()..shader = RadialGradient(colors: [Colors.white.withValues(alpha: 0.75), Colors.white.withValues(alpha: 0)])
+            .createShader(Rect.fromCircle(center: c, radius: r)),
       );
     }
     // Yellow center dot
@@ -103,7 +107,7 @@ class _PosCrosshairPainter extends CustomPainter {
         Paint()..color = Colors.yellow..style = PaintingStyle.fill);
   }
   @override
-  bool shouldRepaint(_PosCrosshairPainter old) => old.headingDeg != headingDeg || old.sure != sure;
+  bool shouldRepaint(_PosCrosshairPainter old) => old.headingDeg != headingDeg;
 }
 
 // ── Thin red crosshair painter ────────────────────────────────────────────────

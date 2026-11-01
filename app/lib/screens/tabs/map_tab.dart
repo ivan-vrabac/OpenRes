@@ -727,7 +727,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
             }),
           // GPS position: glides between fixes, compass heading, accuracy circle
           LiveLocationLayer(
-            marker: (h, sure) => CustomPaint(painter: _PosCrosshairPainter(headingDeg: h, sure: sure)),
+            marker: (h) => CustomPaint(painter: _PosCrosshairPainter(headingDeg: h)),
             onFrame: _followFrame,
           ),
         ],
