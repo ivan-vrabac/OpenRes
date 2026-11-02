@@ -9,6 +9,9 @@ import '../models/tab_config.dart';
 final tutorialAsked = ValueNotifier<bool>(false);
 final tutorialStart = ValueNotifier<int>(0);
 
+/// True while the player has to place the Campus: what the overlay can't cover closes itself.
+final tutorialLocked = ValueNotifier<bool>(false);
+
 /// The tutorial running now. The map writes the steps, the game screen shows them over all the tabs.
 final tutorialRun = ValueNotifier<TutorialRun?>(null);
 
@@ -58,8 +61,11 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     _settled?.cancel();
     _follow?.cancel();
     widget.changes?.removeListener(_changed);
+    _lock(false);
     super.dispose();
   }
+
+  void _lock(bool on) => WidgetsBinding.instance.addPostFrameCallback((_) => tutorialLocked.value = on);
 
   void _changed() {
     if (!mounted) return;
@@ -93,6 +99,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
 
   void _show() {
     _wasWaiting = _waiting;
+    _lock(_wasWaiting);
     _follow?.cancel();
     if (_wasWaiting) {
       _follow = Timer.periodic(const Duration(milliseconds: 500), (_) { if (mounted) setState(() {}); });
@@ -117,9 +124,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     final cardOnTop = hole != null && hole.center.dy > height / 2;
     return Positioned.fill(child: Stack(children: [
       if (waiting) ...[
-        // the map stays free, only what is below the target (the tab bar) is closed
-        Positioned(left: 0, right: 0, top: hole!.bottom, bottom: 0,
-            child: const AbsorbPointer(child: ColoredBox(color: Colors.black54))),
+        // the map stays free; the buttons beside the target and the tab bar below it are closed
+        Positioned(left: 0, right: 0, top: hole!.bottom, bottom: 0, child: _closed),
+        Positioned(left: 0, width: hole.left, top: hole.top, height: hole.height, child: _closed),
+        Positioned(left: hole.right, right: 0, top: hole.top, height: hole.height, child: _closed),
         Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent, dim: false)))),
       ] else
         Positioned.fill(child: AbsorbPointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent)))),
@@ -154,6 +162,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     ]));
   }
 }
+
+const _closed = AbsorbPointer(child: ColoredBox(color: Colors.black54));
 
 class _Scrim extends CustomPainter {
   final Rect? hole;

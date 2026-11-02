@@ -16,7 +16,7 @@ class UiLook {
   static final showHud = ValueNotifier<bool>(true);
 
   /// The bottom tab bar is see-through while the Map tab is open (fades to solid on the others).
-  static final clearTabs = ValueNotifier<bool>(true);
+  static final clearTabs = ValueNotifier<bool>(false);
 
   /// The map also runs behind Android's status bar (when the status bar is shown).
   static final underStatusBar = ValueNotifier<bool>(true);
@@ -29,7 +29,7 @@ class UiLook {
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     showHud.value = p.getBool('ui_show_hud') ?? true;
-    clearTabs.value = p.getBool('ui_clear_tabs') ?? true;
+    clearTabs.value = p.getBool('ui_clear_tabs') ?? false;
     underStatusBar.value = p.getBool('ui_under_status') ?? true;
   }
 

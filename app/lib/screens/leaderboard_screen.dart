@@ -12,12 +12,13 @@ import '../app_colors.dart';
 /// (x activity), countries, Tantalum-180m, and output per hour (one item, or everything at prices).
 /// Compact one-line rows; tap a row for the company sheet. Big numbers are always short (1.25T).
 class LeaderboardScreen extends StatelessWidget {
-  const LeaderboardScreen({super.key});
+  final bool embedded;                     // a tab of the bottom bar: no back arrow
+  const LeaderboardScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: ModalRoute.of(context)?.canPop == true ? AppBar(toolbarHeight: 36) : null,
+      appBar: !embedded && ModalRoute.of(context)?.canPop == true ? AppBar(toolbarHeight: 36) : null,
       body: const DefaultTabController(
         length: 6,
         child: Column(children: [

@@ -1137,7 +1137,6 @@ class _BottomBarSettingsState extends State<_BottomBarSettings> {
   // Tabs that must always be in the bottom bar and cannot be moved to overflow.
   static const _kFixed = {GameTabId.map, GameTabId.warehouse};
   // Tabs that should never appear in the configurable list at all.
-  static const _kHidden = {GameTabId.leaderboard};
 
   @override
   void initState() {
@@ -1148,7 +1147,7 @@ class _BottomBarSettingsState extends State<_BottomBarSettings> {
       if (!_bottom.contains(id)) _bottom.insert(0, id);
     }
     _overflow = GameTabId.values
-        .where((t) => tabMeta.containsKey(t) && !_bottom.contains(t) && !_kHidden.contains(t))
+        .where((t) => tabMeta.containsKey(t) && !_bottom.contains(t))
         .toList();
   }
 

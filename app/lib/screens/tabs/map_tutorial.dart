@@ -45,7 +45,7 @@ extension _MapTutorial on _MapTabState {
             'You get 3 quests a day. Finish all of them every day for a streak, with bonuses every 7 and 30 days. One missed day is forgiven, two end it. '
             'The daily reward works the same way.', null, GameTabId.quests),
         const TutorialStep('Leaderboards',
-            'Open them from your profile card in More. Compete on company value, Campus, hexes, output, countries and Tantalum. Value and Campus count how active you are, so a company that stops playing slides down.', null, GameTabId.leaderboard),
+            'Compete on company value, Campus, hexes, output, countries and Tantalum. Value and Campus count how active you are, so a company that stops playing slides down.', null, GameTabId.leaderboard),
         const TutorialStep('Tantalum-180m',
             'The endgame, from Campus level 40: an Isotope lab turns tantalum and supercomputers into Tantalum-180m. It cannot be sold. '
             'Put it into dark matter research: every level adds 1 % output to everything.', null, GameTabId.luxury),

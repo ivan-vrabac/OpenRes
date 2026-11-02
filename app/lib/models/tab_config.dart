@@ -17,12 +17,18 @@ enum GameTabId {
 
 const _kPrefKey = 'bottom_bar_tabs';
 
-/// Default tabs shown in the bottom bar (must include at most 4; 'more' is always appended)
+/// Default tabs in the bottom bar, which scrolls ('more' is always appended): the tutorial's order, so its
+/// Next goes to the neighbouring tab (owner 2026-11-02). The rest is under More.
 const List<GameTabId> kDefaultBottomTabs = [
   GameTabId.map,
   GameTabId.mines,
-  GameTabId.specialBuildings,
   GameTabId.warehouse,
+  GameTabId.market,
+  GameTabId.specialBuildings,
+  GameTabId.factories,
+  GameTabId.quests,
+  GameTabId.leaderboard,
+  GameTabId.luxury,
 ];
 
 class TabConfig {

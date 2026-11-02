@@ -67,7 +67,8 @@ final Map<GameTabId, _TabMeta> tabMeta = {
       build: () => const FactoryScreen()),
   GameTabId.market: _TabMeta(label: 'Market', icon: Icons.storefront_outlined,
       build: () => const MarketScreen(), needsScaffold: true),
-  // Leaderboard accessible from the More tab profile card — not a standalone tab
+  GameTabId.leaderboard: _TabMeta(label: 'Leaderboard', icon: Icons.leaderboard_outlined,
+      build: () => const LeaderboardScreen(embedded: true)),
   GameTabId.specialBuildings: _TabMeta(label: 'Campus', icon: Icons.location_city_outlined,
       build: () => const CampusScreen()),
   GameTabId.luxury: _TabMeta(label: 'Tantalum', icon: Icons.science_outlined,
@@ -389,7 +390,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 children: _buildPages(),
               ),
               if (hud)
-                Positioned(top: under ? statusTop : 0, left: 0, right: 0, child: PlayerHud(onTap: _openStats)),
+                Positioned(top: under ? statusTop : 0, left: 0, right: 0, child: ValueListenableBuilder<bool>(
+                  valueListenable: tutorialLocked,
+                  builder: (_, locked, hud) => IgnorePointer(ignoring: locked, child: hud),
+                  child: PlayerHud(onTap: _openStats))),
             ]),
           ),
         ]),
@@ -547,19 +551,11 @@ class _MoreTabState extends State<_MoreTab> {
               ])),
             ]),
             const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: OutlinedButton.icon(
-                icon: const Icon(Icons.leaderboard, size: 16),
-                label: const Text('Leaderboard'),
-                onPressed: () => open(const LeaderboardScreen()),
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: OutlinedButton.icon(
-                icon: const Icon(Icons.star_outline, size: 16),
-                label: const Text('Achievements'),
-                onPressed: () => open(const AchievementsScreen()),
-              )),
-            ]),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              icon: const Icon(Icons.star_outline, size: 16),
+              label: const Text('Achievements'),
+              onPressed: () => open(const AchievementsScreen()),
+            )),
           ])),
           const SizedBox(height: 16),
         ],

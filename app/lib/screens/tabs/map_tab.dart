@@ -717,6 +717,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
           child: Row(
             children: [
               const SizedBox(width: 4),
+              // closed while the tutorial waits for the Campus
+              ValueListenableBuilder<bool>(valueListenable: tutorialLocked, builder: (_, locked, row) => IgnorePointer(
+                  ignoring: locked, child: Opacity(opacity: locked ? 0.35 : 1, child: row)), child: Row(mainAxisSize: MainAxisSize.min, children: [
               // Scan/heatmap visibility toggle — no-op when no scan available
               _mapBtnW(
                 Icon(Icons.satellite_alt, size: 20, color: _showClouds ? Colors.white : AppColors.accent),
@@ -740,6 +743,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                 },
                 active: _showMines, tip: 'Hexes and Campuses',
               ),
+              ])),
               const Spacer(),
               // Navigation
               _mapBtn(Icons.my_location, () {
