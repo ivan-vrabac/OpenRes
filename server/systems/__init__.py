@@ -25,7 +25,7 @@ from . import integrity
 # Actions that change the game: at most N per player in a window of S seconds (a script can't hammer
 # them; a person never gets near). path: (N, S)
 LIMITS = {
-    "/api/v3/survey": (20, 60), "/api/v3/hex/build": (30, 60), "/api/v3/hex/renew": (30, 60),
+    "/api/v3/survey": (40, 60), "/api/v3/hex/build": (30, 60), "/api/v3/hex/renew": (30, 60),
     "/api/v3/hex/cancel": (20, 60), "/api/v3/hex/switch": (30, 60), "/api/v3/sell": (30, 60),
     "/api/v1/market/order": (20, 60), "/api/v1/market/edit": (20, 60), "/api/v1/market/take": (30, 60),
     "/api/v1/market/system": (30, 60), "/api/v1/market/cancel": (20, 60),
