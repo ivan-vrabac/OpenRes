@@ -16,7 +16,7 @@ extension _MapSheets on _MapTabState {
     final here = ((res.data['options'] as Map)[op] as Map?)?[item] as Map?;
     final name = _co.itemName(item);
     if (here == null) {
-      _snack('No ${name.toLowerCase()} at this spot. Survey here: hotter colours are better.', error: true);
+      _snack('No ${name.toLowerCase()} at this spot.', error: true);
       return;
     }
     final quality = (here['quality'] as num).toInt();
