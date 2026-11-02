@@ -242,8 +242,8 @@ def pay(conn, hid, amount, what: str) -> None:
     amount = int(round(amount))
     if credits(conn, hid) < amount:
         raise econ.GameError("credits", f"Not enough credits (needs {amount:,})")
-    xp = amount * g.XP_PER_CREDIT.get(what, 0)
-    conn.execute("UPDATE players SET credits=credits-?, xp=COALESCE(xp,0)+? WHERE hID=?", (amount, xp, hid))
+    econ.debit(conn, hid, amount, what)                  # never below zero, and in the ledger
+    conn.execute("UPDATE players SET xp=COALESCE(xp,0)+? WHERE hID=?", (amount * g.XP_PER_CREDIT.get(what, 0), hid))
 
 
 def stock(conn, hid) -> dict:

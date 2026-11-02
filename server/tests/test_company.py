@@ -450,3 +450,22 @@ def test_a_moving_campus_holds_both_places_and_shows_its_site():
 def test_a_new_company_has_its_start_credits_from_the_first_call():
     hid, sid, _ = new_player("mefirst")
     assert call("/api/v3/me", sid)["credits"] == co.START_CREDITS
+
+
+def test_spending_is_in_the_ledger_and_can_not_be_done_twice():
+    import threading
+    import econ
+    hid, sid = setup_hq("led", at=(45.61, 16.33))
+    with main.get_db() as conn:
+        conn.execute("UPDATE players SET credits=? WHERE hID=?", (g.survey_tax(100), hid))
+        conn.commit()
+    out = []
+    ts = [threading.Thread(target=lambda: out.append(call("/api/v3/survey", sid, lat=45.61, lng=16.33, radius=100))) for _ in range(6)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert sum(1 for r in out if r["err"] == 0) == 1             # only the credits for one
+    with main.get_db() as conn:
+        assert conn.execute("SELECT credits FROM players WHERE hID=?", (hid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT credits FROM ledger WHERE hid=? AND kind='survey'", (hid,)).fetchall()[0][0] == -g.survey_tax(100)
