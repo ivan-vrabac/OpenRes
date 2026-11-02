@@ -15,6 +15,7 @@ import re
 import time
 
 import econ
+import names
 
 REASONS = ("insult", "hate", "sexual", "spam", "cheating", "other")
 
@@ -205,7 +206,7 @@ def install(api) -> None:
     @api.endpoint("/api/v1/mod/act", auth=False)
     @mod
     def mod_act(conn, form):
-        """action: dismiss | ban | unban | contact_done | contact_reopen | report_reopen; report id and/or
+        """action: dismiss | ban | unban | rename (`name`) | contact_done | contact_reopen | report_reopen; report id and/or
         pid; hours (empty = forever); reason. Everything is kept in mod_log (one year)."""
         action = form.get("action", "")
         rid = int(form.get("report") or 0)
@@ -219,6 +220,19 @@ def install(api) -> None:
             elif action == "unban" and target:
                 conn.execute("DELETE FROM player_bans WHERE hid=?", (target,))
                 _ban_cache.clear()
+            elif action == "rename" and target:
+                # an offensive name goes without asking the player (terms section 6); free, no name change used
+                new = (form.get("name") or "").strip()
+                problem = names.name_problem(new)
+                if problem:
+                    raise econ.GameError("invalid_name", problem)
+                if conn.execute("SELECT 1 FROM players WHERE lower(company_name)=? AND hID<>?",
+                                (h.norm_name(new), target)).fetchone():
+                    raise econ.GameError("name_taken", "That company name is taken")
+                old = name_of(conn, target)
+                conn.execute("UPDATE players SET company_name=? WHERE hID=?", (new, target))
+                h.add_proto(conn, target, "rename", {"from": old, "to": new, "cost": 0})
+                reason = f"was {old}"
             elif action == "contact_done":
                 conn.execute("UPDATE contact_messages SET handled=1 WHERE id=?", (int(form.get("contact") or 0),))
             elif action == "contact_reopen":

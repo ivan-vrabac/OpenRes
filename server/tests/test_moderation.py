@@ -87,3 +87,14 @@ def test_any_company_can_be_banned_and_mistakes_undone_and_all_is_logged(modpw):
     assert ("ban", name) in log and ("unban", name) in log and ("contact_reopen", f"message #{cid}") in log
     assert any("2 hours" in x["detail"] and "spam" in x["detail"] for x in got["log"] if x["action"] == "ban")
 
+
+def test_a_moderator_renames_a_company_without_asking(modpw):
+    hid, sid, name = new_player("mren")
+    other = new_player("mrtwo")[2]
+    act = lambda **f: call("/api/v1/mod/act", "", mod_password=modpw, action="rename", pid=_pid(sid), **f)
+    assert act(name="Company 4711")["err"] == 0
+    with main.get_db() as conn:
+        assert conn.execute("SELECT company_name, COALESCE(name_changes,0) FROM players WHERE hID=?", (hid,)).fetchone()[:2] == ("Company 4711", 0)
+        assert conn.execute("SELECT detail FROM mod_log ORDER BY id DESC LIMIT 1").fetchone()[0].endswith(f"was {name}")
+    assert act(name=other)["code"] == "name_taken"
+    assert act(name="x")["code"] == "invalid_name"

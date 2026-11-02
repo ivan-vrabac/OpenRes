@@ -8,12 +8,9 @@ import 'top_banner.dart';
 /// written by players). Moved here from the chat widget when chat was removed (0.2.3).
 Future<void> reportPlayer(BuildContext context, String sid, String pid) async {
   const reasons = {
-    'insult': 'Offensive company name or insults',
-    'hate': 'Hate or discrimination',
-    'sexual': 'Sexual content',
-    'spam': 'Spam or advertising',
-    'cheating': 'Cheating',
-    'other': 'Something else',
+    'insult': ('Offensive company name', 'Insults, hate speech, bad words, mocking other people, sexualised words, propaganda'),
+    'cheating': ('Cheating', null),
+    'other': ('Something else', null),
   };
   final reason = await showAppSheet<String>(
     context: context,
@@ -21,7 +18,8 @@ Future<void> reportPlayer(BuildContext context, String sid, String pid) async {
       const ListTile(title: Text('Report', style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text('A moderator will look at it. The player is not told who reported them.')),
       for (final e in reasons.entries)
-        ListTile(dense: true, title: Text(e.value), onTap: () => popIfCurrent(ctx, e.key)),
+        ListTile(dense: true, title: Text(e.value.$1), subtitle: e.value.$2 == null ? null : Text(e.value.$2!),
+            onTap: () => popIfCurrent(ctx, e.key)),
     ])),
   );
   if (reason == null || !context.mounted) return;

@@ -71,7 +71,6 @@ def public_profile(conn, h, viewer_hid: str, target_hid: str) -> dict:
     rank_hexes = _rank(conn, hexes, "SELECT COUNT(*) FROM (SELECT hid, COUNT(*) c FROM co_hexes WHERE op!='campus' "
                                     "GROUP BY hid) WHERE c > ?")
     rank_ta = _rank(conn, ta_mg, "SELECT COUNT(*) FROM co_luxury WHERE produced > ?") if ta_mg > 0 else None
-    rel = set()
     ach = [{"code": r[0], "title": r[1], "ts": r[2]} for r in conn.execute(
         "SELECT code, title, ts FROM achievements WHERE hid=? ORDER BY ts DESC LIMIT 50", (target_hid,))]
     out = {
@@ -90,7 +89,6 @@ def public_profile(conn, h, viewer_hid: str, target_hid: str) -> dict:
         "rankTantalum": rank_ta,
         "achievements": ach,
         "isMe": viewer_hid == target_hid,
-        "relations": sorted(rel),
     }
     # public company sheet: age, hexes by item, plants
     try:

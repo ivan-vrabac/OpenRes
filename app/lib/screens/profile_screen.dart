@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../models/player_provider.dart';
 import '../services/game_api.dart';
 import '../widgets/async_view.dart';
-import '../widgets/top_banner.dart';
 import '../widgets/report.dart';
 import 'achievements_screen.dart';
 import 'luxury_screen.dart' show fmtMass;
@@ -28,7 +27,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _p;
   String? _error;
   bool _loading = true;
-  bool _busy = false;
 
   @override
   void initState() {
@@ -49,19 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _error = r.message;
       }
     });
-  }
-
-  Future<void> _toggle(String kind, bool on) async {
-    if (_busy || _p == null) return;
-    setState(() => _busy = true);
-    final r = await GameApi.call('/api/v1/social/contact', context.read<PlayerProvider>().sid,
-        {'pid': _p!['pid'], 'kind': kind, 'action': on ? 'add' : 'remove'});
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (r.ok) _p!['relations'] = r.get<List>('relations') ?? [];
-    });
-    if (!r.ok) AppNotify.show(context, r.message ?? 'Failed', isError: true);
   }
 
   /// One stat tile; every tile has the same height, an icon and a one-line label (owner 2026-10-31:
@@ -121,20 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ]));
   }
 
-  Widget _relationChip(String kind, String label, IconData icon, Color color) {
-    final rel = (_p?['relations'] as List? ?? const []).contains(kind);
-    return FilterChip(
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      showCheckmark: false,
-      avatar: Icon(icon, size: 14, color: rel ? Colors.black : color),
-      label: Text(label, style: TextStyle(fontSize: 12, color: rel ? Colors.black : null)),
-      selected: rel,
-      selectedColor: color,
-      onSelected: _busy ? null : (v) => _toggle(kind, v),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final body = AsyncView(
@@ -170,15 +141,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   tooltip: 'Report',
                   icon: Icon(Icons.flag_outlined, color: AppColors.t38),
                   onPressed: () => reportPlayer(context, context.read<PlayerProvider>().sid, p['pid'] as String),
-                ),
-              if (!isMe)
-                IconButton(
-                  tooltip: (p['relations'] as List? ?? const []).contains('blacklist') ? 'Unblock' : 'Block',
-                  icon: Icon(Icons.block,
-                      color: (p['relations'] as List? ?? const []).contains('blacklist')
-                          ? Colors.redAccent : AppColors.t38),
-                  onPressed: _busy ? null : () => _toggle('blacklist',
-                      !(p['relations'] as List? ?? const []).contains('blacklist')),
                 ),
             ]),
             const SizedBox(height: 12),
@@ -217,22 +179,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   errorBuilder: (_, __, ___) => Icon(Icons.factory_outlined, size: 40, color: AppColors.t38))),
               _countTag('Lv ${it['level']}'),
             ])),
-            if (!isMe) ...[
-              const SizedBox(height: 12),
-              // compact "Mark as:" row (block is the icon in the header)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  Text('Mark as:', style: TextStyle(color: AppColors.t54, fontSize: 12)),
-                  const SizedBox(width: 6),
-                  _relationChip('friend', 'Friend', Icons.person_add_alt, Colors.lightBlueAccent),
-                  const SizedBox(width: 4),
-                  _relationChip('enemy', 'Enemy', Icons.gpp_bad_outlined, Colors.orangeAccent),
-                  const SizedBox(width: 4),
-                  _relationChip('watch', 'Person of Interest', Icons.visibility_outlined, Colors.amber),
-                ]),
-              ),
-            ],
             const SizedBox(height: 16),
             Card(
               child: ListTile(
