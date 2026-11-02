@@ -21,12 +21,13 @@ DELAY_AFTER_DAYS = 30
 DELAY_DAYS = 30
 SWEEP_S = 3600
 # tables whose rows are someone else's history: the player's id is blanked instead of deleting the row
-KEEP_ROWS = {("mkt_trades", "buyer_hid"), ("mkt_trades", "seller_hid"), ("mkt_trades", "tax_payer"),
+KEEP_ROWS = {("market_trades", "buyer_hid"), ("market_trades", "seller_hid"),
+             ("mkt_trades", "buyer_hid"), ("mkt_trades", "seller_hid"), ("mkt_trades", "tax_payer"),
              ("attacks", "attacker_hid"), ("attacks", "defender_hid"), ("external_repairs", "helper_hid"),
              ("external_repairs", "owner_hid"), ("loans", "lender"), ("auction_bids", "hid")}
 ID_COLUMNS = {"hid", "hID", "owner_hid", "borrower", "lender", "dropper_hid", "from_hid", "to_hid", "target_hid",
               "buyer_hid", "seller_hid", "tax_payer", "attacker_hid", "defender_hid", "helper_hid", "spinner",
-              "collected_by", "winner_hid", "leader_hid"}
+              "collected_by", "winner_hid", "leader_hid", "reporter_hid"}
 
 
 def rename_cost(changes: int) -> int:

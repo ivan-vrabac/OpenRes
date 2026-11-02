@@ -180,6 +180,21 @@ def test_a_renew_quest_asks_for_no_more_than_can_be_renewed():
         conn.rollback()
 
 
+def test_deleting_an_account_keeps_the_other_side_of_trades_and_drops_its_id():
+    from systems import account
+    a = new_player("qdel")[0]
+    b = new_player("qkeep")[0]
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO market_trades(ts, kind, item, qty, price, buyer_hid, seller_hid, tax) "
+                     "VALUES('2026-01-01','player','wood',1,1,?,?,0)", (a, b))
+        conn.execute("INSERT INTO reports(ts, reporter_hid, target_hid, kind, reason) VALUES('2026-01-01',?,?,'player','x')", (a, b))
+        conn.commit()
+        with econ.tx(conn):
+            account.purge(conn, a)
+        assert conn.execute("SELECT buyer_hid FROM market_trades WHERE seller_hid=?", (b,)).fetchone()[0] is None
+        assert not conn.execute("SELECT 1 FROM reports WHERE reporter_hid=?", (a,)).fetchone()
+
+
 def test_the_country_comes_from_cloudflare():
     from helpers import client
     hid, sid, _ = new_player("qcf")

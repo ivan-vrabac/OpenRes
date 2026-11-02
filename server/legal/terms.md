@@ -38,7 +38,7 @@ We decide ourselves what counts as abuse of the game mechanics or as bad behavio
 
 ## 6. Company names and reports
 
-Choose a company name that is respectful: no insults, hate, sexual content, impersonation or advertising. You can block players and report players in the app (on their profile); moderators look at reports and may rename, suspend or ban companies, for some time or forever.
+Choose a company name that is respectful: no insults, hate, sexual content, impersonation or advertising. You can report players in the app (on their profile); moderators look at reports and may rename, suspend or ban companies, for some time or forever.
 
 ## 7. No warranty, liability
 
