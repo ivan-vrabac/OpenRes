@@ -15,7 +15,7 @@ RETENTION_DAYS = 30                 # logs and backups (privacy policy)
 _contact_bucket = econ.TokenBucket(10, 1800.0)   # site-wide: 10 messages, then one more every 30 minutes
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-LEGAL_VERSION = "2026-11-02.2"      # Cloudflare, country from it, transfers outside the EU
+LEGAL_VERSION = "2026-11-02.3"      # no refunds where the law allows it, otherwise Google Play's rules
 _DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "legal")
 
 

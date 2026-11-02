@@ -22,13 +22,17 @@ Credits, raw materials, products, hexes, your Campus, plants, Tantalum-180m and 
 
 ## 4. Buying the game
 
-OpenRes is sold through Google Play. Google handles the purchase, the payment and any refund under its own refund policies. We never see your payment details and we can't issue refunds ourselves.
+OpenRes is sold through Google Play. Google handles the purchase and the payment, and we never see your payment details.
 
 What you buy is the permission to install and play the game described in section 1. You don't buy any in-game item, result or progress, a fixed set of features, or the promise that the game or a world keeps running for any period of time.
 
-The game is digital content that is supplied as soon as you download it. Where the law allows it, by buying and downloading the game you ask for it to be supplied immediately and you accept that you lose your right of withdrawal from that moment.
+The game is digital content that is supplied as soon as you download it. Where the law allows it, by buying, downloading or opening the game you ask for it to be supplied immediately and you accept that you lose your right of withdrawal from that moment.
 
-We give no refunds or compensation of our own, in particular if you stop playing, delete your account, are suspended or banned for breaking these terms, or if the game, its balance or its world is changed or reset. This does not limit any rights that mandatory consumer law gives you and that can't be excluded.
+Our refund policy is no refunds, wherever the law allows it. We give no refunds or compensation of our own, in particular if you stop playing, delete your account, are suspended or banned for breaking these terms, or if the game, its balance or its world is changed or reset.
+
+Where a refund can't be excluded, only the Google Play refund rules that apply to your purchase count, within the time limits they set, and the refund is made through Google Play. We refuse requests that reach us after Google Play's own refund period has ended.
+
+This does not limit any rights that mandatory consumer law gives you and that can't be excluded.
 
 ## 5. Fair play and behaviour
 
