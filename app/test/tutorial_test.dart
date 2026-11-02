@@ -77,7 +77,6 @@ void main() {
       await t.tapAt(const Offset(40, 505));                   // a button beside the slider
       await t.pump();
       expect(mapTaps, 0);
-      expect(tutorialLocked.value, isTrue);
       placed.value = true;
       await t.pump();
       expect(find.text('After'), findsOneWidget);
@@ -87,8 +86,6 @@ void main() {
       expect(find.text('Next'), findsOneWidget);              // done: a normal card now
       expect(find.text('Skip tutorial'), findsOneWidget);
       await t.pumpWidget(const SizedBox());                   // ends its timer
-      await t.pump();
-      expect(tutorialLocked.value, isFalse);
     });
   });
 }

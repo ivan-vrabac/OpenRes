@@ -60,7 +60,7 @@ extension _MapTutorial on _MapTabState {
   Future<void> _maybeTutorial() async {
     if (!mounted || tutorialRun.value != null) return;
     if (_co.state.isEmpty) {                   // not known yet whether there is a Campus
-      Future.delayed(const Duration(seconds: 2), _maybeTutorial);
+      Future.delayed(const Duration(milliseconds: 200), _maybeTutorial);
       return;
     }
     final seen = await StorageService.getTutorial();

@@ -68,6 +68,7 @@ extension _MapMenus on _MapTabState {
 
   /// Categories; one whose first resource your Campus hasn't unlocked yet is locked.
   Future<void> _openCategoryMenu() async {
+    if (tutorialLocked.value) return;
     final level = math.max(1, _co.campusLevel);
     final entries = _entries((_co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {});
     final pick = await _anchoredMenu<String>(_categoryBtnKey, [
@@ -91,6 +92,7 @@ extension _MapMenus on _MapTabState {
   /// The resources of the chosen category, highest unlock at the top (the cheapest next to the
   /// button); locked ones say at which Campus level they unlock. True when one was picked.
   Future<bool> _openResourceMenu() async {
+    if (tutorialLocked.value) return false;
     final co = _co;
     final level = math.max(1, co.campusLevel);
     final list = _entries((co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {})

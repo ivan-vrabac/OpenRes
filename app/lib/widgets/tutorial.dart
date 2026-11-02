@@ -9,8 +9,9 @@ import '../models/tab_config.dart';
 final tutorialAsked = ValueNotifier<bool>(false);
 final tutorialStart = ValueNotifier<int>(0);
 
-/// True while the player has to place the Campus: what the overlay can't cover closes itself.
-final tutorialLocked = ValueNotifier<bool>(false);
+/// No Campus yet (or not known yet): the player stays on the map, also before the first card shows. The
+/// game screen keeps it up to date; what the overlay can't cover closes itself.
+final tutorialLocked = ValueNotifier<bool>(true);
 
 /// The tutorial running now. The map writes the steps, the game screen shows them over all the tabs.
 final tutorialRun = ValueNotifier<TutorialRun?>(null);
@@ -61,11 +62,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     _settled?.cancel();
     _follow?.cancel();
     widget.changes?.removeListener(_changed);
-    _lock(false);
     super.dispose();
   }
-
-  void _lock(bool on) => WidgetsBinding.instance.addPostFrameCallback((_) => tutorialLocked.value = on);
 
   void _changed() {
     if (!mounted) return;
@@ -99,7 +97,6 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
 
   void _show() {
     _wasWaiting = _waiting;
-    _lock(_wasWaiting);
     _follow?.cancel();
     if (_wasWaiting) {
       _follow = Timer.periodic(const Duration(milliseconds: 500), (_) { if (mounted) setState(() {}); });

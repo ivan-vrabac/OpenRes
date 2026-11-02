@@ -293,7 +293,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     if (!started || !mounted) return;
     LocationService.instance.fix.removeListener(_onFix);
     LocationService.instance.fix.addListener(_onFix);
-    Future.delayed(const Duration(seconds: 3), _maybeTutorial);
+    _maybeTutorial();
     _onFix();
   }
 

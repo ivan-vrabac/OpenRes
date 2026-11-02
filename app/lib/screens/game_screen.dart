@@ -113,7 +113,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     tutorialAsked.addListener(_onTutorialAsked);
     mapFocus.addListener(_toMap);
     campusMoveAsked.addListener(_toMap);
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) Company.active.value = _company; });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Company.active.value = _company;
+      _company.addListener(_syncLock);
+      _syncLock();
+    });
     TabConfig.load().then((cfg) {
       if (mounted) setState(() { _config = cfg; _configLoaded = true; });
       if (mounted) _syncGps();
@@ -131,8 +136,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       ApiService.getCountryCode().then((c) { if (c != null) ApiService.setCountryCode(prov.sid, c); });
       // offer a newer published build (once per build; Settings > Updates anytime)
       Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
-      // the login streak: today's reward, once a day
-      Future.delayed(const Duration(seconds: 2), () { if (mounted) offerLoginStreak(context, _company); });
+      Future.delayed(const Duration(seconds: 2), _offerStreak);
     });
   }
 
@@ -147,6 +151,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     final co = _company;
+    co.removeListener(_syncLock);
+    WidgetsBinding.instance.addPostFrameCallback((_) => tutorialLocked.value = true);    // the next login starts unknown
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (Company.active.value == co) Company.active.value = null;
     });
@@ -269,6 +275,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _syncGps();
   }
 
+  void _syncLock() => tutorialLocked.value = _company.error == null && !_company.hasCampus;
+
+  /// The login streak: today's reward, once a day, never over the tutorial (it comes when that ends).
+  void _offerStreak([int tries = 0]) {
+    if (!mounted) return;
+    if (_company.state.isEmpty && _company.error == null && tries < 20) {
+      Future.delayed(const Duration(milliseconds: 500), () => _offerStreak(tries + 1));
+      return;
+    }
+    if (!tutorialLocked.value && tutorialRun.value == null) offerLoginStreak(context, _company);
+  }
+
   /// The tab a tutorial card talks about; one that isn't on the bar is under More.
   void _tutorialTab(TutorialStep step) {
     if (step.more) {
@@ -360,6 +378,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             : TutorialOverlay(steps: run.steps, onStep: _tutorialTab, changes: run.changes, passed: run.passed, onDone: () {
                 _toTab(GameTabId.map);
                 run.onDone();
+                _offerStreak();
               })),
       ]),
     );
@@ -429,7 +448,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 return SizedBox(
                   width: tabW,
                   child: InkWell(
-                    onTap: () => _goToTab(i),
+                    onTap: () { if (!tutorialLocked.value) _goToTab(i); },
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
