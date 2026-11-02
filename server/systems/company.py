@@ -205,6 +205,8 @@ def migrate(conn) -> None:
         conn.execute("ALTER TABLE co_state ADD COLUMN bulk_cancel TEXT")
     if "last_move" not in cols:
         conn.execute("ALTER TABLE co_state ADD COLUMN last_move TEXT")
+    if "visit_at" not in cols:                   # the last real visit (last_visit also starts with the Campus)
+        conn.execute("ALTER TABLE co_state ADD COLUMN visit_at TEXT")
     if "surveys" not in cols:                    # all-time count: the event log only keeps a week
         conn.execute("ALTER TABLE co_state ADD COLUMN surveys INTEGER NOT NULL DEFAULT 0")
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='game_events'").fetchone():
@@ -513,7 +515,7 @@ def install(api) -> None:
         campus = None
         if lv:
             campus = {"level": lv, "lat": row["campus_lat"], "lng": row["campus_lng"], "stage": g.campus_stage(lv),
-                  "efficiency": efficiency(row, now), "lastVisit": row["last_visit"],
+                  "nextVisit": next_visit(row, now), "efficiency": efficiency(row, now), "lastVisit": row["last_visit"],
                   "next": g.campus_upgrade(lv) if lv < g.CAMPUS_MAX else None, **move_status(conn, hid, row, now)}
         survey = None
         if row["survey_at"]:
@@ -564,7 +566,11 @@ def install(api) -> None:
             d = dist_m(lat, lng, row["campus_lat"], row["campus_lng"])
             if d > g.INSPECTION_RANGE_M + GPS_TOLERANCE_M:
                 raise econ.GameError("range", f"Come within {g.INSPECTION_RANGE_M} m of your Campus ({d:.0f} m now)")
-            conn.execute("UPDATE co_state SET last_visit=? WHERE hid=?", (iso(utcnow()), hid))
+            left = next_visit(row, utcnow())
+            if left:
+                wait = max(1, math.ceil((parse(left) - utcnow()).total_seconds() / 60))
+                raise econ.GameError("too_soon", f"You can visit again in {wait // 60} h {wait % 60} min")
+            conn.execute("UPDATE co_state SET last_visit=?, visit_at=? WHERE hid=?", (iso(utcnow()), iso(utcnow()), hid))
             econ.emit(conn, "campus_visit", hid, {}, public=False)
             log(conn, hid, "campus_visit", lat=row["campus_lat"], lng=row["campus_lng"])
         return {"err": 0, "efficiency": 1.0}
@@ -1029,6 +1035,14 @@ def finish_move(conn, hid, move, when) -> None:
     conn.execute("DELETE FROM co_moves WHERE hid=?", (hid,))
     econ.emit(conn, "campus_moved", hid, {}, public=False)
     log(conn, hid, "campus_moved", lat=move["lat"], lng=move["lng"])
+
+
+def next_visit(row, now) -> str | None:
+    """When the next visit is allowed, if not yet."""
+    if not row["visit_at"]:
+        return None
+    nxt = parse(row["visit_at"]) + datetime.timedelta(hours=g.VISIT_EVERY_HOURS)
+    return iso(nxt) if nxt > now else None
 
 
 def move_status(conn, hid, row, now=None) -> dict:

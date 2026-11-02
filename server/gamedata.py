@@ -332,6 +332,7 @@ def storage_upgrade_cost(level: int) -> int:
 
 # ── Weekly inspection ──────────────────────────────────────────────────────────────────────────
 INSPECTION_RANGE_M = 200
+VISIT_EVERY_HOURS = 8              # owner 2026-11-02: at most one visit in this time
 
 # ── Moving the Campus (plan section 3: once a month, 24 h, cancellable; plants pause meanwhile) ──
 MOVE_EVERY_DAYS = 30

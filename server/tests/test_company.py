@@ -479,3 +479,19 @@ def test_a_company_can_build_on_the_sea():
     info = call("/api/v3/hex/info", sid, lat=spot[0], lng=spot[1])
     assert info["land"] == "water" and "wheat" in info["options"]["farm"]
     assert call("/api/v3/hex/build", sid, lat=spot[0], lng=spot[1], plat=spot[0], plng=spot[1], op="farm", item="wheat")["err"] == 0
+
+
+def test_a_visit_every_8_hours_and_a_new_campus_can_visit_at_once():
+    at = (45.31, 16.52)
+    hid, sid = setup_hq("vis", at=at)
+    assert call("/api/v3/state", sid)["campus"]["nextVisit"] is None
+    assert call("/api/v3/campus/visit", sid, lat=at[0], lng=at[1])["err"] == 0
+    assert call("/api/v3/state", sid)["campus"]["nextVisit"]
+    r = call("/api/v3/campus/visit", sid, lat=at[0], lng=at[1])
+    assert r["code"] == "too_soon" and r["msg"] == "You can visit again in 8 h 0 min"
+    with main.get_db() as conn:
+        conn.execute("UPDATE co_state SET visit_at=? WHERE hid=?",
+                     ((datetime.datetime.utcnow() - datetime.timedelta(hours=8, minutes=1)).isoformat(), hid))
+        conn.commit()
+    assert call("/api/v3/state", sid)["campus"]["nextVisit"] is None
+    assert call("/api/v3/campus/visit", sid, lat=at[0], lng=at[1])["err"] == 0

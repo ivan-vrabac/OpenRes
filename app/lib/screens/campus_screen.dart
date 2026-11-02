@@ -241,6 +241,8 @@ class _CampusScreenState extends State<CampusScreen> {
     final dueIn = days == null ? null : 7 - days;
     final ok = eff >= 1;
     final color = ok ? Colors.greenAccent : Colors.orangeAccent;
+    final nextAt = co.campus!['nextVisit'] as String?;
+    final wait = nextAt == null ? 0 : parseUtc(nextAt).difference(DateTime.now().toUtc()).inSeconds;
     return _panel(
       color: color.withValues(alpha: 0.07),
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -256,11 +258,11 @@ class _CampusScreenState extends State<CampusScreen> {
             ),
           ])),
           OutlinedButton.icon(
-            onPressed: _busy || _locating ? null : _visit,
+            onPressed: _busy || _locating || wait > 0 ? null : _visit,
             icon: _locating
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.directions_walk, size: 16),
-            label: Text(_locating ? 'Finding you' : 'Visit'),
+            label: Text(_locating ? 'Finding you' : wait > 0 ? fmtDuration(wait / 86400) : 'Visit'),
           ),
         ]),
         if (dueIn != null) ...[
