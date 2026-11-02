@@ -58,6 +58,28 @@ void main() {
     await t.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('a target on a page of the tabs leaves the pages where they are', (t) async {
+    final onPage = GlobalKey();
+    final pages = PageController(initialPage: 1);
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(body: Stack(children: [
+        PageView(controller: pages, children: [
+          const SizedBox(),
+          Align(alignment: Alignment.bottomRight, child: SizedBox(key: onPage, width: 50, height: 50)),
+          const SizedBox(),
+        ]),
+        TutorialOverlay(onDone: () {}, steps: [TutorialStep('On map', 'text', onPage), const TutorialStep('After', 'next')]),
+      ])),
+    ));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pumpAndSettle();
+    expect(pages.page, 1);
+    await t.tap(find.text('Next'));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pumpAndSettle();
+    expect(pages.page, 1);
+  });
+
   group('waiting for the Campus', () {
     late ValueNotifier<bool> placed;
     final target = GlobalKey();

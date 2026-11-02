@@ -92,10 +92,17 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     _show();
   }
 
+  /// The list this step's target is in, if any. Only a vertical one: the nearest scrollable of something on
+  /// the map is the page view of the tabs, which only the cards may move.
+  ScrollPosition? _list() {
+    final c = widget.steps[_i].target?.currentContext;
+    final s = c == null ? null : Scrollable.maybeOf(c);
+    return s != null && axisDirectionToAxis(s.axisDirection) == Axis.vertical ? s.position : null;
+  }
+
   /// A page scrolled to this step's target goes back to its top.
   void _scrollBack() {
-    final c = widget.steps[_i].target?.currentContext;
-    final pos = c == null ? null : Scrollable.maybeOf(c)?.position;
+    final pos = _list();
     if (pos != null && pos.pixels > 0) {
       pos.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     }
@@ -108,12 +115,13 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
 
   /// Bring the target into view, below the top bar, and follow it with the hole.
   void _reveal() {
-    final c = widget.steps[_i].target?.currentContext;
-    if (c == null || Scrollable.maybeOf(c) == null) {
+    final pos = _list();
+    final box = widget.steps[_i].target?.currentContext?.findRenderObject();
+    if (pos == null || box == null) {
       setState(() {});
       return;
     }
-    Scrollable.ensureVisible(c, alignment: 0.12, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut)
+    pos.ensureVisible(box, alignment: 0.12, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut)
         .then((_) { if (mounted) setState(() {}); });
   }
 
