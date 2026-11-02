@@ -287,7 +287,7 @@ def take_stock(conn, hid, item, qty) -> None:
     have = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item=?", (hid, item)).fetchone()
     if not have or have[0] + 1e-9 < qty:
         raise econ.GameError("stock", f"Not enough {g.ITEM_NAMES.get(item, item).lower()}")
-    conn.execute("UPDATE co_stock SET qty=qty-? WHERE hid=? AND item=?", (qty, hid, item))
+    conn.execute("UPDATE co_stock SET qty=MAX(0, qty-?) WHERE hid=? AND item=?", (qty, hid, item))
 
 
 # ── production ─────────────────────────────────────────────────────────────────────────────────
@@ -772,7 +772,7 @@ def install(api) -> None:
                 done += 1
             if not done:
                 raise econ.GameError("not_found", "Hex not found")
-            conn.execute("UPDATE players SET credits=credits+? WHERE hID=?", (refund, hid))
+            econ.credit(conn, hid, refund, "lease_refund")
             free_supervisors(conn, hid)
             if done == 1:
                 log(conn, hid, "hex_cancelled", n=1, refund=refund, name=g.ITEM_NAMES.get(one["item"], ""),

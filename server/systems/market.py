@@ -182,12 +182,14 @@ def install(api) -> None:
         econ.credit(conn, o["hid"], o["escrow"], f"market_{status}", o["id"])
         conn.execute("UPDATE market_orders SET status=?, qty_open=0, escrow=0 WHERE id=?", (status, o["id"]))
 
-    def record(conn, kind, item, qty, price, buyer, seller, tax=0.0, buy_order=None, earned=None) -> None:
+    def record(conn, kind, item, qty, price, buyer, seller, tax=0.0, buy_order=None, earned=None, log=True) -> None:
         conn.execute("INSERT INTO market_trades(ts, kind, item, qty, price, buyer_hid, seller_hid, tax, buy_order) "
                      "VALUES(?,?,?,?,?,?,?,?,?)",
                      (econ.utcnow_iso(), kind, item, qty, price, buyer, seller, tax, buy_order))
         for who in {buyer, seller} - {None}:           # a trade counts for both sides
             econ.emit(conn, "market_trade", who, {"kind": kind, "item": item, "qty": qty, "price": price}, public=False)
+        if not log:
+            return
         # owner 2026-10-24: your trades are in the log (which deletes old entries), not a market history
         value = round(qty * price)
         to = "the system" if kind.startswith("system") else "a player"
@@ -198,7 +200,13 @@ def install(api) -> None:
             h.add_proto(conn, seller, "marketsold", {"item": item, "name": g.ITEM_NAMES[item], "qty": qty,
                                                      "earned": value if earned is None else earned, "to": to})
 
-    def fill(conn, o, seller_hid: str, qty: float) -> dict:
+    def send(later) -> None:
+        """Notifications of a sale, once it is committed: a sale that rolls back tells nobody anything."""
+        if getattr(h, "notify", None):
+            for n in later:
+                h.notify(*n)
+
+    def fill(conn, o, seller_hid: str, qty: float, later: list) -> dict:
         """The seller (taker) sells qty into resting buy order o at its price and pays the sales tax."""
         value = round(qty * o["price"])
         tax = round(value * o["tax_rate"])          # orders from before the sales tax held a buyer tax
@@ -214,9 +222,8 @@ def install(api) -> None:
         if new_open <= 1e-6:
             econ.credit(conn, o["hid"], max(0, round(new_escrow)), "market_escrow_rest", o["id"])
             conn.execute("UPDATE market_orders SET qty_open=0, escrow=0, status='filled' WHERE id=?", (o["id"],))
-            if getattr(h, "notify", None):
-                h.notify(o["hid"], "order_filled", "Buy order filled",
-                         f"You bought {int(o['qty_total']):,} {g.ITEM_NAMES[o['item']].lower()}. It's in Central Storage.")
+            later.append((o["hid"], "order_filled", "Buy order filled",
+                          f"You bought {int(o['qty_total']):,} {g.ITEM_NAMES[o['item']].lower()}. It's in Central Storage."))
         else:
             conn.execute("UPDATE market_orders SET qty_open=?, escrow=? WHERE id=?", (new_open, new_escrow, o["id"]))
         record(conn, "player", o["item"], qty, o["price"], o["hid"], seller_hid, tax + sales_tax, buy_order=o["id"],
@@ -443,6 +450,8 @@ def install(api) -> None:
         order_id = (form.get("orderID") or "").strip()
         qty = int_arg(form, "qty", None, 0, int(MAX_QTY))
 
+        later = []
+
         def run():
             o = conn.execute("SELECT * FROM market_orders WHERE id=? AND status='open'", (order_id,)).fetchone()
             if not o:
@@ -452,8 +461,10 @@ def install(api) -> None:
             q = min(qty, o["qty_open"])
             if q <= 0:
                 raise econ.GameError("bad_input", "Quantity must be positive")
-            return {"err": 0, **fill(conn, o, hid, q)}
-        return idempotent(conn, hid, form, "market_take", run)
+            return {"err": 0, **fill(conn, o, hid, q, later)}
+        out = idempotent(conn, hid, form, "market_take", run)
+        send(later)
+        return out
 
     @api.endpoint("/api/v3/sell")
     def sell(conn, hid, form):
@@ -462,6 +473,8 @@ def install(api) -> None:
         min_price = float_arg(form, "minPrice", 0, lo=0)
         if item not in g.PRICES or item in g.UNTRADABLE:
             raise econ.GameError("bad_input", "This can't be sold")
+        later = []
+        # all of it in one transaction: goods, credits, orders and the trade records change together or not at all
         with econ.tx(conn):
             expire(conn)
             co.collect(conn, hid)
@@ -476,7 +489,7 @@ def install(api) -> None:
                     q = min(int(left), int(o["qty_open"]))          # orders take whole units
                     if q <= 0:
                         break
-                    got += fill(conn, o, hid, q)["net"]
+                    got += fill(conn, o, hid, q, later)["net"]
                     left -= q
                     orders += 1
             to_system = 0.0
@@ -484,12 +497,17 @@ def install(api) -> None:
                 to_system = left
                 co.take_stock(conn, hid, item, left)
                 value = int(left * g.PRICES[item] / (1000 if item == g.ENERGY else 1))    # electricity in Wh
-                value -= round(value * tax_rate(conn, item))                            # the sales tax
-                conn.execute("UPDATE players SET credits=credits+? WHERE hID=?", (value, hid))
+                tax = round(value * tax_rate(conn, item))                               # the sales tax
+                value -= tax
+                econ.credit(conn, hid, value, "system_sell")
+                # a trade like any other: it counts for the quests and the Trader achievement
+                record(conn, "system_sell", item, left / 1000 if item == g.ENERGY else left, g.PRICES[item], None, hid,
+                       tax, earned=value, log=False)
                 co.log(conn, hid, "sold", name=g.ITEM_NAMES[item], qty=left / 1000 if item == g.ENERGY else left,
                        unit="kWh" if item == g.ENERGY else "", credits=value)
                 got += value
                 left = 0.0
+        send(later)
         return {"err": 0, "credits": got, "sold": qty - left, "unsold": left, "orders": orders, "system": to_system}
 
     @api.endpoint("/api/v3/sell/quote")

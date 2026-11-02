@@ -151,6 +151,72 @@ def test_every_quest_counts_from_the_real_action():
     assert count("educate") == 1
 
 
+def test_a_sale_to_the_system_from_storage_is_a_trade():
+    from test_market import player, put
+    hid, sid = player("qstore")
+    put(hid, "wood", 10)
+    before = credits(hid)
+    r = call("/api/v3/sell", sid, item="wood", qty=10)
+    assert r["err"] == 0 and r["system"] == 10
+    with main.get_db() as conn:
+        assert econ.count_events(conn, hid, "market_trade", "2000") == 1
+        assert conn.execute("SELECT COUNT(*) FROM market_trades WHERE seller_hid=? AND kind='system_sell'", (hid,)).fetchone()[0] == 1
+        assert conn.execute("SELECT credits FROM ledger WHERE hid=? AND kind='system_sell'", (hid,)).fetchone()[0] == credits(hid) - before
+    assert r["credits"] == credits(hid) - before
+
+
+def test_a_sale_that_fails_halfway_changes_nothing_and_tells_nobody(monkeypatch):
+    import gamedata as g
+    from test_market import M, have, player, put
+    buyer, b_sid = player("qrb", cr=10 ** 9)
+    seller, s_sid = player("qrs")
+    item = "clay"
+    assert call(M + "order", b_sid, item=item, qty=5, price=g.PRICES[item] * 1.1)["err"] == 0
+    put(seller, item, 10)
+    stock, cash, escrow = have(seller, item), credits(seller), credits(buyer)
+    told, real_emit, seen = [], econ.emit, []
+    monkeypatch.setattr(main.SYSTEM_HELPERS, "notify", lambda *a, **k: told.append(a))
+
+    def emit(conn, type_, *a, **k):
+        if type_ == "market_trade":
+            seen.append(1)
+            if len(seen) == 3:                  # the order is filled (2 events), then the system sale fails
+                raise RuntimeError("power cut")
+        return real_emit(conn, type_, *a, **k)
+
+    monkeypatch.setattr(econ, "emit", emit)
+    try:
+        call("/api/v3/sell", s_sid, item=item, qty=10)
+        raised = False
+    except RuntimeError:
+        raised = True
+    assert raised and len(seen) == 3
+    monkeypatch.setattr(econ, "emit", real_emit)
+    assert have(seller, item) == stock and credits(seller) == cash and credits(buyer) == escrow
+    assert have(buyer, item) == 0 and told == []
+    with main.get_db() as conn:
+        assert conn.execute("SELECT qty_open, status FROM market_orders WHERE hid=? AND item=?", (buyer, item)).fetchone()[0] == 5
+        assert econ.count_events(conn, seller, "market_trade", "2000") == 0
+    # and the same sale works afterwards, the buyer told once
+    assert call("/api/v3/sell", s_sid, item=item, qty=10)["sold"] == 10
+    assert have(seller, item) == 0 and len(told) == 1
+
+
+def test_selling_the_same_goods_at_once_sells_them_once():
+    from test_market import have, player, put
+    hid, sid = player("qrace")
+    put(hid, "wood", 10)
+    before = credits(hid)
+    out = []
+    ts = [threading.Thread(target=lambda: out.append(call("/api/v3/sell", sid, item="wood", qty=10))) for _ in range(6)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    good = [r for r in out if r["err"] == 0]
+    assert len(good) == 1 and have(hid, "wood") == 0 and credits(hid) - before == good[0]["credits"]
+
+
 def test_a_trade_counts_for_both_sides():
     from test_market import M, player, put
     buyer, b_sid = player("qbuy", cr=10 ** 9)
