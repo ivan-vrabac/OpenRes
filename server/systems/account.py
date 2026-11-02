@@ -80,7 +80,7 @@ def install(api) -> None:
         return {"err": 0, "name": p["company_name"], "ageDays": age, "nameChanges": int(p["name_changes"] or 0),
                 "renameCost": rename_cost(p["name_changes"]), "credits": int(econ.credits_of(conn, hid)),
                 "deleteAt": p["delete_at"], "deletionDelayed": age > DELAY_AFTER_DAYS, "delayDays": DELAY_DAYS,
-                "rules": "3-20 letters, digits, spaces and . , [ ] ( ) -. Rude or misleading names are not accepted; "
+                "rules": f"{names.RULE}. Rude or misleading names are not accepted; "
                          "accounts with such names can be banned or deleted."}
 
     @api.endpoint("/api/v1/account/rename")

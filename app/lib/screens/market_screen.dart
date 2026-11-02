@@ -265,7 +265,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
 
   Future<void> _done(ApiResult r, String ok) async {
     if (!mounted) return;
-    AppNotify.show(context, r.ok ? ok : (r.message ?? 'Failed'), isError: !r.ok);
+    AppNotify.show(context, r.ok ? ok : (r.message ?? 'The order did not go through. Try again.'), isError: !r.ok);
     if (r.ok) context.read<PlayerProvider>().refresh();
     _load();
   }

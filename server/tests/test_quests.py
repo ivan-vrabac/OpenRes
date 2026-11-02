@@ -561,3 +561,12 @@ def test_renew_quest_needs_a_lease_that_can_be_renewed_today():
         conn.rollback()
     assert "err" in call(Q_PATH, sid)                                       # the quest list itself answers
 
+
+def test_company_names_real_letters_only():
+    import names
+    for ok in ("Rough Diamonds", "Šibenik Rudnici", "Čelik d.o.o.", "Москва", "北京矿业", "東京鉱業株式", "한국광업", "Abc" + "d" * 22):
+        assert names.name_problem(ok) is None, ok
+    for bad in ("\ufdfd\ufdfd\ufdfd", "\U0001242b ab", "\U00012219 ab", "\u2e3b ab", "\ua9c5 ab", "abc \U0001f600", "ab\u202e", "ＡＢＣ",
+                "ab", "a" * 26, "Z\u0351\u036b\u0343\u036a alg"):
+        assert names.name_problem(bad), repr(bad)
+    assert names.name_problem("Rоugh Diamonds") == "Use one alphabet in your company name"   # a Cyrillic o

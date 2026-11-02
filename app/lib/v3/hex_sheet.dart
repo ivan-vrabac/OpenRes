@@ -49,7 +49,7 @@ class _HexSheetState extends State<_HexSheet> {
     final r = await co.call(path, params);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (!r.ok) return AppNotify.show(context, r.message ?? 'Failed', isError: true);
+    if (!r.ok) return AppNotify.show(context, r.message ?? 'Could not do that. Check your connection and try again.', isError: true);
     AppNotify.show(context, done);
     await co.refresh();
     if (path == '/api/v3/hex/cancel') {

@@ -45,7 +45,7 @@ def test_weak_password_rejected():
 
 
 def test_invalid_name_rejected():
-    assert signin("x" * 21, "longenough").json()["error"] == "invalid_name"
+    assert signin("x" * 26, "longenough").json()["error"] == "invalid_name"
     r = signin("<script>", "longenough")
     assert r.json()["error"] == "invalid_name"
 

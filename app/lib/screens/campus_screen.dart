@@ -82,7 +82,7 @@ class _CampusScreenState extends State<CampusScreen> {
     if (!mounted) return;
     setState(() { _busy = false; _acting = null; });
     if (!r.ok) {
-      _snack(r.message ?? 'Something went wrong', error: true);
+      _snack(r.message ?? 'Could not do that. Check your connection and try again.', error: true);
       return;
     }
     if (done != null) _snack(done);

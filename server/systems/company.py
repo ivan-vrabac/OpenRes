@@ -537,7 +537,7 @@ def install(api) -> None:
             travel_check(conn, hid, plat, plng)
             row = collect(conn, hid)
             if row["campus_level"]:
-                raise econ.GameError("has_campus", "You already have a campus")
+                raise econ.GameError("has_campus", "You already have a Campus")
             integrity.require(conn, hid)
             in_reach(lat, lng, plat, plng)
             for clat, clng in compound_cells(lat, lng):
@@ -560,10 +560,10 @@ def install(api) -> None:
             travel_check(conn, hid, lat, lng)
             row = collect(conn, hid)
             if not row["campus_level"]:
-                raise econ.GameError("no_campus", "Place your campus first")
+                raise econ.GameError("no_campus", "Place your Campus first")
             d = dist_m(lat, lng, row["campus_lat"], row["campus_lng"])
             if d > g.INSPECTION_RANGE_M + GPS_TOLERANCE_M:
-                raise econ.GameError("range", f"Come within {g.INSPECTION_RANGE_M} m of your campus ({d:.0f} m now)")
+                raise econ.GameError("range", f"Come within {g.INSPECTION_RANGE_M} m of your Campus ({d:.0f} m now)")
             conn.execute("UPDATE co_state SET last_visit=? WHERE hid=?", (iso(utcnow()), hid))
             econ.emit(conn, "campus_visit", hid, {}, public=False)
             log(conn, hid, "campus_visit", lat=row["campus_lat"], lng=row["campus_lng"])
@@ -578,7 +578,7 @@ def install(api) -> None:
             travel_check(conn, hid, plat, plng)
             row = collect(conn, hid)
             if not row["campus_level"]:
-                raise econ.GameError("no_campus", "Place your campus first")
+                raise econ.GameError("no_campus", "Place your Campus first")
             st = move_status(conn, hid, row)
             if st["moving"]:
                 raise econ.GameError("moving", "Your Campus is already moving. Cancel that move first.")
@@ -613,7 +613,7 @@ def install(api) -> None:
             row = collect(conn, hid)
             max_r = g.survey_max_radius(max(1, row["campus_level"]))
             if radius > max_r:
-                raise econ.GameError("radius", f"Your campus allows surveys up to {max_r:,} m")
+                raise econ.GameError("radius", f"Your Campus allows surveys up to {max_r:,} m")
             now = utcnow()
             pay(conn, hid, g.survey_tax(radius), "survey")             # no waiting, only the tax
             nxt = now + datetime.timedelta(minutes=g.survey_wait_minutes(radius))
@@ -669,15 +669,15 @@ def install(api) -> None:
             travel_check(conn, hid, plat, plng)
             row = collect(conn, hid)
             if not row["campus_level"]:
-                raise econ.GameError("no_campus", "Place your campus first")
+                raise econ.GameError("no_campus", "Place your Campus first")
             integrity.require(conn, hid)
             tier = tier_of(op, item)
             if row["campus_level"] < g.TIER_UNLOCK[tier]:
-                raise econ.GameError("level", f"Unlocked at campus level {g.TIER_UNLOCK[tier]}")
+                raise econ.GameError("level", f"Unlocked at Campus level {g.TIER_UNLOCK[tier]}")
             in_reach(lat, lng, plat, plng)
             q = options_at(lat, lng)["options"].get(op, {}).get(item, 0)
             if q <= 0:
-                raise econ.GameError("no_resource", f"There is no {g.ITEM_NAMES[item].lower()} here")
+                raise econ.GameError("no_resource", f"No {g.ITEM_NAMES[item].lower()} at this spot.")
             n = conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)).fetchone()[0]
             if n >= g.MAX_HEXES:
                 raise econ.GameError("max_hexes", f"You have the maximum of {g.MAX_HEXES:,} hexes")
@@ -742,7 +742,7 @@ def install(api) -> None:
                 raise econ.GameError("bad_input", "Choose another product of this operation")
             q = options_at(r["lat"], r["lng"])["options"].get(r["op"], {}).get(item, 0)
             if q <= 0:
-                raise econ.GameError("no_resource", f"{g.ITEM_NAMES[item]} doesn't grow here")
+                raise econ.GameError("no_resource", f"No {g.ITEM_NAMES[item].lower()} at this spot.")
             if credits(conn, hid) < lease_price(r["op"], item):
                 raise econ.GameError("credits", "Not enough credits")
             pay(conn, hid, lease_price(r["op"], item), "lease")
@@ -883,9 +883,9 @@ def install_campus(api) -> None:
             row = collect(conn, hid)
             lv = row["campus_level"]
             if not lv:
-                raise econ.GameError("no_campus", "Place your campus first")
+                raise econ.GameError("no_campus", "Place your Campus first")
             if lv >= g.CAMPUS_MAX:
-                raise econ.GameError("max", "Your campus is at the highest level")
+                raise econ.GameError("max", "Your Campus is at the highest level")
             need = g.campus_upgrade(lv)
             if row["storage_level"] < need["storage"]:
                 raise econ.GameError("storage", f"Needs Central Storage level {need['storage']}")

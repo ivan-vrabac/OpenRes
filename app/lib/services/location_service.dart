@@ -51,8 +51,6 @@ class LiveFix {
 ///   accuracy, the phone's speed and bearing used as a velocity measurement, outliers rejected,
 ///   and the position held still while the accelerometer says the phone isn't moving;
 /// - the compass heading from Google's Fused Orientation Provider;
-/// - optionally (Settings > Performance, asks for the "physical activity" permission) Google's
-///   Activity Recognition: standing / walking / in a vehicle tunes the filter.
 /// The phone reads the location every [intervalSeconds] (the 1-10 s GPS refresh setting: the big
 /// battery saver), and nothing at all while the app is in the background.
 class LocationService with WidgetsBindingObserver {
@@ -67,7 +65,6 @@ class LocationService with WidgetsBindingObserver {
   static const _head = EventChannel('openres/heading');
   static const _motion = EventChannel('openres/motion');
   static const _ctl = MethodChannel('openres/location_ctl');
-  static const _activityCh = EventChannel('openres/activity');
 
   /// The latest smoothed fix (null until the first one).
   final fix = ValueNotifier<LiveFix?>(null);
@@ -78,12 +75,8 @@ class LocationService with WidgetsBindingObserver {
   double headingError = 0;
   /// Whether the phone is moving (accelerometer); null while unknown.
   bool? moving;
-  /// still / walking / running / bicycle / vehicle (Activity Recognition, when enabled).
-  String? activity;
-  /// Activity Recognition is on (the player enabled it and gave the permission).
-  bool useActivity = false;
 
-  StreamSubscription? _locSub, _headSub, _motionSub, _actSub;
+  StreamSubscription? _locSub, _headSub, _motionSub;
   bool _started = false, _settingsChecked = false, _paused = false;
   /// No screen needs the location now (owner 2026-10-31: GPS only while the Map tab is open, or
   /// while a screen asks for a position): the streams are off, as in the background.
@@ -170,24 +163,16 @@ class LocationService with WidgetsBindingObserver {
       }, onError: (_) {});
       _motionSub = _motion.receiveBroadcastStream().listen((e) => moving = e as bool, onError: (_) {});
       unawaited(askFix());
-      if (useActivity) _listenActivity();
     } else {
       _fallback();
     }
-  }
-
-  void _listenActivity() {
-    _actSub?.cancel();
-    _actSub = _activityCh.receiveBroadcastStream().listen((e) => activity = e as String,
-        onError: (_) => activity = null);
   }
 
   void _cancel() {
     _locSub?.cancel();
     _headSub?.cancel();
     _motionSub?.cancel();
-    _actSub?.cancel();
-    _locSub = _headSub = _motionSub = _actSub = null;
+    _locSub = _headSub = _motionSub = null;
   }
 
   /// No GPS while the app is in the background (battery); straight back when it returns.
@@ -209,25 +194,6 @@ class LocationService with WidgetsBindingObserver {
     if (!_started || _paused || _away) return;
     _cancel();
     _listen();
-  }
-
-  /// Turn Activity Recognition on (asks for the permission when [ask]) or off. Returns whether
-  /// it is on.
-  Future<bool> setActivity(bool on, {bool ask = true}) async {
-    if (!on || !_native) {
-      useActivity = false;
-      activity = null;
-      _actSub?.cancel();
-      _actSub = null;
-      return false;
-    }
-    bool granted = false;
-    try {
-      granted = await _ctl.invokeMethod<bool>('activityPermission', {'ask': ask}) ?? false;
-    } catch (_) {}
-    useActivity = granted;
-    if (granted && _started && !_paused && !_away) _listenActivity();
-    return granted;
   }
 
   Future<void> _checkSettings() async {
@@ -260,10 +226,7 @@ class LocationService with WidgetsBindingObserver {
   void _add(double lat, double lng, double acc, double? speed, double? bearing, double? speedAcc,
       double? bearingAcc, DateTime t, bool mock) {
     if (acc > 2000) return;                                 // no real fix
-    // Activity Recognition, when on, knows better than the accelerometer whether we stand still
-    final act = activity;
-    final mv = act == null || act == 'unknown' ? moving : act != 'still';
-    final r = _f.add(lat, lng, acc, speed, bearing, speedAcc, bearingAcc, t, mv, act == 'vehicle');
+    final r = _f.add(lat, lng, acc, speed, bearing, speedAcc, bearingAcc, t, moving, false);
     if (r == null) return;
     fix.value = LiveFix(r.$1, r.$2, acc, r.$3, r.$4, t, mock);
   }

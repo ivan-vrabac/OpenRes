@@ -136,7 +136,7 @@ def install(api) -> None:
         with econ.tx(conn):
             row = co.collect(conn, hid)
             if row["campus_level"] < g.FACTORIES[key][1]:
-                raise econ.GameError("level", f"Unlocked at campus level {g.FACTORIES[key][1]}")
+                raise econ.GameError("level", f"Unlocked at Campus level {g.FACTORIES[key][1]}")
             if plant_row(conn, hid, key):
                 raise econ.GameError("exists", "Already built: upgrade it instead")
             co.pay(conn, hid, g.factory_upgrade_cost(key, 0), "factory")

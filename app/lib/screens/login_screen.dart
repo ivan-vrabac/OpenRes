@@ -171,9 +171,9 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Name your company'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('3-20 letters, digits, spaces and . , [ ] ( ) -', style: TextStyle(fontSize: 12, color: AppColors.t54)),
+          Text('3-25 letters, digits, spaces and . , [ ] ( ) -', style: TextStyle(fontSize: 12, color: AppColors.t54)),
           const SizedBox(height: 8),
-          TextField(controller: name, maxLength: 20, autofocus: true,
+          TextField(controller: name, maxLength: 25, autofocus: true,
               decoration: const InputDecoration(labelText: 'Company name', border: OutlineInputBorder(), counterText: '')),
           if (note != null) ...[
             const SizedBox(height: 8),
@@ -274,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _ctrl,
                     autofocus: true,
                     textInputAction: TextInputAction.next,
-                    maxLength: 20,
+                    maxLength: 25,
                     autofillHints: const [AutofillHints.username],
                     decoration: const InputDecoration(
                       labelText: 'Company name',

@@ -36,7 +36,7 @@ class GameApi {
       final m = jsonDecode(utf8.decode(ZLibDecoder().convert(r.bodyBytes))) as Map<String, dynamic>;
       if ((m['err'] ?? 0) != 0) {
         return ApiResult(m, code: (m['code'] ?? 'error').toString(),
-            message: (m['msg'] ?? 'Something went wrong').toString());
+            message: (m['msg'] ?? 'Could not do that. Try again.').toString());
       }
       return ApiResult(m);
     } catch (_) {

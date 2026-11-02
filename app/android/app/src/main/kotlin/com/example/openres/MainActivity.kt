@@ -65,11 +65,6 @@ class MainActivity : FlutterFragmentActivity() {
         super.onPause()
     }
 
-    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
-        super.onRequestPermissionsResult(code, permissions, results)
-        location?.onPermissionResult(code)
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         location = LocationBridge(this, flutterEngine.dartExecutor.binaryMessenger)

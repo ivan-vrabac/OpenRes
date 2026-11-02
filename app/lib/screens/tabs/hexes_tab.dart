@@ -221,7 +221,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
         final prov = context.read<PlayerProvider>();
         final r = await GameApi.call(path, prov.sid, p);
         if (!mounted) return;
-        AppNotify.show(context, r.ok ? ok : (r.message ?? 'Failed'), isError: !r.ok);
+        AppNotify.show(context, r.ok ? ok : (r.message ?? 'Could not do that. Check your connection and try again.'), isError: !r.ok);
         context.read<Company>().refresh();
         await prov.loadMines();
       });

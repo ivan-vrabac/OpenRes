@@ -247,11 +247,11 @@ def install(api) -> None:
         top = conn.execute("SELECT price FROM market_orders WHERE item=? AND status='open' AND hid<>? "
                            "ORDER BY price DESC, created_at LIMIT 1", (item, hid)).fetchone()
         if top and price > top[0] * MAX_BID_OVER_TOP + 1e-9:
-            raise econ.GameError("price_too_high", f"Bid at most 25% above the best bid ({top[0] * MAX_BID_OVER_TOP:.2f})")
+            raise econ.GameError("price_too_high", f"At most 25 % above the best buy order ({top[0] * MAX_BID_OVER_TOP:.2f})")
         if price > sys_buy(item) + 1e-9:
-            raise econ.GameError("price_too_high", "Above the system ASK price.")
+            raise econ.GameError("price_too_high", "Too high: the system sells it for less.")
         if price < g.PRICES[item] - 1e-9:      # the system's buying price is the floor
-            raise econ.GameError("price_too_low", "Below the system BID price.")
+            raise econ.GameError("price_too_low", "Too low: the system pays more than this.")
 
     # ── read endpoints ──────────────────────────────────────────────────────
 

@@ -71,7 +71,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (!r.ok) {
-      _snack(r.message ?? 'Something went wrong', error: true);
+      _snack(r.message ?? 'Could not do that. Check your connection and try again.', error: true);
       return;
     }
     if (done != null) _snack(done);

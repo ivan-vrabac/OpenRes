@@ -19,15 +19,9 @@ import android.os.Handler
 import android.os.Looper
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.ActivityTransition
-import com.google.android.gms.location.ActivityTransitionRequest
-import com.google.android.gms.location.ActivityTransitionResult
 import com.google.android.gms.location.CurrentLocationRequest
-import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.DeviceOrientationListener
 import com.google.android.gms.location.DeviceOrientationRequest
 import com.google.android.gms.location.Granularity
@@ -51,10 +45,8 @@ import kotlin.math.sqrt
  *   drift corrected, true north), falling back to the rotation-vector sensor.
  * - "openres/motion": whether the phone is moving (accelerometer), so the filter can hold the
  *   position still while standing.
- * - "openres/activity" (optional, needs the "physical activity" permission): still / walking /
- *   running / bicycle / vehicle from Google's Activity Recognition, to tune the filter.
  * - "openres/location_ctl": checkSettings (Google's "turn on Location Accuracy" dialog),
- *   playServices, activityPermission (asks for it).
+ *   playServices.
  * The location interval follows the app's 1-10 s GPS refresh setting (battery).
  */
 class LocationBridge(private val activity: Activity, messenger: BinaryMessenger) {
@@ -65,13 +57,11 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
         EventChannel(messenger, "openres/location").setStreamHandler(LocationStream())
         EventChannel(messenger, "openres/heading").setStreamHandler(HeadingStream())
         EventChannel(messenger, "openres/motion").setStreamHandler(MotionStream())
-        EventChannel(messenger, "openres/activity").setStreamHandler(ActivityStream())
         MethodChannel(messenger, "openres/location_ctl").setMethodCallHandler { call, result ->
             when (call.method) {
                 "playServices" -> result.success(playServices())
                 "checkSettings" -> checkSettings(result)
                 "current" -> currentFix(result)
-                "activityPermission" -> activityPermission(call.argument<Boolean>("ask") == true, result)
                 else -> result.notImplemented()
             }
         }
@@ -282,82 +272,6 @@ class LocationBridge(private val activity: Activity, messenger: BinaryMessenger)
             sensor = null
         }
     }
-
-    private val activityPermission =
-        if (Build.VERSION.SDK_INT >= 29) Manifest.permission.ACTIVITY_RECOGNITION
-        else "com.google.android.gms.permission.ACTIVITY_RECOGNITION"
-
-    private fun hasActivityPermission() =
-        ContextCompat.checkSelfPermission(ctx, activityPermission) == PackageManager.PERMISSION_GRANTED
-
-    private var pendingPerm: MethodChannel.Result? = null
-
-    /** true when granted; with ask=true shows Android's permission dialog first. */
-    private fun activityPermission(ask: Boolean, result: MethodChannel.Result) {
-        if (hasActivityPermission() || !ask || Build.VERSION.SDK_INT < 29) {
-            result.success(hasActivityPermission()); return
-        }
-        pendingPerm?.success(false)
-        pendingPerm = result
-        ActivityCompat.requestPermissions(activity, arrayOf(activityPermission), PERM_CODE)
-    }
-
-    /** From MainActivity.onRequestPermissionsResult. */
-    fun onPermissionResult(code: Int) {
-        if (code != PERM_CODE) return
-        pendingPerm?.success(hasActivityPermission())
-        pendingPerm = null
-    }
-
-    private inner class ActivityStream : EventChannel.StreamHandler {
-        private var receiver: BroadcastReceiver? = null
-        private var pi: PendingIntent? = null
-
-        @SuppressLint("MissingPermission")
-        override fun onListen(args: Any?, sink: EventChannel.EventSink) {
-            if (!playServices() || !hasActivityPermission()) { sink.error("permission", "no activity permission", null); return }
-            val action = ctx.packageName + ".ACTIVITY_TRANSITION"
-            receiver = object : BroadcastReceiver() {
-                override fun onReceive(c: Context, i: Intent) {
-                    if (!ActivityTransitionResult.hasResult(i)) return
-                    val e = ActivityTransitionResult.extractResult(i)?.transitionEvents?.lastOrNull() ?: return
-                    if (e.transitionType != ActivityTransition.ACTIVITY_TRANSITION_ENTER) return
-                    sink.success(when (e.activityType) {
-                        DetectedActivity.STILL -> "still"
-                        DetectedActivity.WALKING, DetectedActivity.ON_FOOT -> "walking"
-                        DetectedActivity.RUNNING -> "running"
-                        DetectedActivity.ON_BICYCLE -> "bicycle"
-                        DetectedActivity.IN_VEHICLE -> "vehicle"
-                        else -> "unknown"
-                    })
-                }
-            }
-            ContextCompat.registerReceiver(ctx, receiver, IntentFilter(action), ContextCompat.RECEIVER_EXPORTED)
-            pi = PendingIntent.getBroadcast(ctx, 7312, Intent(action).setPackage(ctx.packageName),
-                PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0))
-            val types = listOf(DetectedActivity.STILL, DetectedActivity.WALKING, DetectedActivity.RUNNING,
-                DetectedActivity.ON_BICYCLE, DetectedActivity.IN_VEHICLE)
-            val req = ActivityTransitionRequest(types.map {
-                ActivityTransition.Builder().setActivityType(it)
-                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER).build()
-            })
-            try {
-                ActivityRecognition.getClient(ctx).requestActivityTransitionUpdates(req, pi!!)
-                    .addOnFailureListener { e -> sink.error("unavailable", e.message, null) }
-            } catch (e: SecurityException) {
-                sink.error("permission", e.message, null)
-            }
-        }
-
-        @SuppressLint("MissingPermission")
-        override fun onCancel(args: Any?) {
-            try { pi?.let { ActivityRecognition.getClient(ctx).removeActivityTransitionUpdates(it) } } catch (_: Exception) {}
-            try { receiver?.let { ctx.unregisterReceiver(it) } } catch (_: Exception) {}
-            receiver = null; pi = null
-        }
-    }
-
-    companion object { const val PERM_CODE = 7313 }
 
     /** Moving or not, from the spread of the acceleration over the last second (hysteresis). */
     private inner class MotionStream : EventChannel.StreamHandler {

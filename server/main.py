@@ -553,7 +553,7 @@ def hex_min_dist(lat1, lng1, lat2, lng2) -> float:
 
 # ── Auth ────────────────────────────────────────────────────────────────────────
 
-_VALID_NAME = re.compile(r"^[a-zA-Z0-9 .,\[\]()\-]{1,20}$")
+_VALID_NAME = re.compile(r"^.{1,25}$")     # the real rules: names.py
 
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "?"
@@ -569,7 +569,7 @@ async def auth_session(request: Request):
     mode = form.get("mode", "")
     if not _VALID_NAME.match(name):
         return json_resp({"error": "invalid_name",
-                          "message": "Name: 1-20 letters, digits, spaces and . , [ ] ( ) -"})
+                          "message": f"Name: {names.RULE}"})
     canon = norm_name(name)
     ip_key, name_key = f"ip:{_client_ip(request)}", f"name:{canon}"
     if auth.limiter.blocked(ip_key, name_key):
@@ -636,7 +636,7 @@ async def auth_session(request: Request):
 def create_company(conn, name: str) -> str:
     """A new company called `name` (Google sign-in). GameError when the name isn't allowed or taken."""
     if not _VALID_NAME.match(name):
-        raise econ.GameError("invalid_name", "Name: 1-20 letters, digits, spaces and . , [ ] ( ) -")
+        raise econ.GameError("invalid_name", f"Name: {names.RULE}")
     bad = names.name_problem(name)
     if bad:
         raise econ.GameError("invalid_name", bad)

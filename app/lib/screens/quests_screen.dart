@@ -46,7 +46,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
     if (!mounted) return;
     setState(() => _claiming = null);
     if (!r.ok) {
-      AppNotify.show(context, r.message ?? 'Failed', isError: true);
+      AppNotify.show(context, r.message ?? 'Could not claim the reward. Try again.', isError: true);
     } else {
       final ms = (r.data['milestones'] as List? ?? const []).cast<Map<String, dynamic>>();
       final extra = ms.isEmpty

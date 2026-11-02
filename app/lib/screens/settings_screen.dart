@@ -213,29 +213,6 @@ class _AccountPageState extends State<_AccountPage> {
     return same;
   }
 
-  /// A company with a password: the password once, then this Google account signs it in.
-  Future<void> _link(String token) async {
-    final ctl = TextEditingController();
-    final password = await showAppDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Your password'),
-        content: TextField(controller: ctl, obscureText: true, autofocus: true,
-            decoration: const InputDecoration(labelText: 'Password', helperText: 'Not needed any more after this',
-                border: OutlineInputBorder())),
-        actions: [
-          TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => popIfCurrent(ctx, ctl.text), child: const Text('Connect')),
-        ],
-      ),
-    );
-    if (password == null || password.isEmpty || !mounted) return;
-    final r = await GameApi.call('/api/v1/auth/google/link', _sid, {'id_token': token, 'password': password});
-    if (!mounted) return;
-    AppNotify.show(context, r.ok ? 'Connected' : r.message ?? 'Failed', isError: !r.ok);
-    if (r.ok) _load();
-  }
-
   Future<void> _connect(Future<String?> Function() token, String failed, {bool games = false}) async {
     setState(() => _busy = true);
     try {
@@ -244,7 +221,7 @@ class _AccountPageState extends State<_AccountPage> {
       if (t == null) {
         AppNotify.show(context, failed, isError: true);
       } else if (_status?['google'] != true) {
-        await _link(t);
+        AppNotify.show(context, 'This company can not connect an account. Contact us through the website.', isError: true);
       } else if (games && !await _checkGames(t) && mounted) {
         AppNotify.show(context, 'This Play Games profile uses a different Google account than your company.', isError: true);
       }
@@ -558,17 +535,6 @@ class _PerformancePageState extends State<_PerformancePage> {
     await prefs.setInt('gps_interval', seconds);
   }
 
-  Future<void> _setActivity(bool on) async {
-    final got = await LocationService.instance.setActivity(on);
-    if (!mounted) return;
-    setState(() {});
-    if (on && !got) {
-      AppNotify.show(context, 'Allow "Physical activity" for this app to use it', isError: true);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('gps_activity', got);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -615,18 +581,6 @@ class _PerformancePageState extends State<_PerformancePage> {
               'in the background. For the best fix keep Google Location Accuracy and Wi-Fi scanning on.',
               style: TextStyle(fontSize: 11, color: AppColors.t38),
             ),
-            if (!Branding.isPlay) ...[
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Activity recognition (best accuracy)', style: TextStyle(fontSize: 13)),
-              subtitle: Text('Knows when you stand, walk or ride a bus or car and tunes the GPS for it. '
-                  'Asks for the "Physical activity" permission.',
-                  style: TextStyle(fontSize: 12, color: AppColors.t54)),
-              value: LocationService.instance.useActivity,
-              onChanged: _setActivity,
-            ),
-            ],
           ]),
         ),
       ]),
@@ -1031,9 +985,6 @@ Future<void> loadNumDecimalsPrefs() async {
   heatmapSchemeNotifier.value = kHeatmapScheme;
   kGpsIntervalSeconds = (prefs.getInt('gps_interval') ?? 3).clamp(1, 10);
   LocationService.intervalSeconds = kGpsIntervalSeconds;
-  if (prefs.getBool('gps_activity') == true && !Branding.isPlay) {
-    unawaited(LocationService.instance.setActivity(true, ask: false));   // still allowed? then on
-  }
   kMapPanelOpacity = (prefs.getDouble('map_panel_opacity') ?? 0.2).clamp(0.2, 1.0);
   mapPanelOpacityNotifier.value = kMapPanelOpacity;
   kNotifEnabled       = prefs.getBool('notif_enabled')        ?? true;
@@ -1316,7 +1267,7 @@ class _RenameDialogState extends State<_RenameDialog> {
               const SizedBox(height: 8),
               Text(_info?['rules'] as String? ?? '', style: TextStyle(fontSize: 12, color: AppColors.t60)),
               const SizedBox(height: 12),
-              TextField(controller: _ctl, maxLength: 20,
+              TextField(controller: _ctl, maxLength: 25,
                   decoration: const InputDecoration(labelText: 'New company name', border: OutlineInputBorder())),
               if (_error != null) Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
             ]),
