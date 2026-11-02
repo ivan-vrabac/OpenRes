@@ -23,7 +23,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 import econ
-from . import int_arg
+from . import int_arg, quests
 
 KINDS = {
     # kind: (label, default max per day, 0 = unlimited[, on by default])
@@ -240,6 +240,11 @@ def install(api) -> None:
             try:
                 with h.get_db() as conn:
                     game_sweep(conn)
+            except Exception:
+                pass
+            try:
+                with h.get_db() as conn:
+                    quests.deal_all(conn)
             except Exception:
                 pass
 

@@ -2,13 +2,17 @@
 
 Lifecycle (documented assumptions):
 - Each UTC day a player gets DAILY_COUNT quests, picked deterministically from POOL by
-  hash(player, day) when they first open the quest list that day.
-- A quest is completed by doing the activity after it was assigned. Progress is counted from
-  recorded game events (game_events), so it is server-side and survives restarts.
+  hash(player, day). The sweep deals them right after midnight (owner 2026-11-02: active at all times,
+  not when the list is opened); opening the list deals them too, if that comes first.
+- Progress counts everything done that UTC day, also before the list was first opened (owner 2026-11-02:
+  a hex built just before opening Quests stayed at 0). It comes from recorded game events (game_events),
+  so it is server-side and survives restarts.
 - A quest ends at the midnight (UTC) after its day (owner 2026-10-31: quests can't be done
   afterwards). What wasn't completed and claimed by then is gone; the next day starts from zero.
-- "Renew a lease" is dealt only to a company that can renew one that day, and turns into another quest if
-  its hexes go (owner 2026-11-01).
+- Only quests the company can do are dealt (doable()): without a Campus that is survey, trade and placing
+  it. An undone quest that can't be done any more turns into another one (owner 2026-11-01), and targets
+  stay reachable: never more renewals than leases that can be renewed today, never more educations than
+  queue slots.
 - Claiming is atomic and happens at most once per quest (conditional UPDATE + unique keys).
   Reward: credits = 0.2 % of what the next Campus level costs (owner 2026-10-31: no player level any
   more, and lower rewards), at least QUEST_MIN_CREDITS.
@@ -35,6 +39,7 @@ import gamedata as g
 from . import int_arg
 
 DAILY_COUNT = 3
+KEEP_DAYS = 7                  # days without a claim stay this long
 quest_credits, QUEST_MIN_CREDITS, QUEST_CAMPUS_SHARE = g.quest_credits, g.QUEST_MIN_CREDITS, g.QUEST_CAMPUS_SHARE
 
 
@@ -44,15 +49,16 @@ def campus_level(conn, hid) -> int:
 STREAK_MILESTONES = ((7, 5), (30, 10))     # (every N days, quest rewards)
 
 
-# code: (title, event type, target) — target (lo, hi) varies per player and day
+# code: ((title for 1, title for more), event type, target); a target (lo, hi) varies per player and day
 POOL = {
-    "build_hexes":  ("Build {} hexes", "hex_built", (2, 5)),
-    "survey":       ("Make {} government surveys", "survey", (1, 3)),
-    "plant":        ("Build or upgrade a plant {} time(s)", "plant_upgraded", (1, 2)),
-    "educate":      ("Send {} supervisor(s) to education", "education_started", (1, 2)),
-    "trade":        ("Make {} market trades", "market_trade", (2, 5)),
-    "renew":        ("Renew {} hex lease(s)", "hex_renewed", (1, 3)),
-    "visit":        ("Visit your Campus", "campus_visit", 1),
+    "build_hexes":  (("Lease {} new hex", "Lease {} new hexes"), "hex_built", (2, 5)),
+    "survey":       (("Make {} government survey", "Make {} government surveys"), "survey", (1, 3)),
+    "plant":        (("Build or upgrade {} plant", "Build or upgrade {} plants"), "plant_upgraded", (1, 2)),
+    "educate":      (("Send {} supervisor to education", "Send {} supervisors to education"), "education_started", (1, 2)),
+    "trade":        (("Make {} market trade", "Make {} market trades"), "market_trade", (2, 5)),
+    "renew":        (("Renew {} hex lease", "Renew {} hex leases"), "hex_renewed", (1, 3)),
+    "visit":        (("Visit your Campus", "Visit your Campus"), "campus_visit", 1),
+    "place_campus": (("Place your Campus", "Place your Campus"), "campus_placed", 1),
 }
 
 
@@ -65,7 +71,7 @@ def target_of(code, hid, day) -> int:
 
 
 def title_of(code, target) -> str:
-    return POOL[code][0].format(target)
+    return POOL[code][0][0 if target == 1 else 1].format(target)
 
 
 def init_schema(conn) -> None:
@@ -112,17 +118,67 @@ def pick(hid: str, day: str, codes) -> list:
     return ranked[:DAILY_COUNT]
 
 
-def can_renew(conn, hid, now) -> bool:
-    """Could this company renew a lease before today's quests end? (owner 2026-11-01: a company with
-    no hex, or only freshly renewed ones, must not get a quest it can't do)"""
+def renewable(conn, hid, now) -> int:
+    """How many leases can still be renewed before today's quests end (a lease waits a day after its
+    last renewal or its build, so a company with few hexes can't do many)."""
     from .company import parse, renew_wait_hours
     left = (_midnight_after(now) - now).total_seconds() / 3600
-    return any(renew_wait_hours(parse(r[0]), now) <= left for r in conn.execute(
-        "SELECT lease_until FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)))
+    return sum(1 for r in conn.execute("SELECT lease_until FROM co_hexes WHERE hid=? AND op!='campus'", (hid,))
+               if renew_wait_hours(parse(r[0]), now) <= left)
+
+
+def doable(conn, hid, code, now) -> bool:
+    """Can this company do this quest today?"""
+    placed = conn.execute("SELECT 1 FROM co_state WHERE hid=? AND campus_level>0", (hid,)).fetchone() is not None
+    if code == "place_campus":
+        return not placed
+    if code in ("survey", "trade"):
+        return True
+    if not placed:
+        return False
+    if code == "renew":
+        return renewable(conn, hid, now) > 0
+    if code == "educate":
+        return conn.execute("SELECT 1 FROM co_supervisors WHERE hid=? AND edu<4", (hid,)).fetchone() is not None
+    if code == "build_hexes":
+        return conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)).fetchone()[0] < g.MAX_HEXES
+    return True
+
+
+def fit_target(conn, hid, code, target, now) -> int:
+    """The day's target, cut to what the company can reach."""
+    if code == "renew":
+        return min(target, max(1, renewable(conn, hid, now)))
+    if code == "educate":
+        return min(target, g.queue_slots(campus_level(conn, hid)))
+    return target
 
 
 def available(conn, hid, now) -> list:
-    return [c for c in POOL if c != "renew" or can_renew(conn, hid, now)]
+    return [c for c in POOL if doable(conn, hid, c, now)]
+
+
+def repair(conn, hid, day, rows, now) -> None:
+    """Today's undone quests stay doable: one that can't be done any more becomes another quest, a renew
+    target shrinks when there are fewer leases left to renew than it still needs."""
+    have = {r["code"] for r in rows}
+    for q in rows:
+        if q["claimed_at"] or q["code"] not in POOL:
+            continue
+        target, done = q["target"] or target_of(q["code"], hid, day), progress(conn, q)
+        if done >= target:
+            continue
+        if q["code"] == "renew" and (done or renewable(conn, hid, now)):
+            reachable = done + renewable(conn, hid, now)
+            if reachable < target:
+                conn.execute("UPDATE daily_quests SET target=? WHERE id=?", (reachable, q["id"]))
+        elif not doable(conn, hid, q["code"], now):
+            spare = [c for c in available(conn, hid, now) if c not in have]
+            if spare:
+                code = pick(hid, day, spare)[0]
+                have.add(code)
+                conn.execute("UPDATE daily_quests SET code=?, assigned_at=?, target=? WHERE id=?",
+                             (code, now.isoformat(), fit_target(conn, hid, code, target_of(code, hid, day), now), q["id"]))
 
 
 def assign_today(conn, hid, now=None) -> None:
@@ -137,28 +193,37 @@ def assign_today(conn, hid, now=None) -> None:
     if gone and not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=? AND claimed_at IS NOT NULL",
                                  (hid, day)).fetchone():
         conn.execute("DELETE FROM daily_quests WHERE hid=? AND day=?", (hid, day))
-    have = {r[0]: r for r in conn.execute("SELECT code, id, claimed_at FROM daily_quests WHERE hid=? AND day=?", (hid, day))}
-    if have:
-        # a renew quest that can't be done any more (the hexes are gone) becomes another quest
-        r = have.get("renew")
-        if r and not r[2] and not can_renew(conn, hid, now):
-            spare = [c for c in available(conn, hid, now) if c not in have]
-            if spare:
-                code = pick(hid, day, spare)[0]
-                conn.execute("UPDATE daily_quests SET code=?, assigned_at=?, target=? WHERE id=?",
-                             (code, now.isoformat(), target_of(code, hid, day), r[1]))
+    rows = conn.execute("SELECT * FROM daily_quests WHERE hid=? AND day=?", (hid, day)).fetchall()
+    if rows:
+        repair(conn, hid, day, rows, now)
         return
     for code in pick(hid, day, available(conn, hid, now)):
         conn.execute("INSERT OR IGNORE INTO daily_quests(hid, day, code, assigned_at, expires_at, target) "
                      "VALUES(?,?,?,?,?,?)", (hid, day, code, now.isoformat(),
                                              _midnight_after(now).isoformat(),
-                                             target_of(code, hid, day)))
+                                             fit_target(conn, hid, code, target_of(code, hid, day), now)))
+
+
+def deal_all(conn, now=None) -> int:
+    """Deal today's quests to everyone who has none yet (run by the sweep; a short write per company, once a
+    day), and forget old days nothing was claimed on: they can't count for a streak."""
+    now = now or econ.utcnow()
+    day = _day(now)
+    hids = [r[0] for r in conn.execute("SELECT hID FROM players WHERE hID NOT IN "
+                                       "(SELECT hid FROM daily_quests WHERE day=?)", (day,)).fetchall()]
+    for hid in hids:
+        with econ.tx(conn):
+            assign_today(conn, hid, now)
+    with econ.tx(conn):
+        conn.execute("DELETE FROM daily_quests WHERE day<? AND NOT EXISTS (SELECT 1 FROM daily_quests x WHERE "
+                     "x.hid=daily_quests.hid AND x.day=daily_quests.day AND x.claimed_at IS NOT NULL)",
+                     (_day(now - datetime.timedelta(days=KEEP_DAYS)),))
+    return len(hids)
 
 
 def progress(conn, q) -> int:
-    title, event, _ = POOL[q["code"]]
     target = q["target"] or target_of(q["code"], q["hid"], q["day"])
-    n = econ.count_events(conn, q["hid"], event, q["assigned_at"])
+    n = econ.count_events(conn, q["hid"], POOL[q["code"]][1], f"{q['day']}T00:00:00")
     return min(n, target)
 
 

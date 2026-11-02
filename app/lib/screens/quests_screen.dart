@@ -73,6 +73,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
         'trade' => (Icons.storefront_outlined, Colors.tealAccent),
         'renew' => (Icons.autorenew, Colors.orangeAccent),
         'visit' => (Icons.location_city, Colors.pinkAccent),
+        'place_campus' => (Icons.add_location_alt_outlined, Colors.pinkAccent),
         _ => (Icons.flag_outlined, AppColors.accent),
       };
 
@@ -119,7 +120,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
   /// The streak: the days in the current week of it, the bonus every 7 and every 30 days.
   Widget _streakCard(int streak, List<Map<String, dynamic>> ms) {
     num bonus(int every) => ms.firstWhere((m) => m['every'] == every, orElse: () => const {'credits': 0})['credits'] as num;
-    final inWeek = streak % 7;
+    final inWeek = streak == 0 ? 0 : (streak - 1) % 7 + 1;       // day 7 shows a full week
     final to30 = 30 - streak % 30;
     final hot = streak > 0;
     return Container(

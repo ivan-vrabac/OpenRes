@@ -126,6 +126,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       ChatBridge.reportDevice(prov.sid);          // multi-account detection (hashed device ID)
       IntegrityCheck.start(prov.sid);             // real app on a real device?
       PlayGames.start(prov.sid);                  // achievements recorded, and on to Play Games
+      // the server needs it for the flag, the country board and the far map pins, More may never be opened
+      ApiService.getCountryCode().then((c) { if (c != null) ApiService.setCountryCode(prov.sid, c); });
       // offer a newer published build (once per build; Settings > Updates anytime)
       Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
       // the login streak: today's reward, once a day
@@ -499,11 +501,7 @@ class _MoreTabState extends State<_MoreTab> {
   Future<void> _loadCountry() async {
     final had = _countryCode;
     final code = await ApiService.getCountryCode();
-    if (mounted && code != null && code != had) {
-      setState(() => _countryCode = code);
-      final sid = context.read<PlayerProvider>().sid;
-      ApiService.setCountryCode(sid, code);
-    }
+    if (mounted && code != null && code != had) setState(() => _countryCode = code);
   }
 
   Future<void> _loadRank() async {

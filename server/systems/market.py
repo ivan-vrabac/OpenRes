@@ -186,8 +186,8 @@ def install(api) -> None:
         conn.execute("INSERT INTO market_trades(ts, kind, item, qty, price, buyer_hid, seller_hid, tax, buy_order) "
                      "VALUES(?,?,?,?,?,?,?,?,?)",
                      (econ.utcnow_iso(), kind, item, qty, price, buyer, seller, tax, buy_order))
-        econ.emit(conn, "market_trade", buyer or seller, {"kind": kind, "item": item, "qty": qty, "price": price},
-                  public=False)
+        for who in {buyer, seller} - {None}:           # a trade counts for both sides
+            econ.emit(conn, "market_trade", who, {"kind": kind, "item": item, "qty": qty, "price": price}, public=False)
         # owner 2026-10-24: your trades are in the log (which deletes old entries), not a market history
         value = round(qty * price)
         to = "the system" if kind.startswith("system") else "a player"

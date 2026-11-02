@@ -546,6 +546,7 @@ def install(api) -> None:
             conn.execute("UPDATE co_state SET campus_level=1, campus_lat=?, campus_lng=?, last_visit=? WHERE hid=?",
                          (lat, lng, now, hid))
             ensure_supervisors(conn, hid, 1)
+            econ.emit(conn, "campus_placed", hid, {}, public=False)
             log(conn, hid, "campus_placed", lat=lat, lng=lng)
         return {"err": 0, "level": 1}
 
@@ -1101,13 +1102,15 @@ def install_views(api) -> None:
 
     @api.endpoint("/api/v3/campuses/top")
     def campuses_top(conn, hid, form):
-        """The biggest Campus of every country, for the map zoomed far out (owner 2026-10-30)."""
+        """The biggest Campus of every country, for the map zoomed far out (owner 2026-10-30). The country is
+        the company's and can be unknown: those get the biggest per 10 degree square, so they still show."""
         best = {}
         for r in conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name, p.country_code "
                               "FROM co_state c JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 "
                               "AND c.campus_lat IS NOT NULL ORDER BY c.campus_level DESC, c.hid"):
             cc = (r["country_code"] or "").lower()
-            if cc and cc not in best:
-                best[cc] = {"country": cc, "own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
+            key = cc or f"{r['campus_lat'] // 10}:{r['campus_lng'] // 10}"
+            if key not in best:
+                best[key] = {"country": cc, "own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
                             "lng": r["campus_lng"], "name": r["company_name"]}
         return {"err": 0, "campuses": sorted(best.values(), key=lambda c: -c["level"])}

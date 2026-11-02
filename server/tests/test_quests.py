@@ -57,17 +57,149 @@ def test_progress_claim_once_and_rewards():
     assert call(Q + "/claim", sid, id=qs["survey"]["id"])["code"] == "already_claimed"
 
 
-def test_events_before_assignment_do_not_count():
+def test_the_whole_day_counts_not_only_after_opening_the_list():
     hid, sid, _ = new_player("qc")
-    _events(hid, "survey", 5)
-    _force_quests(hid, ["survey", "renew", "plant"])
+    _events(hid, "survey", 1)
+    with main.get_db() as conn:                  # one from yesterday must not count
+        conn.execute("UPDATE game_events SET ts=? WHERE hid=? AND type='survey'",
+                     ((econ.utcnow() - datetime.timedelta(days=1)).isoformat(), hid))
+        conn.commit()
+    _events(hid, "survey", 1)
+    _force_quests(hid, ["survey", "trade", "place_campus"])
+    with main.get_db() as conn:
+        conn.execute("UPDATE daily_quests SET target=3 WHERE hid=? AND code='survey'", (hid,))
+        conn.commit()
     qs = {q["code"]: q for q in call(Q, sid)["quests"]}
-    assert qs["survey"]["progress"] == 0
+    assert qs["survey"]["progress"] == 1
+
+
+def test_the_sweep_deals_everyone_once_a_day_and_forgets_unclaimed_days():
+    a = new_player("qdeal")[0]
+    old = (econ.utcnow() - datetime.timedelta(days=quests.KEEP_DAYS + 1)).strftime("%Y-%m-%d")
+    day = econ.utcnow().strftime("%Y-%m-%d")
+    with main.get_db() as conn:
+        conn.execute("DELETE FROM daily_quests WHERE hid=?", (a,))
+        conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at) VALUES(?,?,'survey','x','x')", (a, old))
+        conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
+                     "VALUES(?,?,'trade','x','x','x')", (a, "2020-01-01"))
+        conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at) VALUES(?,?,'survey','x','x')", (a, "2020-01-01"))
+        conn.commit()
+        assert quests.deal_all(conn) >= 1
+        assert conn.execute("SELECT COUNT(*) FROM daily_quests WHERE hid=? AND day=?", (a, day)).fetchone()[0] == quests.DAILY_COUNT
+        assert quests.deal_all(conn) == 0
+        assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (a, old)).fetchone()
+        assert conn.execute("SELECT COUNT(*) FROM daily_quests WHERE hid=? AND day='2020-01-01'", (a,)).fetchone()[0] == 2
+
+
+def test_only_doable_quests_without_a_campus():
+    hid = new_player("qnoc")[0]
+    with main.get_db() as conn:
+        assert set(quests.available(conn, hid, econ.utcnow())) == {"survey", "trade", "place_campus"}
+        conn.rollback()
+
+
+def test_undoable_quests_are_swapped_and_done_ones_stay():
+    hid, sid, _ = new_player("qswap")
+    _force_quests(hid, ["plant", "visit", "educate"])
+    assert {q["code"] for q in call(Q, sid)["quests"]} == {"survey", "trade", "place_campus"}
+    from test_company import BASE
+    at = (BASE[0] - 2.31, BASE[1] + 1.4)
+    assert call("/api/v3/campus/place", sid, lat=at[0], lng=at[1], plat=at[0], plng=at[1])["err"] == 0
+    qs = {q["code"]: q for q in call(Q, sid)["quests"]}
+    assert qs["place_campus"]["claimable"]              # placing it counts, and the quest stays
+
+
+def test_titles_read_right():
+    assert quests.title_of("survey", 1) == "Make 1 government survey"
+    assert quests.title_of("build_hexes", 2) == "Lease 2 new hexes"
+    assert not any("(s)" in quests.title_of(c, t) for c in quests.POOL for t in (1, 2))
+
+
+def test_every_quest_counts_from_the_real_action():
+    from test_company import BASE, find, put, set_lease
+    import gamedata as g
+    near = (BASE[0] + 1.17, BASE[1] - 0.83)
+    hid, sid, _ = new_player("qall", credits=10 ** 12)
+    call("/api/v3/state", sid)
+    with main.get_db() as conn:
+        conn.execute("UPDATE players SET credits=? WHERE hID=?", (10 ** 12, hid))
+        conn.commit()
+
+    def count(code):
+        with main.get_db() as conn:
+            return quests.progress(conn, {"code": code, "hid": hid, "day": econ.utcnow().strftime("%Y-%m-%d"), "target": 99})
+
+    assert call("/api/v3/campus/place", sid, lat=near[0], lng=near[1], plat=near[0], plng=near[1])["err"] == 0
+    assert count("place_campus") == 1
+    assert call("/api/v3/campus/visit", sid, lat=near[0], lng=near[1])["err"] == 0
+    assert count("visit") == 1
+    assert call("/api/v3/survey", sid, lat=near[0], lng=near[1], radius=100)["err"] == 0
+    assert count("survey") == 1
+    a = find("wood", near=(near[0] + 0.01, near[1]))
+    r = call("/api/v3/hex/build", sid, lat=a[0], lng=a[1], plat=a[0], plng=a[1], op="logging_camp", item="wood")
+    assert r["err"] == 0 and count("build_hexes") == 1
+    set_lease(r["id"], 60)
+    assert call("/api/v3/hex/renew", sid, ids=str(r["id"]))["err"] == 0
+    assert count("renew") == 1
+    assert call("/api/v3/plants/build", sid, key="sawmill")["err"] == 0
+    assert call("/api/v3/plants/upgrade", sid, key="sawmill")["err"] == 0
+    assert count("plant") == 2
+    put(hid, "books", 10)
+    with main.get_db() as conn:
+        sup = conn.execute("SELECT id FROM co_supervisors WHERE hid=? LIMIT 1", (hid,)).fetchone()[0]
+    assert call("/api/v3/education/start", sid, sup=sup)["err"] == 0
+    assert count("educate") == 1
+
+
+def test_a_trade_counts_for_both_sides():
+    from test_market import M, player, put
+    buyer, b_sid = player("qbuy", cr=10 ** 9)
+    seller, s_sid = player("qsel")
+    import gamedata as g
+    item = "wood"
+    assert call(M + "order", b_sid, item=item, qty=10, price=g.PRICES[item] * 1.1)["err"] == 0
+    put(seller, item, 10)
+    assert call("/api/v3/sell", s_sid, item=item, qty=10)["err"] == 0
+    with main.get_db() as conn:
+        n = {who: econ.count_events(conn, who, "market_trade", "2000") for who in (buyer, seller)}
+    assert n == {buyer: 1, seller: 1}
+
+
+def test_a_renew_quest_asks_for_no_more_than_can_be_renewed():
+    from test_company import BASE
+    hid = new_player("qcap")[0]
+    now = econ.utcnow().replace(hour=12)
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO co_state(hid, campus_level, campus_lat, campus_lng) VALUES(?,1,?,?) "
+                     "ON CONFLICT(hid) DO UPDATE SET campus_level=1", (hid, BASE[0], BASE[1]))
+        conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                     "VALUES(?,1,1,'farm','wheat',50,?,?)", (hid, now.isoformat(), (now + datetime.timedelta(days=60)).isoformat()))
+        assert quests.renewable(conn, hid, now) == 1
+        assert quests.fit_target(conn, hid, "renew", 3, now) == 1
+        assert quests.fit_target(conn, hid, "educate", 2, now) == 1          # one queue slot at Campus 1
+        conn.rollback()
+
+
+def test_a_campus_with_no_country_still_gets_a_pin():
+    sid = new_player("qpin")[1]
+    a, b = new_player("qpina")[0], new_player("qpinb")[0]
+    with main.get_db() as conn:
+        for hid, lvl, lat in ((a, 5, 53.5), (b, 3, 53.6)):
+            conn.execute("INSERT INTO co_state(hid, campus_level, campus_lat, campus_lng) VALUES(?,?,?,-113.7) "
+                         "ON CONFLICT(hid) DO UPDATE SET campus_level=excluded.campus_level, "
+                         "campus_lat=excluded.campus_lat, campus_lng=excluded.campus_lng", (hid, lvl, lat))
+            conn.execute("UPDATE players SET country_code=NULL WHERE hID=?", (hid,))
+        conn.commit()
+    here = [c for c in call("/api/v3/campuses/top", sid)["campuses"] if abs(c["lng"] + 113.7) < 0.01]
+    assert [c["level"] for c in here] == [5]                    # the biggest of its square
 
 
 def test_concurrent_claims_pay_once():
     hid, sid, _ = new_player("qd", credits=0, level=1)
-    _force_quests(hid, ["plant", "survey", "renew"])
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO co_state(hid, campus_level) VALUES(?,1) ON CONFLICT(hid) DO UPDATE SET campus_level=1", (hid,))
+        conn.commit()
+    _force_quests(hid, ["plant", "survey", "trade"])
     _events(hid, "plant_upgraded", 2)
     qid = next(q["id"] for q in call(Q, sid)["quests"] if q["code"] == "plant")
     out = []
@@ -248,11 +380,12 @@ def test_renew_quest_needs_a_lease_that_can_be_renewed_today():
     far = (now + datetime.timedelta(days=89, hours=23)).isoformat()         # renewed a moment ago
     old = (now + datetime.timedelta(days=60)).isoformat()                   # renewable for a long time
     with main.get_db() as conn:
+        conn.execute("INSERT INTO co_state(hid, campus_level) VALUES(?,1) ON CONFLICT(hid) DO UPDATE SET campus_level=1", (hid,))
         conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
                      "VALUES(?,1,1,'farm','wheat',50,?,?)", (hid, now.isoformat(), old))
         assert "renew" in Q.available(conn, hid, now)
         conn.execute("UPDATE co_hexes SET lease_until=? WHERE hid=?", (far, hid))
-        assert Q.can_renew(conn, hid, now) is False
+        assert Q.renewable(conn, hid, now) == 0 and "renew" not in Q.available(conn, hid, now)
         conn.rollback()
     assert "err" in call(Q_PATH, sid)                                       # the quest list itself answers
 
