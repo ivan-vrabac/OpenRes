@@ -16,7 +16,7 @@ extension _MapSheets on _MapTabState {
     final here = ((res.data['options'] as Map)[op] as Map?)?[item] as Map?;
     final name = _co.itemName(item);
     if (here == null) {
-      _snack('No ${name.toLowerCase()} here (${res.data['land']}). Check the survey: hotter colours are better.', error: true);
+      _snack('No ${name.toLowerCase()} at this spot. Survey here: hotter colours are better.', error: true);
       return;
     }
     final quality = (here['quality'] as num).toInt();
@@ -52,7 +52,7 @@ extension _MapSheets on _MapTabState {
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                Text('${_co.opName(op)} · ${res.data['land']}', style: TextStyle(color: AppColors.t54, fontSize: 12)),
+                Text(_co.opName(op), style: TextStyle(color: AppColors.t54, fontSize: 12)),
               ])),
             ]),
             const SizedBox(height: 14),
