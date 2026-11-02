@@ -34,13 +34,13 @@ class ReportSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(           // a small phone scrolls instead of cutting the last button off
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               Icon(Icons.flag, color: AppColors.accent, size: 24),
               const SizedBox(width: 10),
-              const Text('Report this company', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+              const Expanded(child: Text('Report this company', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
             ]),
             const SizedBox(height: 6),
             Text('Why are you reporting it? A moderator will take a look, and the company is not told who reported it.',
