@@ -91,6 +91,7 @@ def test_the_sweep_deals_everyone_once_a_day_and_forgets_unclaimed_days():
         assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (asleep, day)).fetchone()   # asleep: no writes
         assert conn.execute("SELECT COUNT(*) FROM daily_quests WHERE hid=? AND day=?", (a, day)).fetchone()[0] == quests.DAILY_COUNT
         assert quests.deal_all(conn) == 0
+        quests.compact(conn)
         assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (a, old)).fetchone()
         assert conn.execute("SELECT COUNT(*) FROM daily_quests WHERE hid=? AND day='2020-01-01'", (a,)).fetchone()[0] == 2
 
@@ -221,7 +222,55 @@ def test_selling_the_same_goods_at_once_sells_them_once():
     assert len(good) == 1 and have(hid, "wood") == 0 and credits(hid) - before == good[0]["credits"]
 
 
-def test_old_ledger_and_events_go_in_batches_surveys_stay():
+def test_old_quest_days_shrink_to_one_row_and_streaks_stay():
+    hid = new_player("qcomp")[0]
+    now = econ.utcnow().replace(hour=12)
+    with main.get_db() as conn:
+        for back in range(0, 70):
+            day = (now - datetime.timedelta(days=back)).strftime("%Y-%m-%d")
+            for c in ("survey", "trade", "visit"):
+                conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
+                             "VALUES(?,?,?,'x','x','x')", (hid, day, c))
+        half = (now - datetime.timedelta(days=65)).strftime("%Y-%m-%d")           # a day only partly done
+        conn.execute("UPDATE daily_quests SET claimed_at=NULL WHERE hid=? AND day=? AND code='visit'", (hid, half))
+        conn.commit()
+        today = now.strftime("%Y-%m-%d")
+        before = quests.streak_ending(conn, hid, today)
+        quests.compact(conn, now)
+        per_day = dict(conn.execute("SELECT day, COUNT(*) FROM daily_quests WHERE hid=? GROUP BY day", (hid,)).fetchall())
+        assert per_day[half] == 1 and per_day[today] == 3
+        assert per_day[(now - datetime.timedelta(days=61)).strftime("%Y-%m-%d")] == 1
+        assert per_day[(now - datetime.timedelta(days=59)).strftime("%Y-%m-%d")] == 3
+        assert quests.streak_ending(conn, hid, today) == before               # the half day still doesn't count
+
+
+def test_old_activity_goes_but_the_leaderboard_days_stay():
+    from systems import legal
+    hid = new_player("qact")[0]
+    now = econ.utcnow()
+    with main.get_db() as conn:
+        for back in (0, 100, 109, 111, 300):
+            conn.execute("INSERT OR IGNORE INTO player_activity(hid, day) VALUES(?,?)",
+                         (hid, (now - datetime.timedelta(days=back)).strftime("%Y-%m-%d")))
+        conn.commit()
+        legal.prune_history(conn, now)
+        assert conn.execute("SELECT COUNT(*) FROM player_activity WHERE hid=?", (hid,)).fetchone()[0] == 3
+
+
+def test_the_survey_achievement_outlives_the_event_log():
+    from systems import achievements, legal
+    from test_company import setup_hq
+    hid, sid = setup_hq("qsurv", at=(45.47, 16.41))
+    assert call("/api/v3/survey", sid, lat=45.47, lng=16.41, radius=100)["err"] == 0
+    with main.get_db() as conn:
+        conn.execute("UPDATE game_events SET ts='2020-01-01T00:00:00' WHERE hid=? AND type='survey'", (hid,))
+        conn.commit()
+        legal.prune_history(conn)
+        assert econ.count_events(conn, hid, "survey", "2000") == 0
+        assert achievements.metrics(conn, main.SYSTEM_HELPERS, hid)["surveys"] == 1
+
+
+def test_old_ledger_and_events_go_in_batches():
     from systems import legal
     hid = new_player("qprune")[0]
     now = econ.utcnow()
@@ -238,7 +287,7 @@ def test_old_ledger_and_events_go_in_batches_surveys_stay():
         assert legal.prune(conn, "ledger", (now - datetime.timedelta(days=90)).isoformat(), batch=10) == 25
         legal.prune_history(conn, now)
         assert conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 1
-        assert sorted(r[0] for r in conn.execute("SELECT type FROM game_events")) == ["hex_built", "survey", "survey", "survey"]
+        assert [r[0] for r in conn.execute("SELECT type FROM game_events")] == ["hex_built"]
 
 
 def test_a_trade_counts_for_both_sides():

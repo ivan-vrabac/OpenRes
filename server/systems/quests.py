@@ -41,6 +41,8 @@ from . import int_arg
 DAILY_COUNT = 3
 KEEP_DAYS = 7                  # days without a claim stay this long
 ACTIVE_DAYS = 7                # the sweep deals to companies seen this recently
+COMPACT_DAYS = 60              # older days keep one row
+WINDOW_DAYS = 14               # compact() looks this far back, so a server that was down catches up
 quest_credits, QUEST_MIN_CREDITS, QUEST_CAMPUS_SHARE = g.quest_credits, g.QUEST_MIN_CREDITS, g.QUEST_CAMPUS_SHARE
 
 
@@ -89,6 +91,7 @@ def init_schema(conn) -> None:
             UNIQUE (hid, day, code)
         );
         CREATE INDEX IF NOT EXISTS idx_dq_hid ON daily_quests(hid, day);
+        CREATE INDEX IF NOT EXISTS idx_dq_day ON daily_quests(day);
         CREATE TABLE IF NOT EXISTS streak_rewards (
             hid        TEXT NOT NULL,
             start_day  TEXT NOT NULL,
@@ -208,7 +211,7 @@ def assign_today(conn, hid, now=None) -> None:
 def deal_all(conn, now=None) -> int:
     """Deal today's quests to companies that played in the last ACTIVE_DAYS and have none yet (run by the sweep,
     a short write per company once a day; anyone else gets theirs on opening the list, so a million sleeping
-    companies cost nothing), and forget old days nothing was claimed on: they can't count for a streak."""
+    companies cost nothing)."""
     now = now or econ.utcnow()
     day = _day(now)
     hids = [r[0] for r in conn.execute(
@@ -217,11 +220,23 @@ def deal_all(conn, now=None) -> int:
     for hid in hids:
         with econ.tx(conn):
             assign_today(conn, hid, now)
-    with econ.tx(conn):
-        conn.execute("DELETE FROM daily_quests WHERE day<? AND NOT EXISTS (SELECT 1 FROM daily_quests x WHERE "
-                     "x.hid=daily_quests.hid AND x.day=daily_quests.day AND x.claimed_at IS NOT NULL)",
-                     (_day(now - datetime.timedelta(days=KEEP_DAYS)),))
     return len(hids)
+
+
+def compact(conn, now=None) -> None:
+    """Once a day (the janitor), over the days that just got old: forget days nothing was claimed on, and of
+    older days keep one row, an unclaimed one if there is any, so a day still counts for a streak exactly
+    when all of it was claimed."""
+    now = now or econ.utcnow()
+    span = lambda age: (_day(now - datetime.timedelta(days=age + WINDOW_DAYS)), _day(now - datetime.timedelta(days=age)))
+    with econ.tx(conn):
+        conn.execute("DELETE FROM daily_quests WHERE day>=? AND day<? AND NOT EXISTS (SELECT 1 FROM daily_quests x "
+                     "WHERE x.hid=daily_quests.hid AND x.day=daily_quests.day AND x.claimed_at IS NOT NULL)",
+                     span(KEEP_DAYS))
+    with econ.tx(conn):
+        conn.execute("DELETE FROM daily_quests WHERE day>=? AND day<? AND id NOT IN ("
+                     "SELECT COALESCE(MIN(CASE WHEN claimed_at IS NULL THEN id END), MIN(id)) FROM daily_quests "
+                     "WHERE day>=? AND day<? GROUP BY hid, day)", span(COMPACT_DAYS) * 2)
 
 
 def progress(conn, q) -> int:

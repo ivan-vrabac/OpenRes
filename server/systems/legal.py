@@ -18,19 +18,19 @@ TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 LEGAL_VERSION = "2026-11-02.4"      # Croatia first; no refunds where the law allows it, otherwise Google Play's rules
 LEDGER_DAYS = 90
 EVENT_DAYS = 7
+ACTIVITY_KEEP_DAYS = 110       # the leaderboards look at the last 100 days
 _DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "legal")
 
 
-def prune(conn, table: str, cutoff: str, keep_type: str | None = None, batch: int = 5000) -> int:
+def prune(conn, table: str, cutoff: str, batch: int = 5000) -> int:
     """Delete rows older than `cutoff` from a table written oldest first, a batch at a time, so a big
-    clean-up never holds the database for long. `keep_type` rows stay."""
-    cols = "id, ts, type" if keep_type else "id, ts"
+    clean-up never holds the database for long."""
     last, gone = 0, 0
     while True:
-        rows = conn.execute(f"SELECT {cols} FROM {table} WHERE id>? ORDER BY id LIMIT ?", (last, batch)).fetchall()
+        rows = conn.execute(f"SELECT id, ts FROM {table} WHERE id>? ORDER BY id LIMIT ?", (last, batch)).fetchall()
         if not rows:
             return gone
-        old = [(r[0],) for r in rows if r[1] < cutoff and not (keep_type and r[2] == keep_type)]
+        old = [(r[0],) for r in rows if r[1] < cutoff]
         with econ.tx(conn):
             conn.executemany(f"DELETE FROM {table} WHERE id=?", old)
         gone += len(old)
@@ -41,11 +41,21 @@ def prune(conn, table: str, cutoff: str, keep_type: str | None = None, batch: in
 
 def prune_history(conn, now=None) -> None:
     """The ledger and the event log would grow for ever: the ledger is kept LEDGER_DAYS for questions about
-    credits, events EVENT_DAYS for the quests. Surveys stay, the Surveyor achievement counts them all."""
+    credits, events EVENT_DAYS for the quests, played days ACTIVITY_KEEP_DAYS for the leaderboards, and old
+    quest days shrink to one row."""
     import datetime
     now = now or econ.utcnow()
     prune(conn, "ledger", (now - datetime.timedelta(days=LEDGER_DAYS)).isoformat())
-    prune(conn, "game_events", (now - datetime.timedelta(days=EVENT_DAYS)).isoformat(), keep_type="survey")
+    prune(conn, "game_events", (now - datetime.timedelta(days=EVENT_DAYS)).isoformat())
+    day = (now - datetime.timedelta(days=ACTIVITY_KEEP_DAYS)).strftime("%Y-%m-%d")
+    while True:
+        with econ.tx(conn):
+            n = conn.execute("DELETE FROM player_activity WHERE rowid IN "
+                             "(SELECT rowid FROM player_activity WHERE day<? LIMIT 5000)", (day,)).rowcount
+        if n < 5000:
+            break
+    from . import quests
+    quests.compact(conn, now)
 
 
 def text(name: str) -> str:

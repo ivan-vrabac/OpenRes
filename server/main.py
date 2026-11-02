@@ -417,6 +417,7 @@ def init_db():
                 day  TEXT NOT NULL,
                 PRIMARY KEY (hid, day)
             )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_day ON player_activity(day)")
         # FCM push tokens
         conn.execute("""
             CREATE TABLE IF NOT EXISTS fcm_tokens (

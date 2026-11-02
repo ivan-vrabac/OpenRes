@@ -61,7 +61,7 @@ def metrics(conn, h, hid) -> dict:
         "masters": _one(conn, "SELECT COUNT(*) FROM co_supervisors WHERE hid=? AND edu>=4", (hid,)),
         "tantalum": int(_one(conn, "SELECT produced FROM co_luxury WHERE hid=?", (hid,))),
         "dark_matter": st["dm_level"] if st else 0,
-        "surveys": _one(conn, "SELECT COUNT(*) FROM game_events WHERE hid=? AND type='survey'", (hid,)),
+        "surveys": _one(conn, "SELECT surveys FROM co_state WHERE hid=?", (hid,)),
         "trader": _one(conn, "SELECT COUNT(*) FROM market_trades WHERE buyer_hid=? OR seller_hid=?", (hid, hid)),
         "storage": st["storage_level"] if st else 1,
         "streak": max(_one(conn, "SELECT MAX(length) FROM streak_rewards WHERE hid=? AND every=1", (hid,)), 0),

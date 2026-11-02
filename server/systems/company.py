@@ -205,6 +205,11 @@ def migrate(conn) -> None:
         conn.execute("ALTER TABLE co_state ADD COLUMN bulk_cancel TEXT")
     if "last_move" not in cols:
         conn.execute("ALTER TABLE co_state ADD COLUMN last_move TEXT")
+    if "surveys" not in cols:                    # all-time count: the event log only keeps a week
+        conn.execute("ALTER TABLE co_state ADD COLUMN surveys INTEGER NOT NULL DEFAULT 0")
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='game_events'").fetchone():
+            conn.execute("UPDATE co_state SET surveys=(SELECT COUNT(*) FROM game_events e "
+                         "WHERE e.hid=co_state.hid AND e.type='survey')")
     if "streak_day" not in cols:
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_day INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_last TEXT")
@@ -616,6 +621,7 @@ def install(api) -> None:
             nxt = now + datetime.timedelta(minutes=g.survey_wait_minutes(radius))
             conn.execute("UPDATE co_state SET survey_lat=?, survey_lng=?, survey_r=?, survey_at=?, survey_next=? "
                          "WHERE hid=?", (lat, lng, radius, iso(now), iso(nxt), hid))
+            conn.execute("UPDATE co_state SET surveys=surveys+1 WHERE hid=?", (hid,))
             econ.emit(conn, "survey", hid, {"radius": radius}, public=False)
             log(conn, hid, "survey", lat=lat, lng=lng, radius=radius, cost=g.survey_tax(radius))
         return {"err": 0, "tax": g.survey_tax(radius), "next": iso(nxt)}
