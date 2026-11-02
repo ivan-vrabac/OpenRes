@@ -9,6 +9,7 @@ the result like the legacy endpoints (zlib JSON).
 from __future__ import annotations
 
 import collections
+import sqlite3
 import threading
 import time
 import types
@@ -37,6 +38,21 @@ LIMITS = {
 }
 _recent: dict = collections.defaultdict(collections.deque)      # (hid, path): times of recent calls
 _recent_lock = threading.Lock()
+_countries: dict = {}                     # hid: the country last saved, so a request only reads it
+
+
+def see_country(conn, hid: str, header: str | None) -> None:
+    """Cloudflare says where a request comes from (CF-IPCountry, from the IP address): that is the company's
+    country. XX is unknown, T1 is Tor; without the header (dev server, tests) what is saved stays."""
+    cc = (header or "").strip().lower()
+    if not hid or len(cc) != 2 or not cc.isalpha() or cc in ("xx", "t1") or _countries.get(hid) == cc:
+        return
+    try:
+        conn.execute("UPDATE players SET country_code=? WHERE hID=? AND COALESCE(country_code,'')!=?", (cc, hid, cc))
+        conn.commit()
+        _countries[hid] = cc
+    except sqlite3.OperationalError:              # busy: the next request tries again
+        conn.rollback()
 
 
 def too_often(hid: str, path: str, now: float | None = None) -> bool:
@@ -75,8 +91,11 @@ class Api:
                 if too_often(hid, path):
                     return h.zlib_resp({"err": 1, "code": "rate_limited", "msg": "Slow down a little and try again."})
 
+                country = request.headers.get("cf-ipcountry")
+
                 def work():
                     with h.get_db() as conn:
+                        see_country(conn, hid, country)
                         try:
                             if path in integrity.GUARDED:
                                 integrity.require(conn, hid)

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import '../models/player.dart';
 
@@ -76,45 +75,6 @@ class ApiService {
       final decoded = ZLibDecoder().convert(r.bodyBytes);
       return jsonDecode(utf8.decode(decoded)) as Map<String, dynamic>;
     } catch (_) { return null; }
-  }
-
-  // ── Geolocation ──────────────────────────────────────────────────────────
-
-  /// Last known country (memory, then this device), so the flag shows at once; the IP lookup
-  /// runs at most once a day (owner 2026-10-23: the More flag loaded slowly every time).
-  static String? countryNow;
-
-  static Future<String?> getCountryCode() async {
-    final prefs = await SharedPreferences.getInstance();
-    countryNow ??= prefs.getString('country_code');
-    final last = prefs.getInt('country_checked') ?? 0;
-    if (countryNow != null && DateTime.now().millisecondsSinceEpoch - last < 86400000) return countryNow;
-    final fresh = await _lookupCountryCode();
-    if (fresh != null) {
-      countryNow = fresh;
-      await prefs.setString('country_code', fresh);
-      await prefs.setInt('country_checked', DateTime.now().millisecondsSinceEpoch);
-    }
-    return countryNow;
-  }
-
-  static Future<String?> _lookupCountryCode() async {
-    try {
-      final r = await http.get(Uri.parse('http://ip-api.com/json?fields=status,countryCode'))
-          .timeout(const Duration(seconds: 5));
-      final data = jsonDecode(r.body) as Map<String, dynamic>;
-      if (data['status'] == 'success') {
-        return (data['countryCode'] as String).toLowerCase();
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static Future<void> setCountryCode(String sid, String code) async {
-    try {
-      await http.post(Uri.parse('$kBaseUrl/api/game/player/country'),
-          body: {'sid': sid, 'code': code}).timeout(const Duration(seconds: 5));
-    } catch (_) {}
   }
 
   static Future<void> registerFcmToken(String sid, String token) async {

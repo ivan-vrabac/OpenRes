@@ -180,6 +180,24 @@ def test_a_renew_quest_asks_for_no_more_than_can_be_renewed():
         conn.rollback()
 
 
+def test_the_country_comes_from_cloudflare():
+    from helpers import client
+    hid, sid, _ = new_player("qcf")
+
+    def country():
+        with main.get_db() as conn:
+            return conn.execute("SELECT country_code FROM players WHERE hID=?", (hid,)).fetchone()[0]
+
+    assert client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "CA"}).status_code == 200
+    assert country() == "ca"
+    client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "XX"})      # unknown keeps it
+    client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "T1"})      # Tor keeps it
+    client.post("/api/v3/me", data={"sid": sid})                                      # no header keeps it
+    assert country() == "ca"
+    client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "HR"})
+    assert country() == "hr"
+
+
 def test_a_campus_with_no_country_still_gets_a_pin():
     sid = new_player("qpin")[1]
     a, b = new_player("qpina")[0], new_player("qpinb")[0]

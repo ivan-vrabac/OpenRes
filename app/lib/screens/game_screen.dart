@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/tab_config.dart';
 import '../models/player_provider.dart';
-import '../services/api_service.dart';
 import '../services/game_api.dart';
 import '../services/chat_bridge.dart';
 import '../services/location_service.dart';
@@ -132,8 +131,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       ChatBridge.reportDevice(prov.sid);          // multi-account detection (hashed device ID)
       IntegrityCheck.start(prov.sid);             // real app on a real device?
       PlayGames.start(prov.sid);                  // achievements recorded, and on to Play Games
-      // the server needs it for the flag, the country board and the far map pins, More may never be opened
-      ApiService.getCountryCode().then((c) { if (c != null) ApiService.setCountryCode(prov.sid, c); });
       // offer a newer published build (once per build; Settings > Updates anytime)
       Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
       Future.delayed(const Duration(seconds: 2), _offerStreak);
@@ -511,20 +508,12 @@ class _MoreTab extends StatefulWidget {
 }
 
 class _MoreTabState extends State<_MoreTab> {
-  String? _countryCode = ApiService.countryNow;   // cached: the flag shows at once
   int? _rank;
 
   @override
   void initState() {
     super.initState();
-    _loadCountry();
     _loadRank();
-  }
-
-  Future<void> _loadCountry() async {
-    final had = _countryCode;
-    final code = await ApiService.getCountryCode();
-    if (mounted && code != null && code != had) setState(() => _countryCode = code);
   }
 
   Future<void> _loadRank() async {
@@ -549,11 +538,11 @@ class _MoreTabState extends State<_MoreTab> {
         if (player != null) ...[
           Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              if (_countryCode != null)
+              if (player.country.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Image.asset(
-                    'assets/images_countryflags/$_countryCode.png',
+                    'assets/images_countryflags/${player.country}.png',
                     width: 60, height: 40, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _fallbackAvatar(player),
                   ),
