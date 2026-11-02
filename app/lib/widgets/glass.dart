@@ -44,10 +44,11 @@ class UiLook {
 /// Padding for a tab page's list: [all] around, plus the room of the status bar and the floating top
 /// bar above and the tab bar below (given as MediaQuery padding by the game screen), so the list
 /// starts below the top bar but scrolls up behind it, like the map (owner 2026-10-31: no black band).
-/// On pages opened on top that room is 0.
-EdgeInsets tabPadding(BuildContext context, double all) {
+/// On pages opened on top that room is 0. A page that builds its own app bar passes [underAppBar]: its
+/// context is above that Scaffold, so it still sees the status bar the app bar already covers.
+EdgeInsets tabPadding(BuildContext context, double all, {bool underAppBar = false}) {
   final p = MediaQuery.paddingOf(context);
-  return EdgeInsets.fromLTRB(all, all + p.top, all, all + p.bottom);
+  return EdgeInsets.fromLTRB(all, all + (underAppBar ? 0 : p.top), all, all + p.bottom);
 }
 
 /// A panel over the map: a floating rounded glass panel (follows the panel opacity setting).

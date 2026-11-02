@@ -118,7 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final ach = (p['achievements'] as List? ?? const []).cast<Map<String, dynamic>>();
         return RefreshIndicator(
           onRefresh: _load,
-          child: ListView(padding: tabPadding(context, 12), children: [
+          child: ListView(padding: tabPadding(context, 12, underAppBar: !widget.embedded), children: [
             Row(children: [
               // country flag in place of an avatar (letter avatar only when no country is set)
               (p['country'] as String? ?? '').isNotEmpty

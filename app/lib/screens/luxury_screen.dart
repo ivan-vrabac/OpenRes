@@ -61,7 +61,7 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
                 ]))
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(padding: tabPadding(context, 12), children: [
+              child: ListView(padding: tabPadding(context, 12, underAppBar: canPop), children: [
                 Center(child: Image.asset(itemPicture('ta180m'), height: 170, fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => TaIcon(size: 100, color: AppColors.accent))),
                 const SizedBox(height: 8),

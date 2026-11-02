@@ -153,7 +153,7 @@ class _CampusScreenState extends State<CampusScreen> {
           await _loadSups();
         },
         // all of it built, so the tutorial can scroll to the supervisors
-        child: ListView(padding: tabPadding(context, 12), cacheExtent: 5000, children: [
+        child: ListView(padding: tabPadding(context, 12, underAppBar: ModalRoute.of(context)?.canPop == true), cacheExtent: 5000, children: [
           if (!co.hasCampus)
             _noCampus()
           else ...[

@@ -152,7 +152,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
       appBar: canPop ? AppBar(toolbarHeight: 36) : null,
       body: RefreshIndicator(
         onRefresh: () => Future.wait([_load(), co.refresh()]),
-        child: ListView(padding: tabPadding(context, 12), children: [
+        child: ListView(padding: tabPadding(context, 12, underAppBar: canPop), children: [
           if (!co.hasCampus)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
