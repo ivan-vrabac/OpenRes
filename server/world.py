@@ -6,7 +6,8 @@ repeats. Nothing is stored: the same point always gives the same answer.
 
 - land(lat, lng): mineral / forest / farmland / pasture, or water (seas, lakes: Natural Earth 1:10m)
 - quality(item, lat, lng): 0-100 (0 = none here); ores and wood only on their land, crops, animals
-  and fish farms anywhere on land at 50-100 (a gentle field); nothing on water
+  and fish farms anywhere at 50-100 (a gentle field). Seas and lakes hold everything land does (owner
+  2026-11-02: a player on a ship must not be worse off): is_land only names the place "water".
 - sun(lat, lng), wind(lat, lng): 0-100 for solar and wind farms
 - grid(item, south, west, north, east, n): an n x n heatmap (survey pictures)
 
@@ -162,14 +163,13 @@ def items() -> list[str]:
 def quality(item: str, lat, lng):
     """0-100: how rich `item` is here (0: not here). Arrays in, arrays out."""
     land_req, field, cut = _ITEMS[item]
-    if cut is None:                           # crops, animals, fish farms: 50-100 anywhere on land
+    if cut is None:                           # crops, animals, fish farms: 50-100 anywhere
         g01 = np.clip((field(lat, lng) + 0.5) / 1.0, 0.0, 1.0)
-        return np.where(is_land(lat, lng), np.round(GENTLE_MIN + (100 - GENTLE_MIN) * g01), 0).astype(np.int16)
+        return np.round(GENTLE_MIN + (100 - GENTLE_MIN) * g01).astype(np.int16)
     # a smooth field like 1.2.3's scans: quality rises and falls gradually (no hard land-type edges);
-    # rarer resources (higher cut) appear in fewer, smaller hotspots; nothing on water
+    # rarer resources (higher cut) appear in fewer, smaller hotspots
     n = field(lat, lng)
     q = np.clip((n - cut) / (1.0 - cut), 0.0, 1.0)
-    q = np.where(is_land(lat, lng), q, 0.0)
     return np.round(q * 100).astype(np.int16)
 
 
@@ -181,13 +181,11 @@ _wind_noise = Field("wind", 15_000, octaves=3)
 def sun(lat, lng):
     """Sunniest near the tropics, little near the poles, with regional weather on top."""
     base = np.cos(np.radians(np.clip(np.abs(np.asarray(lat, dtype=np.float64)) - 15, 0, 90))) ** 1.5
-    v = np.round(np.clip(base * 85 + _sun_noise(lat, lng) * 15, 5, 100))
-    return np.where(is_land(lat, lng), v, 0).astype(np.int16)
+    return np.round(np.clip(base * 85 + _sun_noise(lat, lng) * 15, 5, 100)).astype(np.int16)
 
 
 def wind(lat, lng):
-    v = np.round(np.clip(50 + _wind_noise(lat, lng) * 50, 5, 100))
-    return np.where(is_land(lat, lng), v, 0).astype(np.int16)
+    return np.round(np.clip(50 + _wind_noise(lat, lng) * 50, 5, 100)).astype(np.int16)
 
 
 # ── Heatmaps ───────────────────────────────────────────────────────────────────────────────────
@@ -243,12 +241,9 @@ def around(lat: float, lng: float, radius_m: float) -> tuple[float, float, float
 
 def at(lat: float, lng: float) -> dict:
     """Everything about one point: its land and the quality of every item found there."""
-    code = int(land_code(lat, lng))
-    if code == 0:
-        return {"land": "water", "items": {}, "sun": 0, "wind": 0}
     found = {}
     for item in _ITEMS:                        # the same values the survey pictures show
         q = int(quality(item, lat, lng))
         if q > 0:
             found[item] = q
-    return {"land": LAND_NAMES[code], "items": found, "sun": int(sun(lat, lng)), "wind": int(wind(lat, lng))}
+    return {"land": land(lat, lng), "items": found, "sun": int(sun(lat, lng)), "wind": int(wind(lat, lng))}

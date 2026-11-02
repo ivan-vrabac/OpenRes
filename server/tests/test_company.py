@@ -469,3 +469,13 @@ def test_spending_is_in_the_ledger_and_can_not_be_done_twice():
     with main.get_db() as conn:
         assert conn.execute("SELECT credits FROM players WHERE hID=?", (hid,)).fetchone()[0] == 0
         assert conn.execute("SELECT credits FROM ledger WHERE hid=? AND kind='survey'", (hid,)).fetchall()[0][0] == -g.survey_tax(100)
+
+
+def test_a_company_can_build_on_the_sea():
+    sea = (43.5, 15.5)
+    assert not world.is_land(*sea)
+    hid, sid = setup_hq("sea", at=sea)                       # the Campus too
+    spot = (sea[0] + 0.002, sea[1])
+    info = call("/api/v3/hex/info", sid, lat=spot[0], lng=spot[1])
+    assert info["land"] == "water" and "wheat" in info["options"]["farm"]
+    assert call("/api/v3/hex/build", sid, lat=spot[0], lng=spot[1], plat=spot[0], plng=spot[1], op="farm", item="wheat")["err"] == 0

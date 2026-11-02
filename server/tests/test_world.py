@@ -41,15 +41,15 @@ def test_survey_picture_is_fast():
     assert 0 <= int(w.sun(0, 0)) <= 100 and w.sun(0, 0) > w.sun(70, 0)
 
 
-def test_nothing_on_water_and_farms_anywhere_on_land():
+def test_water_holds_everything_land_does():
     sea, lake, town = (43.5, 15.5), (45.65, 10.68), (45.81, 15.98)
     assert not w.is_land(*sea) and not w.is_land(*lake) and w.is_land(*town)
-    assert w.at(*sea) == {"land": "water", "items": {}, "sun": 0, "wind": 0}
-    assert int(w.quality("iron_ore", *sea)) == 0 and int(w.sun(*sea)) == 0
-    # crops, animals and fish farms: 50-100 anywhere on land (a gentle heatmap), nothing on water
+    assert w.at(*sea)["land"] == "water" and int(w.sun(*sea)) > 0 and int(w.wind(*sea)) > 0
+    # crops, animals and fish farms: 50-100 anywhere (a gentle heatmap), sea and lakes too
     for it in ("wheat", "milk", "carp"):
         assert 50 <= int(w.quality(it, *town)) <= 100
-    assert int(w.quality("wheat", *lake)) == 0
+        assert 50 <= int(w.quality(it, *sea)) <= 100 and 50 <= int(w.quality(it, *lake)) <= 100
+    assert {"wheat", "carp"} <= set(w.at(*sea)["items"])
     import numpy as np
     la, lo = np.meshgrid(np.linspace(45.7, 45.9, 40), np.linspace(15.9, 16.1, 40))
     v = w.quality("wheat", la, lo)

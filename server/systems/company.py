@@ -390,8 +390,6 @@ def income_per_hour(conn, hid, row) -> dict:
 def options_at(lat: float, lng: float) -> dict:
     """What could be built at a point: {op: {item: quality}}."""
     here = world.at(lat, lng)
-    if here["land"] == "water":
-        return {"land": "water", "options": {}}             # nothing is built on water
     out: dict[str, dict] = {}
     for op, (_n, _land, items, _u) in g.OPERATIONS.items():
         if op == "fishing_port":
