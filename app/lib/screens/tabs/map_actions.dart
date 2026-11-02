@@ -81,7 +81,6 @@ extension _MapActions on _MapTabState {
     );
     if (ok != true || !mounted) return;
     final at = _snapCampus(c);
-    Future.delayed(const Duration(seconds: 4), _maybeTutorial);      // the Campus is down: on to the next steps
     final r = await _co.call(moving ? '/api/v3/campus/move' : '/api/v3/campus/place',
         {'lat': at.latitude, 'lng': at.longitude, 'plat': me.latitude, 'plng': me.longitude});
     if (!mounted) return;

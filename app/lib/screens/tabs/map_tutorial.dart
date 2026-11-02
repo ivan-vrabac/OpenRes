@@ -7,8 +7,8 @@ extension _MapTutorial on _MapTabState {
         const TutorialStep('Welcome to OpenRes',
             'The real world is your map. You run a company: find good land, lease hexes on it and sell what they make.'),
         TutorialStep('Place your Campus',
-            'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here.',
-            _surveyBtnKey),
+            'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here to place it.',
+            _surveyBtnKey, null, false, true),
       ];
 
   List<TutorialStep> get _gameSteps => [
@@ -59,14 +59,20 @@ extension _MapTutorial on _MapTabState {
 
   Future<void> _maybeTutorial() async {
     if (!mounted || tutorialRun.value != null) return;
+    if (_co.state.isEmpty) {                   // not known yet whether there is a Campus
+      Future.delayed(const Duration(seconds: 2), _maybeTutorial);
+      return;
+    }
     final seen = await StorageService.getTutorial();
-    if (!mounted) return;
-    final steps = !_co.hasCampus ? (seen < 1 ? _welcomeSteps : null) : (seen < 2 ? _gameSteps : null);
-    if (steps != null) tutorialRun.value = TutorialRun(steps, _tutorialDone);
+    if (!mounted || tutorialRun.value != null) return;
+    // no Campus: always, from the start, and it can't be left before the Campus is down (owner 2026-11-02).
+    // With one (Settings, or the app closed halfway) just the game part, which can be skipped.
+    final steps = !_co.hasCampus ? [..._welcomeSteps, ..._gameSteps] : (seen < 2 ? _gameSteps : null);
+    if (steps != null) tutorialRun.value = TutorialRun(steps, _tutorialDone, changes: _co, passed: () => _co.hasCampus);
   }
 
   void _tutorialDone() {
-    StorageService.saveTutorial(_co.hasCampus ? 2 : 1);
+    StorageService.saveTutorial(2);
     tutorialRun.value = null;
   }
 }

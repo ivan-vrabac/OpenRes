@@ -35,4 +35,53 @@ void main() {
     await t.tap(find.text('Skip tutorial'));
     expect(done, 1);
   });
+
+  group('waiting for the Campus', () {
+    late ValueNotifier<bool> placed;
+    final target = GlobalKey();
+    var mapTaps = 0, tabTaps = 0;
+
+    Future<void> campus(WidgetTester t) async {
+      placed = ValueNotifier(false);
+      mapTaps = tabTaps = 0;
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(body: Stack(children: [
+          Positioned.fill(child: GestureDetector(onTap: () => mapTaps++, behavior: HitTestBehavior.opaque)),
+          Positioned(left: 0, right: 0, bottom: 0, height: 60,
+              child: GestureDetector(onTap: () => tabTaps++, behavior: HitTestBehavior.opaque)),
+          Positioned(left: 100, right: 100, bottom: 70, height: 50, child: SizedBox(key: target)),
+          TutorialOverlay(onDone: () {}, changes: placed, passed: () => placed.value, steps: [
+            const TutorialStep('Welcome', 'hello'),
+            TutorialStep('Place', 'slide', target, null, false, true),
+            const TutorialStep('After', 'next'),
+          ]),
+        ])),
+      ));
+    }
+
+    testWidgets('no skipping, the map is free, the tab bar is not, placing goes on by itself', (t) async {
+      await campus(t);
+      expect(find.text('Skip tutorial'), findsNothing);
+      await t.tap(find.text('Next'));
+      await t.pump();
+      await t.pump();
+      expect(find.text('Place'), findsOneWidget);
+      expect(find.text('Next'), findsNothing);
+      expect(find.text('Skip tutorial'), findsNothing);
+      await t.tapAt(const Offset(400, 400));
+      expect(mapTaps, 1);
+      await t.tapAt(const Offset(400, 590));
+      await t.pump();
+      expect(tabTaps, 0);
+      placed.value = true;
+      await t.pump();
+      expect(find.text('After'), findsOneWidget);
+      expect(find.text('Skip tutorial'), findsNothing);       // the last card has none
+      await t.tap(find.text('Back'));
+      await t.pump();
+      expect(find.text('Next'), findsOneWidget);              // done: a normal card now
+      expect(find.text('Skip tutorial'), findsOneWidget);
+      await t.pumpWidget(const SizedBox());                   // ends its timer
+    });
+  });
 }

@@ -356,7 +356,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // over everything, tab bar too: while it runs only its cards change the tab
         ValueListenableBuilder<TutorialRun?>(valueListenable: tutorialRun, builder: (_, run, __) => run == null
             ? const SizedBox.shrink()
-            : TutorialOverlay(steps: run.steps, onStep: _tutorialTab, onDone: () {
+            : TutorialOverlay(steps: run.steps, onStep: _tutorialTab, changes: run.changes, passed: run.passed, onDone: () {
                 _toTab(GameTabId.map);
                 run.onDone();
               })),

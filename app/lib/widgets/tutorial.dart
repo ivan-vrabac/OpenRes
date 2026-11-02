@@ -15,7 +15,9 @@ final tutorialRun = ValueNotifier<TutorialRun?>(null);
 class TutorialRun {
   final List<TutorialStep> steps;
   final VoidCallback onDone;
-  const TutorialRun(this.steps, this.onDone);
+  final Listenable? changes;               // says when [passed] may have changed
+  final bool Function()? passed;           // the Campus is down: until then no skipping, see TutorialStep.waits
+  const TutorialRun(this.steps, this.onDone, {this.changes, this.passed});
 }
 
 class TutorialStep {
@@ -23,16 +25,20 @@ class TutorialStep {
   final GlobalKey? target;                 // what this step is about, lit up on the darkened screen
   final GameTabId? tab;                    // the tab it talks about (none: the map)
   final bool more;                         // the More tab, which has no id
-  const TutorialStep(this.title, this.text, [this.target, this.tab, this.more = false]);
+  final bool waits;                        // goes on by itself once done: the player does it on the live map
+  const TutorialStep(this.title, this.text, [this.target, this.tab, this.more = false, this.waits = false]);
 }
 
-/// The first steps for a new player (owner 2026-11-01), one card at a time. It can always be skipped. It
-/// covers the whole game, tab bar too: the tabs change with the cards, and only with the cards.
+/// The first steps for a new player (owner 2026-11-01), one card at a time. It covers the whole game, tab
+/// bar too: the tabs change with the cards, and only with the cards. Skipping needs a Campus (owner
+/// 2026-11-02). A step that [TutorialStep.waits] leaves the map free, down to its target, and has no Next.
 class TutorialOverlay extends StatefulWidget {
   final List<TutorialStep> steps;
   final VoidCallback onDone;
   final void Function(TutorialStep step)? onStep;
-  const TutorialOverlay({super.key, required this.steps, required this.onDone, this.onStep});
+  final Listenable? changes;
+  final bool Function()? passed;
+  const TutorialOverlay({super.key, required this.steps, required this.onDone, this.onStep, this.changes, this.passed});
 
   @override
   State<TutorialOverlay> createState() => _TutorialOverlayState();
@@ -41,11 +47,27 @@ class TutorialOverlay extends StatefulWidget {
 class _TutorialOverlayState extends State<TutorialOverlay> {
   int _i = 0;
   Timer? _settled;
+  Timer? _follow;                 // a waiting step keeps its target in sight
+  bool _wasWaiting = false;
+
+  bool get _passed => widget.passed?.call() ?? true;
+  bool get _waiting => widget.steps[_i].waits && !_passed;
 
   @override
   void dispose() {
     _settled?.cancel();
+    _follow?.cancel();
+    widget.changes?.removeListener(_changed);
     super.dispose();
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    if (_wasWaiting && !_waiting) {
+      _go(_i + 1);
+    } else {
+      setState(() {});
+    }
   }
 
   /// Where the step's target is, in this overlay's own coordinates.
@@ -59,6 +81,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   @override
   void initState() {
     super.initState();
+    widget.changes?.addListener(_changed);
     _show();
   }
 
@@ -69,6 +92,11 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   }
 
   void _show() {
+    _wasWaiting = _waiting;
+    _follow?.cancel();
+    if (_wasWaiting) {
+      _follow = Timer.periodic(const Duration(milliseconds: 500), (_) { if (mounted) setState(() {}); });
+    }
     widget.onStep?.call(widget.steps[_i]);
     // the hole needs the layout, and a tab change has to finish first
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
@@ -82,13 +110,22 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     final hole = _hole();
     final last = _i == widget.steps.length - 1;
     final height = MediaQuery.sizeOf(context).height;
+    final waiting = _waiting;
+    // its target gone (the location gate replaces the map): out of the way, that screen has to work
+    if (waiting && hole == null) return const Positioned.fill(child: Stack());
     // the card stays away from what it talks about
     final cardOnTop = hole != null && hole.center.dy > height / 2;
     return Positioned.fill(child: Stack(children: [
-      Positioned.fill(child: AbsorbPointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent)))),
+      if (waiting) ...[
+        // the map stays free, only what is below the target (the tab bar) is closed
+        Positioned(left: 0, right: 0, top: hole!.bottom, bottom: 0,
+            child: const AbsorbPointer(child: ColoredBox(color: Colors.black54))),
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent, dim: false)))),
+      ] else
+        Positioned.fill(child: AbsorbPointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent)))),
       Positioned(
         left: 16, right: 16,
-        top: cardOnTop ? 150 : null,
+        top: waiting ? 96 : cardOnTop ? 150 : null,
         bottom: cardOnTop ? null : 150,
         child: Material(
           color: AppColors.bg,
@@ -104,11 +141,11 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
               Text(step.text, style: const TextStyle(fontSize: 15, height: 1.35)),
               const SizedBox(height: 8),
               Row(children: [
-                if (!last) TextButton(onPressed: widget.onDone, child: const Text('Skip tutorial')),
+                if (!last && _passed) TextButton(onPressed: widget.onDone, child: const Text('Skip tutorial')),
                 const Spacer(),
                 if (_i > 0) TextButton(onPressed: () => _go(_i - 1), child: const Text('Back')),
                 const SizedBox(width: 4),
-                FilledButton(onPressed: () => _go(_i + 1), child: Text(last ? 'Start playing' : 'Next')),
+                if (!waiting) FilledButton(onPressed: () => _go(_i + 1), child: Text(last ? 'Start playing' : 'Next')),
               ]),
             ]),
           ),
@@ -121,7 +158,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
 class _Scrim extends CustomPainter {
   final Rect? hole;
   final Color accent;
-  const _Scrim(this.hole, this.accent);
+  final bool dim;
+  const _Scrim(this.hole, this.accent, {this.dim = true});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -132,10 +170,10 @@ class _Scrim extends CustomPainter {
       return;
     }
     final r = RRect.fromRectAndRadius(h, const Radius.circular(12));
-    canvas.drawPath(Path.combine(PathOperation.difference, all, Path()..addRRect(r)), Paint()..color = Colors.black54);
+    if (dim) canvas.drawPath(Path.combine(PathOperation.difference, all, Path()..addRRect(r)), Paint()..color = Colors.black54);
     canvas.drawRRect(r, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = accent);
   }
 
   @override
-  bool shouldRepaint(_Scrim old) => old.hole != hole || old.accent != accent;
+  bool shouldRepaint(_Scrim old) => old.hole != hole || old.accent != accent || old.dim != dim;
 }

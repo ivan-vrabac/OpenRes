@@ -31,7 +31,7 @@ class StorageService {
     await p.setString(_keySid, sid);
   }
 
-  /// The tutorial: 0 not seen, 1 the welcome before the Campus, 2 all of it.
+  /// The tutorial: 0 not seen, 2 all of it (1: the old welcome only, the game part is still to come).
   static Future<int> getTutorial() async {
     final p = await SharedPreferences.getInstance();
     return p.getInt(_keyTutorial) ?? 0;
