@@ -36,8 +36,8 @@ extension _MapTutorial on _MapTabState {
         const TutorialStep('Campus',
             'Your Campus has 50 levels. Each one costs credits and materials from Storage, and unlocks new resources and plants. '
             'Visit it once a week, standing within 200 m: every missed week lowers your output by 10 %, down to 30 %.', null, GameTabId.specialBuildings),
-        const TutorialStep('Supervisors',
-            'Every Campus level gives 10 supervisors. Appoint one on a hex to make it produce more, and educate them with books and credits to raise it further. Put the best ones on your best hexes.', null, GameTabId.specialBuildings),
+        TutorialStep('Supervisors',
+            'Every Campus level gives 10 supervisors. Appoint one on a hex to make it produce more, and educate them with books and credits to raise it further. Put the best ones on your best hexes.', campusSupervisorsKey, GameTabId.specialBuildings),
         const TutorialStep('Production',
             'Plants sit inside your Campus and turn raw materials into goods worth more, like wood into lumber into furniture. '
             'They need their inputs and electricity in Storage, so make power with solar farms, wind farms or a power plant.', null, GameTabId.factories),

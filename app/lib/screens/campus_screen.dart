@@ -13,6 +13,7 @@ import '../widgets/cards.dart';
 import '../widgets/popups.dart';
 import '../widgets/slide_confirm.dart';
 import '../widgets/top_banner.dart';
+import '../widgets/tutorial.dart';
 import 'luxury_screen.dart' show fmtMass;
 
 /// The Campus: its picture, level and stage, the weekly visit, the upgrade to the next level, the
@@ -151,7 +152,8 @@ class _CampusScreenState extends State<CampusScreen> {
           await co.refresh();
           await _loadSups();
         },
-        child: ListView(padding: tabPadding(context, 12), children: [
+        // all of it built, so the tutorial can scroll to the supervisors
+        child: ListView(padding: tabPadding(context, 12), cacheExtent: 5000, children: [
           if (!co.hasCampus)
             _noCampus()
           else ...[
@@ -162,8 +164,10 @@ class _CampusScreenState extends State<CampusScreen> {
             const SectionLabel('Next level'),
             _upgradeCard(co),
             const SizedBox(height: 18),
-            const SectionLabel('Supervisors'),
-            _supervisorsCard(co),
+            Column(key: campusSupervisorsKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const SectionLabel('Supervisors'),
+              _supervisorsCard(co),
+            ]),
             if (_sups?['allEducated'] == true) ...[
               const SizedBox(height: 18),
               const SectionLabel('Research'),

@@ -13,6 +13,9 @@ final tutorialStart = ValueNotifier<int>(0);
 /// game screen keeps it up to date; what the overlay can't cover closes itself.
 final tutorialLocked = ValueNotifier<bool>(true);
 
+/// The supervisors on the Campus page, for their card.
+final campusSupervisorsKey = GlobalKey();
+
 /// The tutorial running now. The map writes the steps, the game screen shows them over all the tabs.
 final tutorialRun = ValueNotifier<TutorialRun?>(null);
 
@@ -89,7 +92,33 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     _show();
   }
 
+  /// A page scrolled to this step's target goes back to its top.
+  void _scrollBack() {
+    final c = widget.steps[_i].target?.currentContext;
+    final pos = c == null ? null : Scrollable.maybeOf(c)?.position;
+    if (pos != null && pos.pixels > 0) {
+      pos.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  void _skip() {
+    _scrollBack();
+    widget.onDone();
+  }
+
+  /// Bring the target into view, below the top bar, and follow it with the hole.
+  void _reveal() {
+    final c = widget.steps[_i].target?.currentContext;
+    if (c == null || Scrollable.maybeOf(c) == null) {
+      setState(() {});
+      return;
+    }
+    Scrollable.ensureVisible(c, alignment: 0.12, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut)
+        .then((_) { if (mounted) setState(() {}); });
+  }
+
   void _go(int to) {
+    _scrollBack();
     if (to >= widget.steps.length) return widget.onDone();
     setState(() => _i = to);
     _show();
@@ -105,7 +134,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     // the hole needs the layout, and a tab change has to finish first
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
     _settled?.cancel();
-    _settled = Timer(const Duration(milliseconds: 350), () { if (mounted) setState(() {}); });
+    _settled = Timer(const Duration(milliseconds: 350), () { if (mounted) _reveal(); });
   }
 
   @override
@@ -146,7 +175,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
               Text(step.text, style: const TextStyle(fontSize: 15, height: 1.35)),
               const SizedBox(height: 8),
               Row(children: [
-                if (!last && _passed) TextButton(onPressed: widget.onDone, child: const Text('Skip tutorial')),
+                if (!last && _passed) TextButton(onPressed: _skip, child: const Text('Skip tutorial')),
                 const Spacer(),
                 if (_i > 0) TextButton(onPressed: () => _go(_i - 1), child: const Text('Back')),
                 const SizedBox(width: 4),

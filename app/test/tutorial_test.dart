@@ -36,6 +36,28 @@ void main() {
     expect(done, 1);
   });
 
+  testWidgets('a step scrolls its target into view, and leaving it scrolls back', (t) async {
+    final far = GlobalKey();
+    final list = ScrollController();
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(body: Stack(children: [
+        ListView(controller: list, cacheExtent: 5000, children: [
+          const SizedBox(height: 1500),
+          SizedBox(key: far, height: 100),
+          const SizedBox(height: 800),
+        ]),
+        TutorialOverlay(onDone: () {}, steps: [TutorialStep('Far', 'text', far), const TutorialStep('After', 'next')]),
+      ])),
+    ));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pumpAndSettle();
+    expect(list.offset, greaterThan(1000));
+    await t.tap(find.text('Next'));
+    await t.pumpAndSettle();
+    expect(list.offset, 0);
+    await t.pump(const Duration(milliseconds: 400));
+  });
+
   group('waiting for the Campus', () {
     late ValueNotifier<bool> placed;
     final target = GlobalKey();
