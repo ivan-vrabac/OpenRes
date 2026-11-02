@@ -391,7 +391,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     if (!mounted || _gate != LocationGate.ok || context.read<PlayerProvider>().sid.isEmpty) return;
     late final MapCamera cam;
     try { cam = _mapCtrl.camera; } catch (_) { return; }
-    _world.want(cam.visibleBounds, cam.zoom, maxAge: _survey != null ? const Duration(seconds: 5) : null);
+    _world.want(cam.visibleBounds, cam.zoom, centerLng: cam.center.longitude,
+        maxAge: _survey != null ? const Duration(seconds: 5) : null);
   }
 
   double _distM(LatLng a, LatLng b) {
@@ -555,14 +556,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
           minZoom: 3,
           maxZoom: 19,
           backgroundColor: const Color(0xFF343434),
-          // contain (not containCenter) constrains the VIEWPORT edges — the user
-          // can never scroll past the tile coverage area and see the blank background.
-          cameraConstraint: CameraConstraint.contain(
-            bounds: LatLngBounds(
-              const LatLng(-85, -180),
-              const LatLng(85,   180),
-            ),
-          ),
+          // up and down the view stops at the map's edge (no blank background),
+          // left and right the world repeats without end
+          cameraConstraint: const CameraConstraint.containLatitude(85, -85),
           interactionOptions: const InteractionOptions(
             flags: InteractiveFlag.all & ~InteractiveFlag.rotate & ~InteractiveFlag.doubleTapZoom,
           ),

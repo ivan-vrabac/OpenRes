@@ -34,12 +34,14 @@ class MapWorld extends ChangeNotifier {
   MapScene scene = const MapScene();
 
   LatLngBounds? _box;        // what the last answer covered
+  LatLngBounds? _acrossBox;  // and its part beyond the date line
   double _boxZoom = 0;
   bool _boxDetail = false;
   bool _boxCut = false;      // the answer hit a server limit
   DateTime? _boxAt;
 
   LatLngBounds? _view;
+  LatLngBounds? _across;     // the view's part beyond the date line, on the other end of the longitudes
   double _zoom = 0;
   Duration _maxAge = _freshFor;
   bool _dirty = false;       // something changed: fetch even if the view is covered
@@ -77,19 +79,33 @@ class MapWorld extends ChangeNotifier {
     );
   }
 
+  /// The camera's bounds stop at the date line: what the screen shows beyond it.
+  static LatLngBounds? _beyond(LatLngBounds view, double centerLng) {
+    final w = view.longitudeWidth;
+    if (w >= 360) return null;
+    final s = view.south.clamp(-85.0, 85.0), n = view.north.clamp(-85.0, 85.0);
+    if (centerLng + w / 2 > 180) return LatLngBounds(LatLng(s, -180), LatLng(n, centerLng + w / 2 - 360));
+    if (centerLng - w / 2 < -180) return LatLngBounds(LatLng(s, centerLng - w / 2 + 360), LatLng(n, 180));
+    return null;
+  }
+
   bool get _stale {
     final box = _box, view = _view, at = _boxAt;
     if (view == null) return false;
     if (_dirty || box == null || at == null) return true;
     if (!_inside(view, box)) return true;
+    final across = _across, abox = _acrossBox;
+    if (across != null && (abox == null || !_inside(across, abox))) return true;
     if (DateTime.now().difference(at) >= _maxAge) return true;
     if (_zoom >= kHexZoom && !_boxDetail) return true;
     return _boxCut && _zoom >= _boxZoom + 1;        // up close the cut-off parts may be in view
   }
 
-  /// Keep [view] covered. Cheap: call it as often as you like (camera moves, a timer).
-  void want(LatLngBounds view, double zoom, {Duration? maxAge}) {
+  /// Keep [view] covered. Cheap: call it as often as you like (camera moves, a timer). With [centerLng]
+  /// (the camera's) what shows beyond the date line is covered too.
+  void want(LatLngBounds view, double zoom, {Duration? maxAge, double? centerLng}) {
     _view = _clamped(view);
+    _across = centerLng == null ? null : _beyond(view, centerLng);
     _zoom = zoom;
     _maxAge = maxAge ?? _freshFor;
     _load();
@@ -119,12 +135,18 @@ class MapWorld extends ChangeNotifier {
         final zoom = _zoom;
         final detail = zoom >= kHexZoom;
         final box = _withMargin(view, detail);
+        final across = _across == null ? null : _withMargin(_across!, detail);
         final r = await _fetch('/api/v3/map', {'south': box.south, 'west': box.west,
             'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0});
         if (_gone) return;
         if (!r.ok) { _dirty = true; break; }        // what is known stays; the next want tries again
-        _merge(r, box, detail);
+        final ra = across == null ? null : await _fetch('/api/v3/map', {'south': across.south, 'west': across.west,
+            'north': across.north, 'east': across.east, 'detail': detail ? 1 : 0});
+        if (_gone) return;
+        if (ra != null && !ra.ok) { _dirty = true; break; }
+        _merge(r, box, detail, also: ra == null ? null : (ra, across!));
         _box = box;
+        _acrossBox = across;
         _boxZoom = zoom;
         _boxDetail = detail;
         _boxCut = r.data['more'] == true;
@@ -135,7 +157,24 @@ class MapWorld extends ChangeNotifier {
     }
   }
 
-  void _merge(ApiResult r, LatLngBounds box, bool detail) {
+  void _merge(ApiResult r, LatLngBounds box, bool detail, {(ApiResult, LatLngBounds)? also}) {
+    _mergeOne(r, box, detail);
+    if (also != null) _mergeOne(also.$1, also.$2, detail);
+    if (detail) {
+      smoke = SmokeData.fromLatLng(Float64List.fromList([
+        for (final h in hexes)
+          ...[(h['lat'] as num).toDouble(), (h['lng'] as num).toDouble()],     // Campus cells too
+      ]));
+    } else {
+      smoke = SmokeData.fromLatLng(Float64List.fromList([
+        for (final a in [r, if (also != null) also.$1])
+          for (final v in a.data['dots'] as List? ?? const []) (v as num).toDouble(),
+      ]));
+    }
+    _rebuild();
+  }
+
+  void _mergeOne(ApiResult r, LatLngBounds box, bool detail) {
     bool inBox(Map<String, dynamic> m) =>
         (m['lat'] as num) >= box.south && (m['lat'] as num) <= box.north &&
         (m['lng'] as num) >= box.west && (m['lng'] as num) <= box.east;
@@ -161,15 +200,7 @@ class MapWorld extends ChangeNotifier {
               'overlapUntil': now.add(Duration(milliseconds: ((h['shareFor'] as num) * 1000).round())),
           },
       ];
-      smoke = SmokeData.fromLatLng(Float64List.fromList([
-        for (final h in hexes)
-          ...[(h['lat'] as num).toDouble(), (h['lng'] as num).toDouble()],     // Campus cells too
-      ]));
-    } else {
-      smoke = SmokeData.fromLatLng(Float64List.fromList(
-          [for (final v in r.data['dots'] as List? ?? const []) (v as num).toDouble()]));
     }
-    _rebuild();
   }
 
   Future<void> _loadTop() async {

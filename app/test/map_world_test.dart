@@ -213,4 +213,25 @@ void main() {
     expect(worldPerMetre(0), closeTo(256 / 40075017, 1e-9));
     expect(worldPerMetre(60), closeTo(2 * 256 / 40075017, 2e-8));
   });
+
+  test('a view across the date line loads both sides', () async {
+    srv.campuses..add(campus(0, 179.99))..add(campus(0, -179.99));
+    final view = LatLngBounds.worldSafe(south: -0.01, north: 0.01, longitudeCenter: 179.995, longitudeWidth: 0.04);
+    w.want(view, 16, centerLng: 179.995);
+    await settle();
+    expect(w.campuses.length, 2);
+    expect(srv.calls.length, 2);
+    srv.calls.clear();
+    w.want(view, 16, centerLng: 179.995);             // covered: nothing more to fetch
+    await settle();
+    expect(srv.calls, isEmpty);
+  });
+
+  test('clouds of both sides of the date line stay together when far out', () async {
+    srv.hexes..add(hex(1, 0, 170))..add(hex(2, 0, -170));
+    final view = LatLngBounds.worldSafe(south: -30, north: 30, longitudeCenter: 175, longitudeWidth: 60);
+    w.want(view, 5, centerLng: 175);
+    await settle();
+    expect(w.smoke!.length, 2);
+  });
 }

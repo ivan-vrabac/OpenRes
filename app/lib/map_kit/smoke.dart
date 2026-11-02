@@ -31,6 +31,10 @@ Future<ui.Image> makePuffImage(Color color) {
 }
 
 double mercX(double lng) => (lng + 180) / 360 * 256;
+
+/// The map repeats left and right: this x distance to the nearest copy of the world. One copy is enough
+/// to draw, a world is wider than any screen at the lowest zoom.
+double nearestWorld(double dx) => dx - 256 * (dx / 256).roundToDouble();
 double mercY(double lat) {
   final lr = lat.clamp(-85.05, 85.05) * math.pi / 180;
   return (1 - math.log(math.tan(lr) + 1 / math.cos(lr)) / math.pi) / 2 * 256;
@@ -84,7 +88,7 @@ class SmokePainter extends CustomPainter {
     final w = d.world, xf = d.xf;
     int k = 0;
     for (int i = 0; i < d.length; i++) {
-      final sx = halfW + (w[2 * i] - cx) * scale;
+      final sx = halfW + nearestWorld(w[2 * i] - cx) * scale;
       final sy = halfH + (w[2 * i + 1] - cy) * scale;
       if (sx < -r || sx > size.width + r || sy < -r || sy > size.height + r) continue;
       xf[4 * k]     = s;

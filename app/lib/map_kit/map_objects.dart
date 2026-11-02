@@ -119,7 +119,7 @@ class _MapObjectsPainter extends CustomPainter {
       var k = 0;
       for (var i = 0; i < n; i++) {
         final px = 2 * kHexRadiusM * d[3 * i + 2] * scale;
-        final sx = halfW + (d[3 * i] - cx) * scale, sy = halfH + (d[3 * i + 1] - cy) * scale;
+        final sx = halfW + nearestWorld(d[3 * i] - cx) * scale, sy = halfH + (d[3 * i + 1] - cy) * scale;
         if (sx < -px || sx > size.width + px || sy < -px || sy > size.height + px) continue;
         if (tile == null) {                   // the picture is still being made: its place, not a hole
           canvas.drawPath(HexTiles.hexPath(sx, sy, px / 2), Paint()..color = frame.withValues(alpha: 0.5));
@@ -141,7 +141,7 @@ class _MapObjectsPainter extends CustomPainter {
     final now = DateTime.now();
     for (final m in scene.marks) {
       final px = 2 * kHexRadiusM * m.perM * scale, ph = px * 0.866;
-      final sx = halfW + (m.x - cx) * scale, sy = halfH + (m.y - cy) * scale;
+      final sx = halfW + nearestWorld(m.x - cx) * scale, sy = halfH + (m.y - cy) * scale;
       if (sx < -px || sx > size.width + px || sy < -px || sy > size.height + px) continue;
       if (m.stack > 1 && px >= 18) {          // inside the hex, top centre (neighbours cover the edges)
         _chip(canvas, '×${m.stack}', (px * 0.16).clamp(8.0, 12.0), Colors.white, Offset(sx, sy - ph * 0.3));
@@ -166,7 +166,7 @@ class _MapObjectsPainter extends CustomPainter {
     for (final c in scene.campuses.reversed) {
       final ppm = c.perM * scale;
       final w = kCampusWidthM * ppm, h = kCampusHeightM * ppm;
-      final sx = halfW + (c.x - cx) * scale, sy = halfH + (c.y - cy) * scale;
+      final sx = halfW + nearestWorld(c.x - cx) * scale, sy = halfH + (c.y - cy) * scale;
       if (sx < -w || sx > size.width + w || sy < -h || sy > size.height + h) continue;
       final img = w >= 2 ? HexTiles.campus(campusPicture(c.level), w * dpr) : null;
       if (img != null) {
@@ -189,7 +189,7 @@ class _MapObjectsPainter extends CustomPainter {
     for (final c in scene.sites) {
       final ppm = c.perM * scale;
       final w = kCampusWidthM * ppm;
-      final sx = halfW + (c.x - cx) * scale, sy = halfH + (c.y - cy) * scale;
+      final sx = halfW + nearestWorld(c.x - cx) * scale, sy = halfH + (c.y - cy) * scale;
       if (sx < -w || sx > size.width + w || sy < -w || sy > size.height + w) continue;
       canvas.save();
       canvas.translate(sx, sy);

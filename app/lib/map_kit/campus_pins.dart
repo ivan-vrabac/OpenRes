@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -6,13 +8,21 @@ const double _pinW = 12, _pinH = 17;
 
 LatLng _pos(Map<String, dynamic> c) => LatLng((c['lat'] as num).toDouble(), (c['lng'] as num).toDouble());
 
+/// Where a Campus is on the screen, on the nearest copy of the world.
+Offset _onScreen(Map<String, dynamic> c, MapCamera cam) {
+  final s = cam.latLngToScreenOffset(_pos(c));
+  final world = 256 * math.pow(2, cam.zoom).toDouble(), mid = cam.nonRotatedSize.width / 2;
+  final dx = s.dx - mid;
+  return Offset(mid + dx - world * (dx / world).roundToDouble(), s.dy);
+}
+
 /// The Campus whose pin is under a point on the screen (within a finger's reach), if any.
 Map<String, dynamic>? campusPinAt(List<Map<String, dynamic>> campuses, MapCamera cam, Offset point) {
   Map<String, dynamic>? best;
   var bestD = 20.0;
   for (final c in campuses) {
-    final s = cam.latLngToScreenPoint(_pos(c));
-    final d = (Offset(s.x, s.y - _pinH / 2) - point).distance;       // the middle of the pin
+    final s = _onScreen(c, cam);
+    final d = (Offset(s.dx, s.dy - _pinH / 2) - point).distance;     // the middle of the pin
     if (d < bestD) { bestD = d; best = c; }
   }
   return best;
@@ -59,10 +69,10 @@ class _PinPainter extends CustomPainter {
     // the biggest last, on top; yours above them all
     final order = [...campuses.reversed.where((c) => c['own'] != true), ...campuses.where((c) => c['own'] == true)];
     for (final c in order) {
-      final s = cam.latLngToScreenPoint(_pos(c));
-      if (s.x < -_pinW || s.x > size.width + _pinW || s.y < 0 || s.y > size.height + _pinH) continue;
+      final s = _onScreen(c, cam);
+      if (s.dx < -_pinW || s.dx > size.width + _pinW || s.dy < 0 || s.dy > size.height + _pinH) continue;
       canvas.save();
-      canvas.translate(s.x, s.y);
+      canvas.translate(s.dx, s.dy);
       canvas.drawPath(_pin, edge);
       canvas.drawPath(_pin, Paint()..color = c['own'] == true ? accent : Colors.white);
       canvas.drawCircle(const Offset(0, -_pinH + _pinW / 2), 2, Paint()..color = Colors.black87);
