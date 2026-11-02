@@ -26,11 +26,13 @@ We use your data only to run the game. We don't use it for marketing or advertis
 
 - **Other players** see your company name, level, country, public profile, rankings and the positions of your Campus and hexes on the map. Your own position is never shown to them.
 - **OpenStreetMap** (OpenStreetMap Foundation, United Kingdom) delivers the map pictures directly to your phone, so it receives your IP address and the map area you look at (see the OpenStreetMap privacy policy).
-- **Cloudflare** (Cloudflare, Inc., USA) sits in front of our game server and website: all connections pass through it, so it receives your IP address and the data sent, to protect the service against attacks and to tell us your country (see Cloudflare's privacy policy).
+- **Cloudflare** (Cloudflare, Inc., USA) sits in front of our game server and website: all connections pass through it, so it receives your IP address and the data sent, to protect the service against attacks and to tell us your country. Its Turnstile check also protects the contact form on the website (see Cloudflare's privacy policy).
 - **ip-api.com** was used to find your country by app versions before 0.2.13, so those versions send it your IP address. It receives nothing else, and the game no longer uses it from version 0.2.13.
 - **Google** provides location services and app distribution on Android phones, and handles the purchase of the game and its payment; we never see your payment details (see Google's privacy policy).
 - **Our hosting:** the game server runs on our own hardware in the EU. **Google** stores our backups in our private Google Drive account.
 - **Authorities**, only where the law requires it.
+
+Google and Cloudflare may process data outside the European Union, including in the USA, and OpenStreetMap is based in the United Kingdom. Such transfers rely on an EU adequacy decision (for the USA, the EU-US Data Privacy Framework for certified companies) or on the EU's standard contractual clauses.
 
 We don't sell or rent personal data and we don't share it for marketing ("we do not sell or share your personal information", also in the sense of US state privacy laws such as the CCPA).
 
