@@ -2,7 +2,7 @@
 
 Version {version}
 
-This policy applies to the OpenRes game (the Android app "OpenRes" and its game server) and explains which personal data the game uses, why, who receives it, how it is protected and how long it is kept. The controller is {operator}. Our server is located in the European Union and we follow the EU General Data Protection Regulation (GDPR) and Croatian law.
+This policy applies to the OpenRes game (the Android app "OpenRes" and its game server) and explains which personal data the game uses, why, who receives it, how it is protected and how long it is kept. The controller is {operator}. We run the game from the Republic of Croatia, our server is located there, and we follow Croatian law and the EU General Data Protection Regulation (GDPR).
 
 ## In short
 
@@ -31,7 +31,7 @@ Where no other legal basis is named below, we process the data to perform our ag
 - **Cloudflare** (Cloudflare, Inc., USA) sits in front of our game server and website: all connections pass through it, so it receives your IP address and the data sent, to protect the service against attacks and to tell us your country. Its Turnstile check also protects the contact form on the website (see Cloudflare's privacy policy).
 - **ip-api.com** was used to find your country by app versions before 0.2.13, so those versions send it your IP address. It receives nothing else, and the game no longer uses it from version 0.2.13.
 - **Google** provides location services and app distribution on Android phones, and handles the purchase of the game and its payment; we never see your payment details. If you use Google Play Games, Google signs you in and receives the achievements you earn (see Google's privacy policy).
-- **Our hosting:** the game server runs on our own hardware in the EU. **Google** stores our backups in our private Google Drive account.
+- **Our hosting:** the game server runs on our own hardware in Croatia. **Google** stores our backups in our private Google Drive account.
 - **Authorities**, only where the law requires it.
 
 Google and Cloudflare may process data outside the European Union, including in the USA, and OpenStreetMap is based in the United Kingdom. Such transfers rely on an EU adequacy decision (for the USA, the EU-US Data Privacy Framework for certified companies) or on the EU's standard contractual clauses.

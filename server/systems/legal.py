@@ -15,8 +15,37 @@ RETENTION_DAYS = 30                 # logs and backups (privacy policy)
 _contact_bucket = econ.TokenBucket(10, 1800.0)   # site-wide: 10 messages, then one more every 30 minutes
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-LEGAL_VERSION = "2026-11-02.3"      # no refunds where the law allows it, otherwise Google Play's rules
+LEGAL_VERSION = "2026-11-02.4"      # Croatia first; no refunds where the law allows it, otherwise Google Play's rules
+LEDGER_DAYS = 90
+EVENT_DAYS = 7
 _DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "legal")
+
+
+def prune(conn, table: str, cutoff: str, keep_type: str | None = None, batch: int = 5000) -> int:
+    """Delete rows older than `cutoff` from a table written oldest first, a batch at a time, so a big
+    clean-up never holds the database for long. `keep_type` rows stay."""
+    cols = "id, ts, type" if keep_type else "id, ts"
+    last, gone = 0, 0
+    while True:
+        rows = conn.execute(f"SELECT {cols} FROM {table} WHERE id>? ORDER BY id LIMIT ?", (last, batch)).fetchall()
+        if not rows:
+            return gone
+        old = [(r[0],) for r in rows if r[1] < cutoff and not (keep_type and r[2] == keep_type)]
+        with econ.tx(conn):
+            conn.executemany(f"DELETE FROM {table} WHERE id=?", old)
+        gone += len(old)
+        if rows[-1][1] >= cutoff:
+            return gone
+        last = rows[-1][0]
+
+
+def prune_history(conn, now=None) -> None:
+    """The ledger and the event log would grow for ever: the ledger is kept LEDGER_DAYS for questions about
+    credits, events EVENT_DAYS for the quests. Surveys stay, the Surveyor achievement counts them all."""
+    import datetime
+    now = now or econ.utcnow()
+    prune(conn, "ledger", (now - datetime.timedelta(days=LEDGER_DAYS)).isoformat())
+    prune(conn, "game_events", (now - datetime.timedelta(days=EVENT_DAYS)).isoformat(), keep_type="survey")
 
 
 def text(name: str) -> str:
@@ -76,6 +105,7 @@ def install(api) -> None:
                         with open(log, "w", encoding="utf-8") as f:
                             f.writelines(kept)
                 with h.get_db() as conn:
+                    prune_history(conn)
                     with econ.tx(conn):
                         year = (econ.utcnow() - __import__("datetime").timedelta(days=365)).isoformat()
                         conn.execute("DELETE FROM contact_messages WHERE ts < ?", (year,))

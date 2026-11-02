@@ -40,6 +40,7 @@ from . import int_arg
 
 DAILY_COUNT = 3
 KEEP_DAYS = 7                  # days without a claim stay this long
+ACTIVE_DAYS = 7                # the sweep deals to companies seen this recently
 quest_credits, QUEST_MIN_CREDITS, QUEST_CAMPUS_SHARE = g.quest_credits, g.QUEST_MIN_CREDITS, g.QUEST_CAMPUS_SHARE
 
 
@@ -205,12 +206,14 @@ def assign_today(conn, hid, now=None) -> None:
 
 
 def deal_all(conn, now=None) -> int:
-    """Deal today's quests to everyone who has none yet (run by the sweep; a short write per company, once a
-    day), and forget old days nothing was claimed on: they can't count for a streak."""
+    """Deal today's quests to companies that played in the last ACTIVE_DAYS and have none yet (run by the sweep,
+    a short write per company once a day; anyone else gets theirs on opening the list, so a million sleeping
+    companies cost nothing), and forget old days nothing was claimed on: they can't count for a streak."""
     now = now or econ.utcnow()
     day = _day(now)
-    hids = [r[0] for r in conn.execute("SELECT hID FROM players WHERE hID NOT IN "
-                                       "(SELECT hid FROM daily_quests WHERE day=?)", (day,)).fetchall()]
+    hids = [r[0] for r in conn.execute(
+        "SELECT DISTINCT hid FROM player_activity WHERE day>=? AND hid NOT IN "
+        "(SELECT hid FROM daily_quests WHERE day=?)", (_day(now - datetime.timedelta(days=ACTIVE_DAYS)), day)).fetchall()]
     for hid in hids:
         with econ.tx(conn):
             assign_today(conn, hid, now)

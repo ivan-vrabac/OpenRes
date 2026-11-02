@@ -75,9 +75,12 @@ def test_the_whole_day_counts_not_only_after_opening_the_list():
 
 def test_the_sweep_deals_everyone_once_a_day_and_forgets_unclaimed_days():
     a = new_player("qdeal")[0]
+    asleep = new_player("qsleep")[0]
     old = (econ.utcnow() - datetime.timedelta(days=quests.KEEP_DAYS + 1)).strftime("%Y-%m-%d")
     day = econ.utcnow().strftime("%Y-%m-%d")
     with main.get_db() as conn:
+        conn.execute("INSERT OR IGNORE INTO player_activity(hid, day) VALUES(?,?)", (a, day))
+        conn.execute("DELETE FROM player_activity WHERE hid=?", (asleep,))
         conn.execute("DELETE FROM daily_quests WHERE hid=?", (a,))
         conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at) VALUES(?,?,'survey','x','x')", (a, old))
         conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
@@ -85,6 +88,7 @@ def test_the_sweep_deals_everyone_once_a_day_and_forgets_unclaimed_days():
         conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at) VALUES(?,?,'survey','x','x')", (a, "2020-01-01"))
         conn.commit()
         assert quests.deal_all(conn) >= 1
+        assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (asleep, day)).fetchone()   # asleep: no writes
         assert conn.execute("SELECT COUNT(*) FROM daily_quests WHERE hid=? AND day=?", (a, day)).fetchone()[0] == quests.DAILY_COUNT
         assert quests.deal_all(conn) == 0
         assert not conn.execute("SELECT 1 FROM daily_quests WHERE hid=? AND day=?", (a, old)).fetchone()
@@ -215,6 +219,26 @@ def test_selling_the_same_goods_at_once_sells_them_once():
         t.join()
     good = [r for r in out if r["err"] == 0]
     assert len(good) == 1 and have(hid, "wood") == 0 and credits(hid) - before == good[0]["credits"]
+
+
+def test_old_ledger_and_events_go_in_batches_surveys_stay():
+    from systems import legal
+    hid = new_player("qprune")[0]
+    now = econ.utcnow()
+    old = (now - datetime.timedelta(days=200)).isoformat()
+    with main.get_db() as conn:
+        conn.execute("DELETE FROM ledger")
+        conn.execute("DELETE FROM game_events")
+        for i in range(25):
+            conn.execute("INSERT INTO ledger(ts, hid, kind, credits) VALUES(?,?,'test',1)", (old, hid))
+            conn.execute("INSERT INTO game_events(ts, type, hid, data) VALUES(?,?,?,'{}')", (old, "survey" if i < 3 else "hex_built", hid))
+        conn.execute("INSERT INTO ledger(ts, hid, kind, credits) VALUES(?,?,'test',1)", (now.isoformat(), hid))
+        conn.execute("INSERT INTO game_events(ts, type, hid, data) VALUES(?,'hex_built',?,'{}')", (now.isoformat(), hid))
+        conn.commit()
+        assert legal.prune(conn, "ledger", (now - datetime.timedelta(days=90)).isoformat(), batch=10) == 25
+        legal.prune_history(conn, now)
+        assert conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 1
+        assert sorted(r[0] for r in conn.execute("SELECT type FROM game_events")) == ["hex_built", "survey", "survey", "survey"]
 
 
 def test_a_trade_counts_for_both_sides():

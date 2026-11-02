@@ -56,7 +56,9 @@ We may change these terms and the Privacy Policy at any time. The current versio
 
 ## 9. Law and courts
 
-Croatian law applies to these terms and to everything related to the game. Any dispute is decided by the competent court in the Republic of Croatia. If you are a consumer in the EU, this does not take away the protection of the mandatory rules of the country where you live.
+The game is run from the Republic of Croatia by an operator established there, and that is where we provide it to you. Croatian law applies to these terms, to your use of the game and to everything related to it, and any dispute is decided by the competent court in the Republic of Croatia.
+
+If you are a consumer in the European Union, you keep the protection of EU law and of the mandatory rules that can't be excluded where you live, including where you may bring or must answer a claim. Nothing else in these terms is governed by any other law.
 
 ## 10. Contact
 
