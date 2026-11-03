@@ -468,8 +468,8 @@ class _EnergyCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: Text('Made ${fmtNum(made)} kWh/h', style: const TextStyle(fontSize: 12))),
-          Text('Used ${fmtNum(used)} kWh/h', style: const TextStyle(fontSize: 12)),
+          Expanded(child: Text('Making ${fmtNum(made)} kWh/h', style: const TextStyle(fontSize: 12))),
+          Text('Using ${fmtNum(used)} kWh/h', style: const TextStyle(fontSize: 12)),
         ]),
         const SizedBox(height: 4),
         Text(

@@ -32,7 +32,8 @@ class _CampusScreenState extends State<CampusScreen> {
   Map<String, dynamic>? _dm;            // /api/v3/darkmatter, once every supervisor is fully educated
   bool _busy = false;
   String? _acting;                         // the action running now: only its own slider shows it
-  bool _locating = false;                  // only the Visit button waits for this
+  bool _locating = false;
+  int? _pick;                              // the education step the player chose to train for                  // only the Visit button waits for this
   Timer? _tick;
 
   Company get _co => context.read<Company>();
@@ -376,15 +377,23 @@ class _CampusScreenState extends State<CampusScreen> {
       if (nextStage != null)
         Text('${nextStage['name']} at level ${nextStage['from']}', style: TextStyle(color: AppColors.t54, fontSize: 12)),
       if (unlocks.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final u in unlocks)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-              child: Text(u, style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
-            ),
-        ]),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Unlocks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent)),
+            const SizedBox(height: 4),
+            for (final (what, list) in unlocks)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: '$what: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  TextSpan(text: list, style: TextStyle(color: AppColors.t70)),
+                ]), style: const TextStyle(fontSize: 12)),
+              ),
+          ]),
+        ),
       ],
       const SizedBox(height: 14),
       LayoutBuilder(builder: (ctx, box) {
@@ -406,132 +415,156 @@ class _CampusScreenState extends State<CampusScreen> {
     ]));
   }
 
-  /// What reaching `level` unlocks: plants and hex tiers (from the catalog).
-  static List<String> _unlocks(Company co, int level) {
-    final out = <String>[];
+  /// What reaching `level` unlocks, by kind: plants, hex resources, education (from the catalog).
+  static List<(String, String)> _unlocks(Company co, int level) {
+    if (level <= 1) return const [];
     final plants = (co.catalog['plants'] as Map?)?.cast<String, dynamic>() ?? const {};
-    for (final e in plants.entries) {
-      if ((e.value['unlock'] as num?)?.toInt() == level && level > 1) out.add(e.value['name'] as String);
-    }
     final raw = (co.catalog['raw'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final items = [for (final e in raw.entries) if ((e.value['unlock'] as num?)?.toInt() == level && level > 1) co.itemName(e.key)];
-    if (items.isNotEmpty) out.add('${items.join(', ')} hexes');
-    const slotLevels = [10, 20, 30, 40, 50];
-    if (slotLevels.contains(level)) out.add('One more education slot');
-    return out;
+    final made = [for (final e in plants.entries) if ((e.value['unlock'] as num?)?.toInt() == level) e.value['name'] as String];
+    final res = [for (final e in raw.entries) if ((e.value['unlock'] as num?)?.toInt() == level) co.itemName(e.key)];
+    return [
+      if (made.isNotEmpty) ('Production', made.join(', ')),
+      if (res.isNotEmpty) ('Resources', res.join(', ')),
+      if (const [10, 20, 30, 40, 50].contains(level)) ('Education', 'one more place in class'),
+    ];
   }
 
-  // ── Supervisors: only the steps that mean something now (owner 2026-11-01: seeing all of them was too
-  // much), the whole ladder behind the info button ──
+  // ── Supervisors (owner 2026-11-03, redone): the team in one bar, who is training, one action ──
   Widget _supervisorsCard(Company co) {
     final s = _sups;
     if (s == null) {
       return _panel(const Center(child: Padding(padding: EdgeInsets.all(8),
           child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))));
     }
-    final slots = (s['slots'] as num).toInt();
-    final queue = _queue;
     final steps = (s['steps'] as List).cast<Map<String, dynamic>>();
     final byStep = (s['byStep'] as List).map((e) => (e as num).toInt()).toList();
+    final total = (s['total'] as num).toInt();
+    final onHexes = (s['assigned'] as num).toInt();
+    final slots = (s['slots'] as num).toInt();
+    final queue = _queue;
     final books = ((co.stock['books'] as num?) ?? 0).toDouble();
-    final queuedFor = <int, int>{};                      // step -> supervisors queued for it
+    final queuedFor = <int, int>{};
     for (final q in queue) {
       final to = (q['to'] as num).toInt();
       queuedFor[to] = (queuedFor[to] ?? 0) + 1;
     }
-    final now = DateTime.now().toUtc();
+    int count(int k) => k < byStep.length ? byStep[k] : 0;
+    int ready(int k) => k == 0 ? 0 : count(k - 1) - (queuedFor[k] ?? 0);
+    final choices = [for (var k = 1; k < steps.length; k++) if (ready(k) > 0) k];
+    final pick = choices.contains(_pick) ? _pick! : (choices.isEmpty ? null : choices.first);
 
-    Widget learning(Map<String, dynamic> q, bool first) {
+    // the team by education, as one bar
+    final bar = Row(children: [
+      for (var k = 0; k < steps.length; k++)
+        if (count(k) > 0)
+          Expanded(flex: count(k), child: Container(height: 12, color: _stepColor(k))),
+    ]);
+    final legend = Wrap(spacing: 12, runSpacing: 4, children: [
+      for (var k = 0; k < steps.length; k++)
+        if (count(k) > 0)
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: _stepColor(k), shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            Text('${count(k)} ${steps[k]['name']}', style: TextStyle(fontSize: 12, color: AppColors.t70)),
+          ]),
+    ]);
+
+    // who is in class now
+    Widget? training;
+    if (queue.isNotEmpty) {
+      final q = queue.first;
       final to = (q['to'] as num).toInt();
-      final left = parseUtc(q['finish'] as String).difference(now);
+      final left = parseUtc(q['finish'] as String).difference(DateTime.now().toUtc());
       final whole = (steps[to]['hours'] as num).toDouble() * 3600;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+      training = Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: _stepColor(to).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Icon(first ? Icons.school : Icons.hourglass_empty, size: 16, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Expanded(child: Text('Supervisor #${q['sup']} to ${steps[to]['name']}', style: const TextStyle(fontSize: 12))),
-            Text(left.isNegative ? 'done' : fmtDuration(left.inSeconds / 86400),
-                style: TextStyle(fontSize: 12, color: AppColors.t60)),
+            Icon(Icons.school, size: 18, color: _stepColor(to)),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Training for ${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+            Text(left.isNegative ? 'done' : fmtDuration(left.inSeconds / 86400), style: TextStyle(fontSize: 12, color: AppColors.t70)),
           ]),
-          if (first) ...[
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: whole <= 0 ? 1 : (1 - left.inSeconds / whole).clamp(0.0, 1.0),
-                minHeight: 4, backgroundColor: Colors.white12, color: AppColors.accent,
-              ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: whole <= 0 ? 1 : (1 - left.inSeconds / whole).clamp(0.0, 1.0),
+              minHeight: 5, backgroundColor: Colors.white12, color: _stepColor(to),
             ),
+          ),
+          if (queue.length > 1) ...[
+            const SizedBox(height: 4),
+            Text('${queue.length - 1} more waiting', style: TextStyle(fontSize: 11, color: AppColors.t54)),
           ],
         ]),
       );
     }
 
-    int count(int k) => k < byStep.length ? byStep[k] : 0;
-    int ready(int k) => k == 0 ? 0 : count(k - 1) - (queuedFor[k] ?? 0);
-
-    Widget rung(int k) {
-      final st = steps[k];
-      final boost = ((st['boost'] as num) * 100).round();
-      final n = count(k);
-      final trainable = ready(k) > 0;
-      String? line;                        // what it costs, or why it can't start yet
-      var can = false;
-      if (trainable) {
-        final needBooks = (st['books'] as num).toDouble();
-        final cost = (st['credits'] as num).toDouble();
-        final why = queue.length >= slots ? 'Education queue is full'
-            : books < needBooks ? 'Needs ${fmtNum(needBooks)} books, you have ${fmtNum(books)}'
-            : co.credits < cost ? 'Needs ${fmtCredits(cost)}'
-            : null;
-        line = why ?? '${_hours(st['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)}';
-        can = why == null && !_busy;
-      }
-      return Padding(
-        padding: EdgeInsets.only(top: k == 0 ? 0 : 10),
-        child: Row(children: [
-          Container(
-            width: 34, height: 34, alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: n > 0 ? AppColors.accent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
-              shape: BoxShape.circle,
-            ),
-            child: Text('$n', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13,
-                color: n > 0 ? AppColors.accent : AppColors.t38)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${st['name']}  +$boost %', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            if (line != null) Text(line, style: TextStyle(fontSize: 11, color: AppColors.t54)),
-          ])),
-          if (trainable)
-            OutlinedButton(
-              onPressed: can ? () => _educate(k) : null,
-              style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-              child: const Text('Start'),
-            ),
-        ]),
-      );
+    // one action: train the next one
+    Widget action;
+    if (pick == null) {
+      action = Text(count(steps.length - 1) == total ? 'Everyone has the highest education.'
+              : 'Everyone who can be trained is already in class.',
+          textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.t54));
+    } else {
+      final st = steps[pick];
+      final needBooks = (st['books'] as num).toDouble();
+      final cost = (st['credits'] as num).toDouble();
+      final why = queue.length >= slots ? 'The class is full: wait until it ends'
+          : books < needBooks ? 'Needs ${fmtNum(needBooks)} books, you have ${fmtNum(books)}'
+          : co.credits < cost ? 'Needs ${fmtCredits(cost)}'
+          : null;
+      action = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (choices.length > 1) ...[
+          Wrap(spacing: 8, alignment: WrapAlignment.center, children: [
+            for (final k in choices)
+              ChoiceChip(
+                label: Text('${steps[k]['name']}  +${((steps[k]['boost'] as num) * 100).round()} %'),
+                selected: k == pick,
+                onSelected: (_) => setState(() => _pick = k),
+              ),
+          ]),
+          const SizedBox(height: 8),
+        ],
+        FilledButton.icon(
+          onPressed: why == null && !_busy ? () => _educate(pick) : null,
+          icon: const Icon(Icons.school_outlined, size: 18),
+          label: Text('Train one for ${st['name']}'),
+        ),
+        const SizedBox(height: 6),
+        Text(why ?? '${_hours(st['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)} · +${((st['boost'] as num) * 100).round()} % on a hex',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: why == null ? AppColors.t60 : Colors.orangeAccent)),
+      ]);
     }
 
     return _panel(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        Expanded(child: Text('Appoint them from a hex or the Hexes list.', style: TextStyle(fontSize: 12, color: AppColors.t54))),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text('$total', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1)),
+        const SizedBox(width: 8),
+        Expanded(child: Text('supervisors · $onHexes on hexes', style: TextStyle(fontSize: 13, color: AppColors.t60))),
         IconButton(
           icon: Icon(Icons.info_outline, size: 20, color: AppColors.accent),
-          tooltip: 'How education works',
+          tooltip: 'How supervisors work',
           visualDensity: VisualDensity.compact,
           onPressed: () => _supervisorInfo(steps),
         ),
       ]),
-      const SizedBox(height: 6),
-      for (var i = 0; i < queue.length; i++) learning(queue[i], i == 0),
-      for (var k = 0; k < steps.length; k++)
-        if (count(k) > 0 || ready(k) > 0) rung(k),
+      const SizedBox(height: 10),
+      ClipRRect(borderRadius: BorderRadius.circular(6), child: bar),
+      const SizedBox(height: 8),
+      legend,
+      if (training != null) ...[const SizedBox(height: 12), training],
+      const SizedBox(height: 14),
+      action,
     ]));
   }
+
+  static Color _stepColor(int k) => const [
+        Color(0xFF6B7280), Color(0xFF4FC3F7), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373),
+      ][k.clamp(0, 4)];
 
   /// The whole ladder, for whoever wants to plan ahead.
   void _supervisorInfo(List<Map<String, dynamic>> steps) {
@@ -665,8 +698,6 @@ Future<void> showCampusLevels(BuildContext context) async {
                 Builder(builder: (_) {
                   final lvl = (l['level'] as num).toInt();
                   final cost = l['cost'] as Map<String, dynamic>?;
-                  final plants = (l['plants'] as List).cast<String>().map(co.plantName).toList();
-                  final tiers = (l['tiers'] as List).map((t) => 'tier-$t hexes').toList();
                   return Container(
                     height: 84,
                     margin: const EdgeInsets.only(bottom: 8),
@@ -690,9 +721,8 @@ Future<void> showCampusLevels(BuildContext context) async {
                           Text('${l['supervisors']} supervisors · ${l['queueSlots']} education slot'
                               '${(l['queueSlots'] as num) > 1 ? 's' : ''} · surveys up to ${fmtNum((l['surveyRadius'] as num) / 1000)} km',
                               style: TextStyle(fontSize: 12, color: AppColors.t70)),
-                          if (plants.isNotEmpty || tiers.isNotEmpty)
-                            Text('Unlocks: ${[...plants, ...tiers].join(', ')}',
-                                style: TextStyle(fontSize: 12, color: AppColors.accent)),
+                          for (final (what, list) in _CampusScreenState._unlocks(co, lvl))
+                            Text('$what: $list', style: TextStyle(fontSize: 12, color: AppColors.accent)),
                           if (cost != null)
                             Text('Costs ꞓ${fmtNum(cost['credits'] as num)}, '
                                 '${(cost['materials'] as Map).entries.map((e) => '${fmtNum(e.value as num)} ${co.itemName(e.key as String).toLowerCase()}').join(', ')}'
