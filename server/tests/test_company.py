@@ -542,3 +542,10 @@ def test_first_hex_gives_a_starter_harvest():
     with main.get_db() as conn:
         after = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item='sugar_beet'", (hid,)).fetchone()[0]
     assert after - before < g.FIRST_HEX_STARTER                  # only the first one
+
+
+def test_catalog_says_which_map_tiles():
+    _hid, sid = setup_hq("tiles", at=(45.55, 16.30))
+    t = call("/api/v3/catalog", sid)["tiles"]
+    assert t["url"].startswith("https://") and "{z}" in t["url"] and "{x}" in t["url"] and "{y}" in t["url"]
+    assert "OpenStreetMap" in t["attribution"] and t["maxZoom"] == 19

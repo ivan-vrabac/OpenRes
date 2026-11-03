@@ -130,6 +130,21 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
   Company get _co => context.read<Company>();
 
+  // The map's base tiles come from the server's catalog (owner 2026-11-03: a switch needs no release);
+  // OpenStreetMap until it says otherwise. One provider, so the phone's tile cache is kept.
+  static const _osmTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // OSM's tile policy: a distinct User-Agent naming the app, with a contact
+  static const kTileUserAgent =
+      'OpenRes/${Branding.buildName} (+https://game.vrabac.eu; contact: support.vrabac@gmail.com)';
+  late final _tileProvider = NetworkTileProvider(headers: {'User-Agent': kTileUserAgent});
+
+  Map get _tiles => (_co.catalog['tiles'] as Map?) ?? const {};
+  String get _tileUrl {
+    final u = _tiles['url'];
+    return u is String && u.startsWith('https://') && u.contains('{z}') && u.contains('{x}') && u.contains('{y}')
+        ? u : _osmTiles;
+  }
+
   /// Where you are for every range decision: the same gliding position the range circle is drawn around
   /// (owner 2026-11-01: the circle, the ghost hex and the build check each used their own position, and
   /// _pos only moves at the GPS interval, so they disagreed while walking).
@@ -603,9 +618,11 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     0,       0,       0, 1,   0,
             ]),
             child: TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              key: ValueKey(_tileUrl),
+              urlTemplate: _tileUrl,
+              tileProvider: _tileProvider,
               userAgentPackageName: Branding.appId,
-              maxNativeZoom: 19,
+              maxNativeZoom: ((_tiles['maxZoom'] as num?) ?? 19).toInt().clamp(1, 22),
             ),
           ),
 
@@ -811,7 +828,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                 color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(3),
               ),
-              child: Text('© OpenStreetMap contributors',
+              child: Text((_tiles['attribution'] as String?) ?? '© OpenStreetMap contributors',
                   style: TextStyle(color: AppColors.t54, fontSize: 9)),
             ),
           ),

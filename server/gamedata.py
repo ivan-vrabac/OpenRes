@@ -278,6 +278,13 @@ EDUCATION = {
 QUEUE_UNLOCKS = (10, 20, 30, 40, 50)         # one more education queue slot at each of these levels
 
 
+# The map's base tiles, sent to the app in the catalog (owner 2026-11-03): if OpenStreetMap ever asks us to
+# move, set TILE_URL (and TILE_ATTRIBUTION, TILE_MAX_ZOOM) in the server's environment and every player
+# switches on the next start, without a new app release.
+TILE_URL = os.environ.get("TILE_URL") or "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+TILE_ATTRIBUTION = os.environ.get("TILE_ATTRIBUTION") or "© OpenStreetMap contributors"
+TILE_MAX_ZOOM = int(os.environ.get("TILE_MAX_ZOOM") or 19)
+
 # the first hex a company builds puts this much of its product in Central Storage at once, so a new
 # player has something to sell in the tutorial right away (owner 2026-11-03)
 FIRST_HEX_STARTER = 10

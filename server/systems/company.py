@@ -1159,6 +1159,7 @@ def install_views(api) -> None:
     @api.endpoint("/api/v3/catalog")
     def catalog(conn, hid, form):
         return {"err": 0,
+                "tiles": {"url": g.TILE_URL, "attribution": g.TILE_ATTRIBUTION, "maxZoom": g.TILE_MAX_ZOOM},
                 "items": {k: {"name": n, "price": g.PRICES.get(k), "tradable": k not in g.UNTRADABLE}
                           for k, n in g.ITEM_NAMES.items()},
                 "operations": {op: {"name": n, "land": land, "items": list(items)}
