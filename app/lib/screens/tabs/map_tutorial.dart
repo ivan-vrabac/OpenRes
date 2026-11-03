@@ -5,7 +5,8 @@ part of 'map_tab.dart';
 extension _MapTutorial on _MapTabState {
   List<TutorialStep> get _welcomeSteps => [
         const TutorialStep('Welcome to OpenRes',
-            'The real world is your map. You run a company: find good land, lease hexes on it and sell what they make.'),
+            'The real world is your map. You run a company: find good land, lease hexes on it and sell what they make.\n\n'
+            'You can see this tutorial again any time in More, Settings, Game, Tutorial.'),
         TutorialStep('Place your Campus',
             'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here to place it.',
             _surveyBtnKey, null, false, true),

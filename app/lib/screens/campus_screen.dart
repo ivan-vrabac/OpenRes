@@ -553,7 +553,9 @@ class _CampusScreenState extends State<CampusScreen> {
       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text('$total', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1)),
         const SizedBox(width: 8),
-        Expanded(child: Text('supervisors · $onHexes on hexes', style: TextStyle(fontSize: 13, color: AppColors.t60))),
+        Expanded(child: Text('supervisors / $onHexes appointed', style: TextStyle(fontSize: 13, color: AppColors.t60))),
+        // everyone at the top: nothing left to queue or explain
+        if (shown.isNotEmpty || queue.isNotEmpty) ...[
         IconButton(
           icon: Badge(
             isLabelVisible: queue.isNotEmpty,
@@ -570,6 +572,7 @@ class _CampusScreenState extends State<CampusScreen> {
           visualDensity: VisualDensity.compact,
           onPressed: () => _supervisorInfo(steps),
         ),
+        ],
       ]),
       const SizedBox(height: 10),
       ClipRRect(borderRadius: BorderRadius.circular(6), child: bar),
