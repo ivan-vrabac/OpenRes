@@ -235,9 +235,7 @@ class _CampusScreenState extends State<CampusScreen> {
       Row(children: [
         StatTile('$eff %', 'Efficiency', color: eff >= 100 ? Colors.greenAccent : Colors.orangeAccent),
         const SizedBox(width: 8),
-        StatTile(assigned == null ? '$total' : '$assigned / $total', 'On hexes'),
-        const SizedBox(width: 8),
-        StatTile('${_queue.length} / ${(s?['slots'] as num?)?.toInt() ?? 1}', 'Education'),
+        StatTile(assigned == null ? '$total' : '$assigned / $total', 'Appointed'),
       ]),
     ]);
   }

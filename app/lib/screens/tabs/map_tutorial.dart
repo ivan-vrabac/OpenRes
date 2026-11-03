@@ -6,20 +6,20 @@ extension _MapTutorial on _MapTabState {
   List<TutorialStep> get _welcomeSteps => [
         const TutorialStep('Welcome to OpenRes',
             'The real world is your map. You run a company: find good land, lease hexes on it and sell what they make.\n\n'
-            'You can see this tutorial again any time in More, Settings, Game, Tutorial.'),
+            'You can see this tutorial again any time in More › Settings › Game › Tutorial.'),
         TutorialStep('Place your Campus',
             'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here to place it.',
             _surveyBtnKey, null, false, true),
       ];
 
   List<TutorialStep> get _gameSteps => [
-        TutorialStep('Pick a category', 'Start here: ores, forestry, farming, fish, energy and more.', _categoryBtnKey),
-        TutorialStep('Pick a resource', 'Then choose what to produce. New resources unlock as your Campus grows.', _resourceBtnKey),
+        TutorialStep('Pick a category', 'Start here: ores, forestry, farming, fish, energy and more. Tap it and pick one, or tap Next.', _categoryBtnKey),
+        TutorialStep('Pick a resource', 'Then choose what to produce. New resources unlock as your Campus grows. Tap it and pick one.', _resourceBtnKey),
         TutorialStep('Find the best spot',
-            'Slide to survey the land around the crosshair. The map fills with colours: hotter colours mean better quality for the resource you picked. Every place is different, so look around before you build.',
+            'Slide to survey the land around the crosshair. The map fills with colours: hotter colours mean better quality for the resource you picked. Every place is different: drag the map and look around before you build.',
             _surveyBtnKey),
         TutorialStep('Build in range',
-            'Put the crosshair on a hot spot inside the circle around you. This button lights up when the hex is in range.',
+            'Put the crosshair on a hot spot inside the circle around you. This button lights up when the hex is in range: tap it to see what the hex gives.',
             _buildBtnKey),
         const TutorialStep('Is it worth it?',
             'Before you build you see the quality, the Worth / hour, the build price and the 90 day lease. '
@@ -51,7 +51,8 @@ extension _MapTutorial on _MapTabState {
             'The endgame, from Campus level 40: an Isotope lab turns tantalum and supercomputers into Tantalum-180m. It cannot be sold. '
             'Put it into dark matter research: every level adds 1 % output to everything.', null, GameTabId.luxury),
         const TutorialStep('More',
-            'The More tab holds every other page, plus Settings. In Settings you can pin your favourite tabs to the bottom bar, and see this tutorial again.', null, null, true),
+            'The More tab holds every other page, plus Settings. In Settings you can pin your favourite tabs to the bottom bar. '
+            'You can see this tutorial again any time: More › Settings › Game › Tutorial.', null, null, true),
       ];
 
   void _onTutorialStart() {

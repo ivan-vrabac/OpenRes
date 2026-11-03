@@ -60,6 +60,13 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   bool get _passed => widget.passed?.call() ?? true;
   bool get _waiting => widget.steps[_i].waits && !_passed;
 
+  /// A step about a button on the map: the map and that button work while the card is up (owner
+  /// 2026-11-03), so the player does it for real; Next still goes on.
+  bool get _hands {
+    final s = widget.steps[_i];
+    return s.target != null && s.tab == null && !s.more;
+  }
+
   @override
   void dispose() {
     _settled?.cancel();
@@ -135,7 +142,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   void _show() {
     _wasWaiting = _waiting;
     _follow?.cancel();
-    if (_wasWaiting) {
+    if (_wasWaiting || _hands) {
       _follow = Timer.periodic(const Duration(milliseconds: 500), (_) { if (mounted) setState(() {}); });
     }
     widget.onStep?.call(widget.steps[_i]);
@@ -152,12 +159,13 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     final last = _i == widget.steps.length - 1;
     final height = MediaQuery.sizeOf(context).height;
     final waiting = _waiting;
+    final free = waiting || (_hands && hole != null);
     // its target gone (the location gate replaces the map): out of the way, that screen has to work
     if (waiting && hole == null) return const Positioned.fill(child: Stack());
     // the card stays away from what it talks about
     final cardOnTop = hole != null && hole.center.dy > height / 2;
     return Positioned.fill(child: Stack(children: [
-      if (waiting) ...[
+      if (free) ...[
         // the map stays free; the buttons beside the target and the tab bar below it are closed
         Positioned(left: 0, right: 0, top: hole!.bottom, bottom: 0, child: _closed),
         Positioned(left: 0, width: hole.left, top: hole.top, height: hole.height, child: _closed),
@@ -168,7 +176,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
       Positioned(
         left: 16, right: 16,
         top: waiting ? 96 : cardOnTop ? 150 : null,
-        bottom: cardOnTop ? null : 150,
+        bottom: waiting || cardOnTop ? null : 150,
         child: Material(
           color: AppColors.bg,
           elevation: 8,
