@@ -750,7 +750,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
               ),
               ])),
               // the top bar hidden: the credits sit here, where spending starts (owner 2026-11-03)
-              Expanded(child: ValueListenableBuilder<bool>(valueListenable: UiLook.showHud, builder: (_, hud, __) => hud
+              Expanded(child: AnimatedBuilder(animation: Listenable.merge([UiLook.showHud, UiLook.hideBalance]),
+                  builder: (_, __) => UiLook.showHud.value || UiLook.hideBalance.value
                   ? const SizedBox.shrink()
                   : Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text(fmtCredits(co.credits),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber)))))),

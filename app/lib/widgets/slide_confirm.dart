@@ -37,6 +37,8 @@ class SlideToConfirm extends StatefulWidget {
 const double _bodyW = 40, _point = 10, _gap = 3, _band = 7;
 const double _tailW = 2 * (_gap + _band);         // the two chevrons
 const double _pad = 4;
+// a soft dark edge around the label's letters
+const _shade = [Shadow(color: Color(0xCC000000), blurRadius: 3), Shadow(color: Color(0x99000000), blurRadius: 1)];
 
 class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStateMixin {
   final _x = ValueNotifier<double>(0);            // knob offset, px
@@ -167,22 +169,6 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
                         borderRadius: BorderRadius.circular(widget.radius),
                       )),
                     ),
-                  // the label, centred in the track beside the knob (owner 2026-11-03: on a narrow phone it ran
-                  // under the knob, the same colour), a little see-through
-                  Positioned(
-                    left: _pad + _bodyW + _point + _tailW, right: _pad, top: 0, bottom: 0,
-                    child: Opacity(
-                      opacity: (1 - t * 1.6).clamp(0.0, 1.0),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                color: look ? Colors.white.withValues(alpha: 0.8) : AppColors.t38)),
-                        if (widget.sublabel != null)
-                          Text(widget.sublabel!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: look ? Colors.white60 : Colors.white24)),
-                      ]),
-                    ),
-                  ),
                   Positioned(
                     left: _pad + x, top: _pad,
                     child: SizedBox(
@@ -202,6 +188,23 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
                           ),
                         ),
                       ),
+                    ),
+                  ),
+                  // the label, centred on the whole track like the button it replaced, drawn over the knob:
+                  // white with a dark shadow reads on the track and on the black knob alike (owner 2026-11-03)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: (1 - t * 1.6).clamp(0.0, 1.0),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                color: look ? Colors.white.withValues(alpha: 0.92) : AppColors.t38,
+                                shadows: look ? _shade : null)),
+                        if (widget.sublabel != null)
+                          Text(widget.sublabel!, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: look ? Colors.white70 : Colors.white24,
+                                  shadows: look ? _shade : null)),
+                      ]),
                     ),
                   ),
                 ]);
@@ -243,8 +246,8 @@ class _KnobPainter extends CustomPainter {
       ..lineTo(0, radius)
       ..arcToPoint(Offset(radius, 0), radius: Radius.circular(radius))
       ..close();
-    // a dark knob: the white icon on it stands out from the track (owner 2026-11-03)
-    canvas.drawPath(body, Paint()..color = Colors.black.withValues(alpha: on ? 0.38 : 0.2));
+    // a black knob, a white icon: the strongest contrast (owner 2026-11-03: black to white, not see-through)
+    canvas.drawPath(body, Paint()..color = on ? Colors.black : Colors.black.withValues(alpha: 0.4));
     canvas.drawPath(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = base.withValues(alpha: 0.35));
     if (squash <= 0.01) return;
     final gap = _gap * squash, band = _band * squash;

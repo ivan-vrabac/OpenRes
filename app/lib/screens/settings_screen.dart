@@ -416,7 +416,8 @@ class _InterfaceSection extends StatelessWidget {
           SwitchListTile(
             title: const Text('Top bar'),
             subtitle: Text(UiLook.showHud.value ? 'Company name, Campus level and credits'
-                : 'Hidden: your credits show in the middle of the map buttons', style: TextStyle(fontSize: 12, color: AppColors.t54)),
+                : UiLook.hideBalance.value ? 'Hidden' : 'Hidden: your credits show in the middle of the map buttons',
+                style: TextStyle(fontSize: 12, color: AppColors.t54)),
             value: UiLook.showHud.value,
             onChanged: (v) => UiLook.set(hud: v),
           ),
@@ -427,6 +428,12 @@ class _InterfaceSection extends StatelessWidget {
               value: UiLook.hudOpensCompany.value,
               onChanged: (v) => UiLook.set(hudOpens: v),
             ),
+          SwitchListTile(
+            title: const Text('Hide balance'),
+            subtitle: Text('Your credits are not shown on the top bar or the map', style: TextStyle(fontSize: 12, color: AppColors.t54)),
+            value: UiLook.hideBalance.value,
+            onChanged: (v) => UiLook.set(hideCredits: v),
+          ),
           SwitchListTile(
             title: const Text('See-through tab bar on the map'),
             subtitle: Text('The map shows under the bottom tabs; other pages bring their own background',

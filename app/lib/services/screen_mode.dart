@@ -14,6 +14,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ScreenMode {
   static bool hideNav = true;
   static bool hideStatus = false;
+  /// The status bar's height, remembered while it shows: with the bar hidden the app keeps that room at
+  /// the top (owner 2026-11-03: titles and the back arrow went under the camera). The map still runs up.
+  static double _statusTop = 0;
+
+  static void rememberTop(double v) {
+    if (v <= 0 || (v - _statusTop).abs() < 0.5) return;
+    _statusTop = v;
+    SharedPreferences.getInstance().then((p) => p.setDouble('screen_status_top', v));
+  }
+
+  /// The top room while the bar is hidden: what it was, or the camera cutout, at least 24.
+  static double keptTop(double now) => [_statusTop, now, 24.0].reduce((a, b) => a > b ? a : b);
   static Timer? _rehide;
   /// Bumps when a setting changes (the game screen makes room under the tabs when the bar is hidden).
   static final changed = ValueNotifier<int>(0);
@@ -22,6 +34,7 @@ class ScreenMode {
     final prefs = await SharedPreferences.getInstance();
     hideNav = prefs.getBool('screen_hide_nav') ?? true;
     hideStatus = prefs.getBool('screen_hide_status') ?? false;
+    _statusTop = prefs.getDouble('screen_status_top') ?? 0;
     SystemChrome.setSystemUIChangeCallback((visible) async {
       // bars shown by a swipe: hide them again after a moment
       if (visible && (hideNav || hideStatus)) {

@@ -31,6 +31,14 @@ void main() {
     expect(fmtQty(8e18), '8.00Qi');
   });
 
+  test('the activity log shows exact amounts', () {
+    expect(fmtFull(1234567), '1,234,567');
+    expect(fmtFull(-9876543.5), '-9,876,543.50');
+    expect(fmtFull(999), '999');
+    expect(fmtFull(5e18), '5,000,000,000,000,000,000');
+    expect(fmtFull(3e22), '30.00Sx');            // beyond exact digits: the short form
+  });
+
   test('not a number or infinite: no crash', () {
     expect(fmtNum(double.infinity), '∞');
     expect(fmtNum(double.nan), '-');

@@ -33,6 +33,23 @@ String? suffixed(num v, int d, {double from = 1e3, bool lowerK = false}) {
   return null;
 }
 
+/// The whole number with thousands commas (and cents when it has them): the activity log shows exact
+/// amounts (owner 2026-11-03). Past 1e21 it falls back to the short form.
+String fmtFull(num v) {
+  if (!v.isFinite || v.abs() >= 1e21) return fmtNum(v);
+  final a = v.abs();
+  final s = a.toStringAsFixed(a == a.roundToDouble() ? 0 : 2);
+  final parts = s.split('.');
+  final w = parts[0];
+  final buf = StringBuffer(v < 0 ? '-' : '');
+  for (var i = 0; i < w.length; i++) {
+    if (i > 0 && (w.length - i) % 3 == 0) buf.write(',');
+    buf.write(w[i]);
+  }
+  if (parts.length > 1) buf.write('.${parts[1]}');
+  return buf.toString();
+}
+
 /// Large numbers with a suffix and [kNumDecimals] decimals (1.23K, 4.56M ... up to Dc); below 1,000 whole.
 String fmtNum(num n, {int? decimals}) {
   if (!n.isFinite) return suffixed(n, 0)!;

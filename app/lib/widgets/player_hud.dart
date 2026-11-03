@@ -39,12 +39,16 @@ class PlayerHud extends StatelessWidget {
             Text('$campus', style: TextStyle(fontSize: 12, color: AppColors.t70)),
             const SizedBox(width: 12),
           ],
-          // a negative balance (after penalties) is shown in red
-          CreditsIcon(size: 15, color: AppColors.t54),
-          const SizedBox(width: 3),
-          Text('ꞓ${fmtNum(prov.credits)}', style: TextStyle(fontSize: 12,
-              color: prov.credits < 0 ? Colors.redAccent : AppColors.t70,
-              fontWeight: prov.credits < 0 ? FontWeight.bold : null)),
+          // a negative balance (after penalties) is shown in red; Hide balance leaves it out
+          ValueListenableBuilder<bool>(valueListenable: UiLook.hideBalance, builder: (_, hide, __) => hide
+              ? const SizedBox.shrink()
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  CreditsIcon(size: 15, color: AppColors.t54),
+                  const SizedBox(width: 3),
+                  Text('ꞓ${fmtNum(prov.credits)}', style: TextStyle(fontSize: 12,
+                      color: prov.credits < 0 ? Colors.redAccent : AppColors.t70,
+                      fontWeight: prov.credits < 0 ? FontWeight.bold : null)),
+                ])),
         ]),
       ),
     );

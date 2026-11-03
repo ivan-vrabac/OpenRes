@@ -3,7 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../app_colors.dart';
-import '../constants.dart' show fmtNum;
+import '../constants.dart' show fmtFull;
 import '../models/player_provider.dart';
 import '../services/api_service.dart';
 import '../v3/company.dart';
@@ -120,7 +120,7 @@ class _LogScreenState extends State<LogScreen> {
     );
   }
 
-  static String _c(dynamic v) => 'ꞓ${fmtNum((v as num?) ?? 0)}';
+  static String _c(dynamic v) => 'ꞓ${fmtFull((v as num?) ?? 0)}';
 
   static String _label(String t, Map<String, dynamic> d) {
     switch (t) {
@@ -132,7 +132,7 @@ class _LogScreenState extends State<LogScreen> {
         return d['n'] == 1 ? 'Gave up a ${d['name']} hex (${_c(d['refund'])} back)'
             : 'Gave up ${d['n']} hexes (${_c(d['refund'])} back)';
       case 'hex_switched': return 'Switched a hex to ${d['name']} (quality ${d['quality']}) for ${_c(d['cost'])}';
-      case 'survey': return 'Government survey, ${fmtNum((d['radius'] as num? ?? 0).round())} m, for ${_c(d['cost'])}';
+      case 'survey': return 'Government survey, ${fmtFull((d['radius'] as num? ?? 0).round())} m, for ${_c(d['cost'])}';
       case 'campus_placed': return 'Campus placed';
       case 'campus_visit': return 'Campus visited';
       case 'campus_move': return 'Campus move started';
@@ -142,15 +142,15 @@ class _LogScreenState extends State<LogScreen> {
       case 'storage_upgrade': return 'Central Storage level ${d['level']} for ${_c(d['cost'])}';
       case 'plant': return d['level'] == 1 ? 'Built a ${d['name']} for ${_c(d['cost'])}'
           : '${d['name']} level ${d['level']} for ${_c(d['cost'])}';
-      case 'education': return 'A supervisor started a ${d['step']} (${_c(d['cost'])}, ${fmtNum(d['books'] as num? ?? 0)} books)';
-      case 'sold': return 'Sold ${fmtNum(d['qty'] as num? ?? 0)}${d['unit'] == 'kWh' ? ' kWh' : ''} ${d['name']} for ${_c(d['credits'])}';
+      case 'education': return 'A supervisor started a ${d['step']} (${_c(d['cost'])}, ${fmtFull(d['books'] as num? ?? 0)} books)';
+      case 'sold': return 'Sold ${fmtFull(d['qty'] as num? ?? 0)}${d['unit'] == 'kWh' ? ' kWh' : ''} ${d['name']} for ${_c(d['credits'])}';
       case 'daily_reward': return 'Daily reward, day ${d['day']}: ${_c(d['credits'])}';
       case 'dark_matter': return 'Dark matter research level ${d['level']}';
       case 'marketbuy':
-        return 'Bought ${fmtNum(d['qty'] as num? ?? 0)} ${d['name'] ?? ''} '
+        return 'Bought ${fmtFull(d['qty'] as num? ?? 0)} ${d['name'] ?? ''} '
             'for ${_c(d['cost'])}${d['from'] != null ? ' from ${d['from']}' : ''}';
       case 'marketsold':
-        return 'Sold ${fmtNum(d['qty'] as num? ?? 0)} ${d['name'] ?? ''} '
+        return 'Sold ${fmtFull(d['qty'] as num? ?? 0)} ${d['name'] ?? ''} '
             'to ${d['to'] ?? 'a buyer'} for ${_c(d['earned'])}';
       case 'rename': return 'Renamed the company to ${d['name'] ?? d['company_name'] ?? ''}';
       default: return t;

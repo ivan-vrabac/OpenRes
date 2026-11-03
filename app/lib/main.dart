@@ -77,8 +77,16 @@ class OpenResApp extends StatelessWidget {
                   // A hidden bar that a swipe shows for a moment floats over the app: its room is not
                   // taken from the layout, so nothing jumps (owner 2026-10-31).
                   final mq = MediaQuery.of(ctx);
-                  final data = mq.removePadding(removeTop: ScreenMode.hideStatus, removeBottom: ScreenMode.hideNav)
+                  if (!ScreenMode.hideStatus) ScreenMode.rememberTop(mq.viewPadding.top);
+                  var data = mq.removePadding(removeTop: ScreenMode.hideStatus, removeBottom: ScreenMode.hideNav)
                       .removeViewPadding(removeTop: ScreenMode.hideStatus, removeBottom: ScreenMode.hideNav);
+                  if (ScreenMode.hideStatus) {
+                    // the bar is hidden, its room stays: titles and back arrows keep clear of the camera,
+                    // the map still runs up behind it (owner 2026-11-03)
+                    final top = ScreenMode.keptTop(mq.viewPadding.top);
+                    data = data.copyWith(padding: data.padding.copyWith(top: top),
+                        viewPadding: data.viewPadding.copyWith(top: top));
+                  }
                   return MediaQuery(
                     data: data,
                     child: ColoredBox(
