@@ -945,7 +945,7 @@ def install_campus(api) -> None:
                                        "ORDER BY finish_at", (hid,))]
         maxed = sum(1 for s in sups if s["edu"] >= 4)
         total = row["campus_level"] * g.SUPERVISORS_PER_LEVEL
-        return {"err": 0, "total": total, "maxed": maxed, "assigned": sum(1 for s in sups if s["hex"]),
+        return {"err": 0, "now": iso(utcnow()), "total": total, "maxed": maxed, "assigned": sum(1 for s in sups if s["hex"]),
                 "byStep": [sum(1 for s in sups if s["edu"] == k) for k in range(5)],
                 "supervisors": sups, "queue": queue, "slots": g.queue_slots(row["campus_level"]),
                 "allEducated": total == g.CAMPUS_MAX * g.SUPERVISORS_PER_LEVEL and maxed == total,

@@ -33,7 +33,12 @@ class _CampusScreenState extends State<CampusScreen> {
   bool _busy = false;
   String? _acting;                         // the action running now: only its own slider shows it
   bool _locating = false;
-  int? _pick;                              // the education step the player chose to train for                  // only the Visit button waits for this
+  int? _pick;
+  Duration _skew = Duration.zero;          // server time minus the phone's time
+  DateTime get _serverNow => DateTime.now().toUtc().add(_skew);
+
+  /// Time left as text: never "expired", a finished one is "done".
+  static String _left(Duration d) => d.inSeconds <= 0 ? 'done' : fmtDuration(d.inSeconds / 86400);                              // the education step the player chose to train for                  // only the Visit button waits for this
   Timer? _tick;
 
   Company get _co => context.read<Company>();
@@ -59,6 +64,9 @@ class _CampusScreenState extends State<CampusScreen> {
     if (!_co.hasCampus) return;
     final r = await _co.call('/api/v3/supervisors');
     if (!mounted || !r.ok) return;
+    // the phone's clock can be a few seconds off: count from the server's time
+    final sv = r.data['now'] as String?;
+    if (sv != null) _skew = parseUtc(sv).difference(DateTime.now().toUtc());
     setState(() => _sups = r.data);
     if (r.data['allEducated'] == true) {
       final dm = await _co.call('/api/v3/darkmatter');
@@ -68,7 +76,7 @@ class _CampusScreenState extends State<CampusScreen> {
     final next = _queue.map((q) => parseUtc(q['finish'] as String)).fold<DateTime?>(null,
         (a, b) => a == null || b.isBefore(a) ? b : a);
     if (next != null) {
-      final wait = next.difference(DateTime.now().toUtc()) + const Duration(seconds: 2);
+      final wait = next.difference(_serverNow) + const Duration(seconds: 2);
       Future.delayed(wait.isNegative ? const Duration(seconds: 2) : wait, () {
         if (mounted) _loadSups();
       });
@@ -474,7 +482,7 @@ class _CampusScreenState extends State<CampusScreen> {
     if (queue.isNotEmpty) {
       final q = queue.first;
       final to = (q['to'] as num).toInt();
-      final left = parseUtc(q['finish'] as String).difference(DateTime.now().toUtc());
+      final left = parseUtc(q['finish'] as String).difference(_serverNow);
       final whole = (steps[to]['hours'] as num).toDouble() * 3600;
       training = Container(
         padding: const EdgeInsets.all(10),
@@ -484,7 +492,7 @@ class _CampusScreenState extends State<CampusScreen> {
             Icon(Icons.school, size: 18, color: _stepColor(to)),
             const SizedBox(width: 8),
             Expanded(child: Text('Training for ${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-            Text(left.isNegative ? 'done' : fmtDuration(left.inSeconds / 86400), style: TextStyle(fontSize: 12, color: AppColors.t70)),
+            Text(_left(left), style: TextStyle(fontSize: 12, color: AppColors.t70)),
           ]),
           const SizedBox(height: 6),
           ClipRRect(
@@ -610,7 +618,7 @@ class _CampusScreenState extends State<CampusScreen> {
 
         Widget row(Map<String, dynamic> q, {required bool training, Key? key, int? index}) {
           final to = (q['to'] as num).toInt();
-          final left = parseUtc(q['finish'] as String).difference(DateTime.now().toUtc());
+          final left = parseUtc(q['finish'] as String).difference(_serverNow);
           return Container(
             key: key,
             margin: const EdgeInsets.only(bottom: 8),
@@ -621,8 +629,8 @@ class _CampusScreenState extends State<CampusScreen> {
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text(training ? 'In training · ${left.isNegative ? 'done' : fmtDuration(left.inSeconds / 86400)}'
-                        : 'Waiting · done in ${left.isNegative ? 'a moment' : fmtDuration(left.inSeconds / 86400)}',
+                Text(training ? 'In training · ${_left(left)}'
+                        : 'Waiting · done in ${left.inSeconds <= 0 ? 'a moment' : _left(left)}',
                     style: TextStyle(fontSize: 11, color: AppColors.t54)),
               ])),
               if (!training) ...[
