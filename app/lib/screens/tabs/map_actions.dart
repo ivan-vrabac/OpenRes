@@ -55,6 +55,7 @@ extension _MapActions on _MapTabState {
           'op': r['op'], 'item': r['item'], 'wip': true});
       _co.refresh();
       _world.refresh();
+      context.read<PlayerProvider>().loadMines();    // the hexes lists (and the tutorial's Build card) at once
     }
   }
 
