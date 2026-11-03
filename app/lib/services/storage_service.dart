@@ -42,6 +42,14 @@ class StorageService {
     await p.setInt(_keyTutorial, v);
   }
 
+  /// The guided tutorial's checkpoint: the title of the card the player is on (null: not running).
+  static Future<String?> getTutorialAt() async => (await SharedPreferences.getInstance()).getString('tutorial_at');
+
+  static Future<void> saveTutorialAt(String? title) async {
+    final p = await SharedPreferences.getInstance();
+    title == null ? await p.remove('tutorial_at') : await p.setString('tutorial_at', title);
+  }
+
   /// The player signed out: no sign-in without a tap until they sign in again.
   static Future<bool> getSignedOut() async {
     final p = await SharedPreferences.getInstance();

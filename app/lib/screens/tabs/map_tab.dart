@@ -874,7 +874,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                 // the tutorial waiting for a slide: the knob shows the way
                 child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, __) =>
                     ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
-                  final hint = focus == _surveyBtnKey;
+                  // only to place the Campus, and only once it can go here (owner 2026-11-03)
+                  final hint = focus == _surveyBtnKey && _placingCampus;
                   // the Campus goes down like a hex: the ghost at the crosshair, within 100 m of you
                   final c = _mapCenter ?? _pos;
                   if (_placingCampus) {
@@ -902,7 +903,6 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     enabled: !_scanning,
                     busy: _scanning,
                     radius: _innerR,
-                    hint: hint,
                     onConfirm: _scan,
                   );
                 })),

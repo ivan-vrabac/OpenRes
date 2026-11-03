@@ -378,7 +378,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ValueListenableBuilder<TutorialRun?>(valueListenable: tutorialRun, builder: (_, run, __) => run == null
             ? const SizedBox.shrink()
             : TutorialOverlay(key: ObjectKey(run), steps: run.steps, onStep: _tutorialTab, changes: run.changes,
-                guided: run.guided, onDone: () {
+                guided: run.guided, start: run.start, onShow: run.onShow, onDone: () {
                 _toTab(GameTabId.map);
                 run.onDone();
                 _offerStreak();

@@ -579,7 +579,14 @@ class _CampusScreenState extends State<CampusScreen> {
       ClipRRect(borderRadius: BorderRadius.circular(6), child: bar),
       const SizedBox(height: 8),
       legend,
-      if (training != null) ...[const SizedBox(height: 12), training],
+      // grows open instead of pushing the buttons below down at once (owner 2026-11-03: nothing jumps)
+      AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: training == null ? const SizedBox(width: double.infinity)
+            : Padding(padding: const EdgeInsets.only(top: 12), child: training),
+      ),
       const SizedBox(height: 14),
       KeyedSubtree(key: campusTrainKey, child: action),
     ]));

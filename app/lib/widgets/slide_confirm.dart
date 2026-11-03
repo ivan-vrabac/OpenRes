@@ -48,19 +48,30 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
   late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(seconds: 3));
   late final AnimationController _nudge = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
     ..addListener(() {
-      if (!_drag && !_back.isAnimating) _x.value = _max * 0.28 * math.sin(math.pi * Curves.easeInOut.transform(_nudge.value));
+      if (!_drag && !_back.isAnimating) {
+        _x.value = _max * _reach * math.sin(math.pi * Curves.easeInOut.transform(_nudge.value));
+      }
     });
   Timer? _nudges;
+  Timer? _firstNudge;
+  double _reach = 0.28;
 
   void _syncHint() {
     final want = widget.hint && _on;
     if (want && _nudges == null) {
+      // the first one comes at once and goes further, then calmer ones
+      _reach = 0.5;
+      _firstNudge = Timer(const Duration(milliseconds: 500), () {
+        if (mounted && !_drag && _x.value == 0) _nudge.forward(from: 0);
+      });
       _nudges = Timer.periodic(const Duration(milliseconds: 2400), (_) {
+        _reach = 0.28;
         if (mounted && !_drag && _x.value == 0) _nudge.forward(from: 0);
       });
     } else if (!want && _nudges != null) {
       _nudges!.cancel();
       _nudges = null;
+      _firstNudge?.cancel();
       _nudge.stop();
       if (!_drag && _x.value > 0) _goBack();
     }
@@ -92,6 +103,7 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
   @override
   void dispose() {
     _nudges?.cancel();
+    _firstNudge?.cancel();
     _nudge.dispose();
     _spin.dispose();
     _back.dispose();

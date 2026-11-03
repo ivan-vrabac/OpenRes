@@ -40,9 +40,12 @@ extension _MapSheets on _MapTabState {
             ]),
           ),
         );
+    // the tutorial's first hex is built, not looked at and left (owner 2026-11-03), if it can be built here
+    final forced = tutorialFocus.value == _buildBtnKey && inLocalRange && unlocked;
     showAppSheet<void>(
       context: context,
       isScrollControlled: true,
+      dismissible: !forced,
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
@@ -127,7 +130,7 @@ extension _MapSheets on _MapTabState {
               },
             ))),
             const SizedBox(height: 4),
-            Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel'))),
+            if (!forced) Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel'))),
           ]),
         ),
       ),

@@ -98,26 +98,29 @@ extension _MapTutorial on _MapTabState {
       return;
     }
     final seen = await StorageService.getTutorial();
+    final at = await StorageService.getTutorialAt();
     if (!mounted || tutorialRun.value != null) return;
-    // no Campus: guided from the start. Closed halfway (1): guided again, done tasks pass by themselves.
-    // A Campus but never seen (an older install): the cards to read, once.
-    final guided = !_co.hasCampus || seen == 1;
+    // no Campus: guided from the start. Closed halfway (a checkpoint saved): guided again, from that card
+    // (owner 2026-11-03). A Campus but never seen (an older install): the cards to read, once.
+    final guided = !_co.hasCampus || (at != null && seen < 2);
     if (!guided && seen >= 2) return;
+    final steps = _tutorialSteps(guided: guided, welcome: !_co.hasCampus);
     if (guided) {
-      await StorageService.saveTutorial(1);
-      if (!mounted) return;
       _update(() {                             // the tutorial's resource
         _category = 'Agriculture';
         _selectedMineType = 'sugar_beet';
         _rebuildHeatmapOverlays();
       });
     }
-    tutorialRun.value = TutorialRun(_tutorialSteps(guided: guided, welcome: !_co.hasCampus), _tutorialDone,
-        guided: guided, changes: _co);
+    // no Campus (a new or reset company): from the first card, whatever was saved before
+    final start = guided && at != null && _co.hasCampus ? steps.indexWhere((s) => s.title == at) : -1;
+    tutorialRun.value = TutorialRun(steps, _tutorialDone, guided: guided, changes: _co, start: start < 0 ? 0 : start,
+        onShow: guided ? (s) => StorageService.saveTutorialAt(s.title) : null);
   }
 
   void _tutorialDone() {
     StorageService.saveTutorial(2);
+    StorageService.saveTutorialAt(null);
     tutorialRun.value = null;
   }
 }

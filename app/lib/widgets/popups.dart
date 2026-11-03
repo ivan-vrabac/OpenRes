@@ -16,10 +16,11 @@ Future<T?> showAppDialog<T>({required BuildContext context, required WidgetBuild
 
 /// [showModalBottomSheet] that does nothing (returns null) while a popup already covers the screen.
 Future<T?> showAppSheet<T>({required BuildContext context, required WidgetBuilder builder,
-    bool isScrollControlled = false}) =>
+    bool isScrollControlled = false, bool dismissible = true}) =>
     _covered(context)
         ? Future<T?>.value()
-        : showModalBottomSheet<T>(context: context, builder: builder, isScrollControlled: isScrollControlled);
+        : showModalBottomSheet<T>(context: context, builder: builder, isScrollControlled: isScrollControlled,
+            isDismissible: dismissible, enableDrag: dismissible);
 
 Route<dynamic>? _uncoveredRoute;
 DateTime _uncoveredAt = DateTime(2000);

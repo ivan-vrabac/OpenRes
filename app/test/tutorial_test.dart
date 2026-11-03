@@ -3,28 +3,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openres/widgets/tutorial.dart';
 
 void main() {
-  Future<void> show(WidgetTester t, void Function() done, {GlobalKey? target}) => t.pumpWidget(MaterialApp(
-        home: Scaffold(body: Stack(children: [
-          Align(key: target, alignment: Alignment.bottomCenter, child: const SizedBox(width: 50, height: 50)),
-          TutorialOverlay(onDone: done, steps: [
-            TutorialStep('One', 'first', target: target),
-            const TutorialStep('Two', 'second'),
-          ]),
-        ])),
-      ));
+  // the cards fade in once the page has settled, and fade into each other
+  Future<void> settle(WidgetTester t) => t.pump(const Duration(milliseconds: 400));
+
+  Future<void> show(WidgetTester t, void Function() done, {GlobalKey? target}) async {
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(body: Stack(children: [
+        Align(key: target, alignment: Alignment.bottomCenter, child: const SizedBox(width: 50, height: 50)),
+        TutorialOverlay(onDone: done, steps: [
+          TutorialStep('One', 'first', target: target),
+          const TutorialStep('Two', 'second'),
+        ]),
+      ])),
+    ));
+    await settle(t);
+  }
 
   testWidgets('steps go forward and back, and the last one finishes', (t) async {
     var done = 0;
     await show(t, () => done++);
     expect(find.text('1 of 2'), findsOneWidget);
     await t.tap(find.text('Next'));
-    await t.pump();
+    await settle(t);
     expect(find.text('Two'), findsOneWidget);
     await t.tap(find.text('Back'));
-    await t.pump();
+    await settle(t);
     expect(find.text('One'), findsOneWidget);
     await t.tap(find.text('Next'));
-    await t.pump();
+    await settle(t);
     await t.tap(find.text('Start playing'));
     expect(done, 1);
   });
@@ -103,6 +109,7 @@ void main() {
           ]),
         ])),
       ));
+      await settle(t);
     }
 
     testWidgets('no skipping or going back; the map is free, its top buttons and the tab bar are not; done goes on',
@@ -110,8 +117,7 @@ void main() {
       await campus(t);
       expect(find.text('Skip tutorial'), findsNothing);
       await t.tap(find.text('Next'));
-      await t.pump();
-      await t.pump();
+      await settle(t);
       expect(find.text('Place'), findsOneWidget);
       expect(find.text('Next'), findsNothing);
       expect(find.text('Back'), findsNothing);
@@ -130,7 +136,7 @@ void main() {
       await t.pump();
       expect(find.text('Place'), findsOneWidget);             // done: it waits for Next
       await t.tap(find.text('Next'));
-      await t.pump();
+      await settle(t);
       expect(find.text('After'), findsOneWidget);
       expect(find.text('Back'), findsNothing);
       await t.pumpWidget(const SizedBox());                   // ends its timers
@@ -145,6 +151,7 @@ void main() {
           const TutorialStep('After', 'next'),
         ]),
       ]))));
+      await settle(t);
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('Skip tutorial'), findsOneWidget);
       await t.pumpWidget(const SizedBox());
