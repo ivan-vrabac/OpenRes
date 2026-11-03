@@ -654,6 +654,9 @@ class _CampusScreenState extends State<CampusScreen> {
           );
         }
 
+        Widget label(String text) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 6),
+            child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.t70)));
+
         Widget place(String text, IconData icon) => Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -673,14 +676,14 @@ class _CampusScreenState extends State<CampusScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Text('Education queue', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
               const SizedBox(height: 4),
-              Text('One trains at a time, the rest wait their turn. Drag to change the order; cancelling a waiting one '
+              Text('One trains in the training slot, the others wait in the queue; more queue places come with the Campus level. Drag to change the order; cancelling a waiting one '
                   'gives back everything. The one in training can\'t be cancelled.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.t54)),
               const SizedBox(height: 14),
-              if (queue.isNotEmpty) row(queue.first, training: true),
+              label('Training slot:'),
+              if (queue.isNotEmpty) row(queue.first, training: true) else place('Free: start a training on the Campus page', Icons.add_circle_outline),
               const SizedBox(height: 6),
-              Padding(padding: const EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text('Queue:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.t70))),
+              label('Queue:'),
               if (waiting.isNotEmpty)
                 ReorderableListView(
                   shrinkWrap: true,
@@ -699,8 +702,7 @@ class _CampusScreenState extends State<CampusScreen> {
                       row(waiting[i], training: false, key: ValueKey(waiting[i]['sup']), index: i),
                   ],
                 ),
-              for (var i = queue.isEmpty ? 0 : queue.length - 1; i < slots - (queue.isEmpty ? 0 : 1); i++)
-                place('Free place', Icons.add_circle_outline),
+              for (var i = waiting.length; i < slots - 1; i++) place('Free place', Icons.add_circle_outline),
               for (final l in locked) place('Unlocks at Campus level $l', Icons.lock_outline),
               const SizedBox(height: 4),
               Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
