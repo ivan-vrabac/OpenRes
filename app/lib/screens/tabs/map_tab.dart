@@ -135,7 +135,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   static const _osmTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   // OSM's tile policy: a distinct User-Agent naming the app, with a contact
   static const kTileUserAgent =
-      'OpenRes/${Branding.buildName} (+https://game.vrabac.eu; contact: support.vrabac@gmail.com)';
+      'OpenRes/${Branding.buildName} (+https://resources.vrabac.eu; contact: support.vrabac@gmail.com)';
   late final _tileProvider = NetworkTileProvider(headers: {'User-Agent': kTileUserAgent});
 
   Map get _tiles => (_co.catalog['tiles'] as Map?) ?? const {};
