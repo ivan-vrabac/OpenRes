@@ -88,6 +88,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   final _resourceBtnKey = GlobalKey();
   final _surveyBtnKey = GlobalKey();
   final _buildBtnKey = GlobalKey();
+  final _topBarKey = GlobalKey();
+  final _bottomPanelKey = GlobalKey();
   double _surveyRadius = 5000;         // chosen in the survey settings (clamped by the Campus level)
 
   static const _kCategories = ['Raw ores', 'Forestry', 'Agriculture', 'Livestock', 'Fish', 'Power'];
@@ -511,6 +513,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   }
 
   void _openOwnHex(int id) {
+    if (tutorialGuided) return;                // no lease can be cancelled during the first tutorial
     showHexSheet(context, id).then((_) {
       if (mounted) _world.refresh();
     });
@@ -711,6 +714,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
         top: MediaQuery.of(context).padding.top,
         left: 0, right: 0,
         child: MapPanel(
+          key: _topBarKey,
           height: 42,
           radius: 21,                                   // a pill: the round buttons sit in its ends
           padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -812,6 +816,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
       Positioned(
         bottom: MediaQuery.of(context).padding.bottom, left: 0, right: 0,
         child: MapPanel(
+          key: _bottomPanelKey,
           margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           padding: const EdgeInsets.all(6),
           child: Row(
@@ -866,7 +871,10 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
               // ── Center: scan button ───────────────────────────────────────
               Expanded(
                 key: _surveyBtnKey,
-                child: ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
+                // the tutorial waiting for a slide: the knob shows the way
+                child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, __) =>
+                    ValueListenableBuilder<double>(valueListenable: _crosshairDist, builder: (_, liveDist, __) {
+                  final hint = focus == _surveyBtnKey;
                   // the Campus goes down like a hex: the ghost at the crosshair, within 100 m of you
                   final c = _mapCenter ?? _pos;
                   if (_placingCampus) {
@@ -881,6 +889,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                       icon: Icons.apartment,
                       enabled: inReach && !same,
                       radius: _innerR,
+                      hint: hint,
                       onConfirm: _placeCampus,
                     );
                   }
@@ -893,9 +902,10 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                     enabled: !_scanning,
                     busy: _scanning,
                     radius: _innerR,
+                    hint: hint,
                     onConfirm: _scan,
                   );
-                }),
+                })),
               ),
 
               const SizedBox(width: 8),

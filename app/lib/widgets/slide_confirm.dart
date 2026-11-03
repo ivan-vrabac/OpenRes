@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
@@ -20,8 +23,11 @@ class SlideToConfirm extends StatefulWidget {
   final double height;
   final double radius;
   final VoidCallback onConfirm;
+  /// The tutorial waits for it: every couple of seconds the knob slides a bit and eases back, like
+  /// someone impatient showing which way it goes (owner 2026-11-03).
+  final bool hint;
   const SlideToConfirm({super.key, required this.label, this.sublabel, required this.icon, required this.onConfirm,
-      this.enabled = true, this.busy = false, this.height = 66, this.radius = 10});
+      this.enabled = true, this.busy = false, this.height = 66, this.radius = 10, this.hint = false});
 
   @override
   State<SlideToConfirm> createState() => _SlideToConfirmState();
@@ -40,6 +46,25 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
   late final AnimationController _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))
     ..addListener(() => _x.value = _from * (1 - Curves.easeOut.transform(_back.value)));
   late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(seconds: 3));
+  late final AnimationController _nudge = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
+    ..addListener(() {
+      if (!_drag && !_back.isAnimating) _x.value = _max * 0.28 * math.sin(math.pi * Curves.easeInOut.transform(_nudge.value));
+    });
+  Timer? _nudges;
+
+  void _syncHint() {
+    final want = widget.hint && _on;
+    if (want && _nudges == null) {
+      _nudges = Timer.periodic(const Duration(milliseconds: 2400), (_) {
+        if (mounted && !_drag && _x.value == 0) _nudge.forward(from: 0);
+      });
+    } else if (!want && _nudges != null) {
+      _nudges!.cancel();
+      _nudges = null;
+      _nudge.stop();
+      if (!_drag && _x.value > 0) _goBack();
+    }
+  }
 
   void _goBack() {
     _from = _x.value;
@@ -50,6 +75,7 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
   void initState() {
     super.initState();
     if (widget.busy) _spin.repeat();
+    _syncHint();
   }
 
   @override
@@ -60,10 +86,13 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
       _spin.reset();
       if (_x.value > 0) _goBack();
     }
+    _syncHint();
   }
 
   @override
   void dispose() {
+    _nudges?.cancel();
+    _nudge.dispose();
     _spin.dispose();
     _back.dispose();
     _x.dispose();
@@ -100,7 +129,7 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
           // only a drag that starts on the knob moves it
           onHorizontalDragStart: on ? (d) {
             _drag = d.localPosition.dx <= _pad + _x.value + _bodyW + _point + _tailW;
-            if (_drag) _back.stop();
+            if (_drag) { _back.stop(); _nudge.stop(); }
           } : null,
           onHorizontalDragUpdate: on ? (d) { if (_drag) _x.value = (_x.value + d.delta.dx).clamp(0.0, _max); } : null,
           onHorizontalDragEnd: on ? (_) { if (_drag) _release(); _drag = false; } : null,

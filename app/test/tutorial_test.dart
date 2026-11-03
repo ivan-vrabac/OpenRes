@@ -128,6 +128,9 @@ void main() {
       expect(mapTaps, 0);
       placed.value = true;
       await t.pump();
+      expect(find.text('Place'), findsOneWidget);             // done: it waits for Next
+      await t.tap(find.text('Next'));
+      await t.pump();
       expect(find.text('After'), findsOneWidget);
       expect(find.text('Back'), findsNothing);
       await t.pumpWidget(const SizedBox());                   // ends its timers

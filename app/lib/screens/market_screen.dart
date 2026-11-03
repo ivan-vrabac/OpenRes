@@ -15,7 +15,8 @@ import '../widgets/popups.dart';
 import '../widgets/price_chart.dart';
 import '../v3/company.dart';
 import '../v3/sell_sheet.dart';
-import '../widgets/tutorial.dart' show tutorialBooksKey, tutorialFocus;
+import '../widgets/tutorial.dart';
+import '../models/tab_config.dart' show GameTabId;
 /// Market (0.2.3 redo, owner 2026-10-31): one page, no tabs. A short tax note, your open buy orders
 /// as a strip of cards, then every tradable item as a card with what you'd get selling it now (the
 /// best buy order or the system) and its sales tax, which is lowest on items few companies make.
@@ -236,6 +237,8 @@ class MarketItemScreen extends StatefulWidget {
 }
 
 class _MarketItemScreenState extends State<MarketItemScreen> {
+  // opened from the tutorial's Market card: it goes on here, 10 books from the system (owner 2026-11-03)
+  late final bool _tour = tutorialFocus.value == tutorialBooksKey && widget.item == 'books';
   Timer? _live;
   Map<String, dynamic>? _b;
   bool _loading = true;
@@ -280,10 +283,11 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
   Future<void> _qtyTrade({required String title, required num price, required int maxQty,
       required bool selling, required Future<ApiResult> Function(int qty) run, double taxRate = 0,
       Future<int?> Function()? liveMax}) async {
+    final fixed = _tour && !selling;
     final q = await showAppDialog<int>(
       context: context,
-      builder: (_) => _QtyDialog(title: title, item: widget.item, price: price, maxQty: maxQty,
-          selling: selling, taxRate: taxRate, liveMax: liveMax),
+      builder: (_) => _QtyDialog(title: title, item: widget.item, price: price, maxQty: fixed ? min(10, maxQty) : maxQty,
+          selling: selling, taxRate: taxRate, liveMax: fixed ? null : liveMax, fixed: fixed),
     );
     if (q == null || q <= 0) return;
     final r = await run(q);
@@ -335,7 +339,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Stack(children: [Scaffold(
       appBar: AppBar(toolbarHeight: 40, title: Text(_name)),
       body: AsyncView(
         loading: _loading,
@@ -409,7 +413,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
                 ),
               if (sysBuy != null) ...[
                 const SizedBox(height: 10),
-                _wideButton(Icons.storefront_outlined, 'Buy from the system at ${fmtCredits(sysBuy)}', () => _qtyTrade(
+                KeyedSubtree(key: tutorialSystemBuyKey, child: _wideButton(Icons.storefront_outlined, 'Buy from the system at ${fmtCredits(sysBuy)}', () => _qtyTrade(
                   title: 'Buy from the system', price: sysBuy, selling: false,
                   maxQty: max(0, min(space, (credits / sysBuy).floor())),
                   liveMax: () async {                    // hexes and plants keep filling Central Storage
@@ -418,7 +422,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
                     return max(0, min((r.data['freeSpace'] as num).toInt(), ((r.data['credits'] as num) / sysBuy).floor()));
                   },
                   run: (q) => GameApi.call('/api/v1/market/system', _sid,
-                      {'side': 'buy', 'item': widget.item, 'qty': q, 'fit': 1, 'rid': _rid()}))),
+                      {'side': 'buy', 'item': widget.item, 'qty': q, 'fit': 1, 'rid': _rid()})))),
               ],
               const SizedBox(height: 18),
               Text('Buy orders', style: TextStyle(color: AppColors.t54, fontSize: 12)),
@@ -442,8 +446,23 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
           );
         },
       ),
-    );
+    ),
+      if (_tour) _tutorialCard(),
+    ]);
   }
+
+  Widget _tutorialCard() => TutorialOverlay(
+        guided: true,
+        finish: 'Back to the Market',
+        onDone: () => Navigator.of(context).maybePop(),
+        steps: [
+          TutorialStep('Buy from the system',
+              'The system always sells at this price, and buying is tax-free. Tap here and buy the 10 books your first Course needs.',
+              target: tutorialSystemBuyKey, tab: GameTabId.market,
+              done: () => ((context.read<Company>().stock['books'] as num?) ?? 0) >= 10,
+              poll: () => context.read<Company>().refresh()),
+        ],
+      );
 
   Widget _wideButton(IconData icon, String text, VoidCallback? onTap, {bool filled = false}) {
     final child = FittedBox(fit: BoxFit.scaleDown, child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -491,8 +510,9 @@ class _QtyDialog extends StatefulWidget {
   final bool selling;
   final double taxRate;      // the sales tax, taken off what a seller receives
   final Future<int?> Function()? liveMax;   // asked every few seconds: the maximum can change while open
+  final bool fixed;          // the tutorial: exactly [maxQty], nothing to change
   const _QtyDialog({required this.title, required this.item, required this.price, required this.maxQty,
-      required this.selling, this.taxRate = 0, this.liveMax});
+      required this.selling, this.taxRate = 0, this.liveMax, this.fixed = false});
   @override
   State<_QtyDialog> createState() => _QtyDialogState();
 }
@@ -548,6 +568,10 @@ class _QtyDialogState extends State<_QtyDialog> {
               ? "You don't have any to sell." : 'Not enough credits or room in Central Storage.',
               style: const TextStyle(color: Colors.orangeAccent)))
         else ...[
+          if (widget.fixed)
+            Padding(padding: const EdgeInsets.only(top: 12), child: Text('Quantity: ${fmtNum(_q)}',
+                style: const TextStyle(fontWeight: FontWeight.bold)))
+          else ...[
           Slider(value: _q.toDouble(), min: 0, max: _max.toDouble(),
               onChanged: (v) => _set(v.round())),
           TextField(
@@ -557,6 +581,7 @@ class _QtyDialogState extends State<_QtyDialog> {
             decoration: InputDecoration(labelText: 'Quantity', helperText: 'Maximum: ${fmtNum(_max)}'),
             onChanged: (t) => _set(int.tryParse(t) ?? 0),
           ),
+          ],
           const SizedBox(height: 10),
           if (tax > 0)
             Row(children: [

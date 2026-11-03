@@ -22,6 +22,15 @@ final campusTrainKey = GlobalKey();
 final tutorialHexesKey = GlobalKey();
 final tutorialStorageKey = GlobalKey();
 final tutorialBooksKey = GlobalKey();
+final tutorialAppointKey = GlobalKey();        // inside a resource's hexes
+final tutorialSystemBuyKey = GlobalKey();      // inside the Books page of the Market
+final campusQueueKey = GlobalKey();
+
+/// The education queue was opened (its card waits for it).
+final campusQueueSeen = ValueNotifier<bool>(false);
+
+/// The first, guided tutorial runs: no hex opens (no lease can be cancelled), the Books page sells 10.
+bool get tutorialGuided => tutorialRun.value?.guided == true;
 
 /// The target of the hands-on card showing now (null: none). A list it sits in stays still meanwhile.
 final tutorialFocus = ValueNotifier<GlobalKey?>(null);
@@ -50,8 +59,9 @@ class TutorialStep {
   final bool Function()? done;
   final VoidCallback? enter;               // guided: when the card shows
   final VoidCallback? poll;                // guided: every few seconds until done (fresh data from the server)
+  final GlobalKey? area;                   // on the map: the panel around the target, closed but for the target
   const TutorialStep(this.title, this.text,
-      {this.target, this.tab, this.more = false, this.done, this.enter, this.poll});
+      {this.target, this.tab, this.more = false, this.done, this.enter, this.poll, this.area});
 }
 
 /// The first steps for a new player (owner 2026-11-01), one card at a time. It covers the whole game, tab
@@ -63,8 +73,9 @@ class TutorialOverlay extends StatefulWidget {
   final void Function(TutorialStep step)? onStep;
   final Listenable? changes;
   final bool guided;
+  final String finish;                     // the last card's button
   const TutorialOverlay({super.key, required this.steps, required this.onDone, this.onStep, this.changes,
-      this.guided = false});
+      this.guided = false, this.finish = 'Start playing'});
 
   @override
   State<TutorialOverlay> createState() => _TutorialOverlayState();
@@ -76,10 +87,11 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   Timer? _follow;                 // a task card keeps its target in sight and checks whether it is done
   Timer? _poll;
   bool _revealed = false;
+  bool _finished = false;         // this card's task is done: Next shows, nothing else works any more
 
   TutorialStep get _step => widget.steps[_i];
   /// A task the player still has to do.
-  bool get _task => widget.guided && _step.done != null;
+  bool get _task => widget.guided && _step.done != null && !_finished;
 
   @override
   void initState() {
@@ -98,14 +110,16 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     super.dispose();
   }
 
-  /// Done: on to the next card.
+  /// Done: the card shows Next, the player goes on when ready (owner 2026-11-03).
   void _check() {
     if (!mounted) return;
     if (_task && _step.done!()) {
-      _go(_i + 1);
-    } else {
-      setState(() {});
+      _finished = true;
+      _follow?.cancel();
+      _poll?.cancel();
+      tutorialFocus.value = null;
     }
+    setState(() {});
   }
 
   /// Where the step's target is, in this overlay's own coordinates.
@@ -167,16 +181,17 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     _follow?.cancel();
     _poll?.cancel();
     _revealed = false;
+    _finished = false;
     final task = _task;
     tutorialFocus.value = task ? _step.target : null;
     widget.onStep?.call(_step);
     if (task) {
       _step.enter?.call();
       if (_step.done!()) {
-        // already done (the app was closed halfway): straight on
-        WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _go(_i + 1); });
-        return;
-      }
+        // already done (the app was closed halfway): Next at once
+        _finished = true;
+        tutorialFocus.value = null;
+      } else {
       _follow = Timer.periodic(const Duration(milliseconds: 500), (_) {
         if (!mounted) return;
         if (!_revealed) _reveal();     // a target that shows up later (a list still loading)
@@ -184,6 +199,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
       });
       if (_step.poll != null) {
         _poll = Timer.periodic(const Duration(seconds: 3), (_) { if (mounted) _step.poll!(); });
+      }
       }
     }
     // the hole needs the layout, and a tab change has to finish first
@@ -205,6 +221,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     // the card stays away from what it talks about
     final cardOnTop = hole != null && hole.center.dy > size.height / 2 && hole.height < size.height / 2;
     final topBar = MediaQuery.paddingOf(context).top + 46;
+    final areaBox = step.area?.currentContext?.findRenderObject() as RenderBox?;
+    final me = context.findRenderObject() as RenderBox?;
+    final areaTop = areaBox == null || me == null || !areaBox.attached || !areaBox.hasSize
+        ? null : areaBox.localToGlobal(Offset.zero, ancestor: me).dy;
     return Positioned.fill(child: Stack(children: [
       if (task && hole != null) ...[
         // only the target works (and the map around it); the rest is closed
@@ -213,6 +233,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
         Positioned(left: hole.right, right: 0, top: hole.top, height: hole.height, child: _closed),
         // on a tab everything above is closed; on the map just its buttons along the top
         Positioned(left: 0, right: 0, top: 0, height: onMap ? topBar : hole.top, child: _closed),
+        // the rest of the panel the target sits in (the buttons above a short one)
+        if (areaTop != null && areaTop < hole.top)
+          Positioned(left: 0, right: 0, top: areaTop, height: hole.top - areaTop, child: _closed),
         Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent, dim: false)))),
       ] else
         Positioned.fill(child: AbsorbPointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent)))),
@@ -239,7 +262,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
                 if (!widget.guided && _i > 0) TextButton(onPressed: () => _go(_i - 1), child: const Text('Back')),
                 const SizedBox(width: 4),
                 if (!task)
-                  FilledButton(onPressed: () => _go(_i + 1), child: Text(last ? 'Start playing' : 'Next'))
+                  FilledButton(onPressed: () => _go(_i + 1), child: Text(last ? widget.finish : 'Next'))
                 else
                   const SizedBox(height: 40),
               ]),

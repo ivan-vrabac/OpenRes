@@ -557,6 +557,7 @@ class _CampusScreenState extends State<CampusScreen> {
         // everyone at the top: nothing left to queue or explain
         if (shown.isNotEmpty || queue.isNotEmpty) ...[
         IconButton(
+          key: campusQueueKey,
           icon: Badge(
             isLabelVisible: queue.isNotEmpty,
             label: Text('${queue.length}'),
@@ -604,6 +605,7 @@ class _CampusScreenState extends State<CampusScreen> {
   /// The education queue: places still locked by the Campus level on top, the class below. The first one is
   /// in training; the others can be dragged into another order or cancelled for a full refund.
   Future<void> _queueSheet(List<Map<String, dynamic>> steps) async {
+    campusQueueSeen.value = true;                 // the tutorial's queue card waits for this
     // the times count down every second; when the one in training is done the queue reloads by itself
     void Function(void Function())? redraw;
     var reloading = false;

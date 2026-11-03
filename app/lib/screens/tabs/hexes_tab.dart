@@ -12,7 +12,8 @@ import '../../widgets/async_view.dart' show HexClipper, HexPicture;
 import '../../widgets/glass.dart' show tabPadding;
 import '../../widgets/slide_confirm.dart';
 import '../../widgets/top_banner.dart';
-import '../../widgets/tutorial.dart' show tutorialHexesKey;
+import '../../widgets/tutorial.dart';
+import '../../models/tab_config.dart' show GameTabId;
 
 /// Hexes (0.2.3 redo, owner 2026-10-31; the 1.2.3 mine list followed the original game): a summary,
 /// the leases that end soon with one slide to renew them, then a honeycomb of your resources. A
@@ -211,6 +212,8 @@ class _HexGroupPageState extends State<_HexGroupPage> {
   bool _asc = true;                                // tap the chosen sort again to turn it around
   bool _busy = false;
   final _selected = <String>{};                    // hold a hex to start choosing hexes to cancel
+  // opened from the tutorial's Hexes card: it goes on here, only Appoint works (owner 2026-11-03)
+  final bool _tour = tutorialFocus.value == tutorialHexesKey;
 
   Future<void> _run(Future<void> Function() fn) async {
     if (_busy) return;
@@ -262,7 +265,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
     final unit = widget.item == 'electricity' ? ' kWh' : '';
     double shown(double r) => widget.item == 'electricity' ? r / 1000 : r;
     final steps = (co.catalog['education'] as List?) ?? const [];
-    return Scaffold(
+    return Stack(children: [Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
         title: Text(choosing ? '${_selected.length} chosen' : co.itemName(widget.item)),
@@ -343,12 +346,27 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                   Text('Hold to choose', style: TextStyle(fontSize: 11, color: AppColors.t38)),
               ]),
               const SizedBox(height: 8),
-              for (final m in hexes) _hexCard(co, m, steps, unit, shown, choosing),
+              for (final m in hexes) _hexCard(co, m, steps, unit, shown, choosing, first: identical(m, hexes.first)),
             ]),
-    );
+    ),
+      if (_tour)
+        TutorialOverlay(
+          guided: true,
+          finish: 'Back to Hexes',
+          onDone: () => Navigator.of(context).maybePop(),
+          steps: [
+            TutorialStep('Appoint',
+                'A supervisor runs a hex better, so it makes more: +25 % even untrained, up to +200 % with a Master\'s. '
+                'Tap Appoint: it always sends your best free supervisor.',
+                target: tutorialAppointKey, tab: GameTabId.mines, done: () => hexes.any((m) => m.edu != null) ||
+                    (context.read<PlayerProvider>().mines ?? const <Hex>[]).any((m) => m.item == widget.item && m.edu != null)),
+          ],
+        ),
+    ]);
   }
 
-  Widget _hexCard(Company co, Hex m, List steps, String unit, double Function(double) shown, bool choosing) {
+  Widget _hexCard(Company co, Hex m, List steps, String unit, double Function(double) shown, bool choosing,
+      {bool first = false}) {
     final lc = _leaseColor(m.leaseDays);
     final sup = m.edu == null ? null : (m.edu! < steps.length ? steps[m.edu!]['name'] as String : 'Supervisor');
     final picked = _selected.contains(m.id);
@@ -360,8 +378,9 @@ class _HexGroupPageState extends State<_HexGroupPage> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onLongPress: toggle,
-          onTap: choosing ? toggle : () async {
+          // the first tutorial opens no hex and cancels no lease
+          onLongPress: tutorialGuided ? null : toggle,
+          onTap: tutorialGuided ? null : choosing ? toggle : () async {
             await showHexSheet(context, int.parse(m.id));
             if (mounted) context.read<PlayerProvider>().loadMines();
           },
@@ -406,6 +425,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                   )),
                   const SizedBox(width: 8),
                   Expanded(child: OutlinedButton.icon(
+                    key: first ? tutorialAppointKey : null,
                     onPressed: _busy ? null : () => m.edu == null
                         ? _call('/api/v3/supervisors/assign', {'hex': m.id}, 'Supervisor appointed')
                         : _call('/api/v3/supervisors/unassign', {'hex': m.id}, 'The supervisor went back to the Campus'),

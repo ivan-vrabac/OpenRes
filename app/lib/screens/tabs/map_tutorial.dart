@@ -19,7 +19,7 @@ extension _MapTutorial on _MapTabState {
               'You can see this tutorial again any time in More › Settings › Game › Tutorial.'),
           TutorialStep('Place your Campus',
               'Your Campus is your home on the map. Move the map until the crosshair is where you want it, inside the circle around you, then slide here to place it.',
-              target: _surveyBtnKey, done: () => _co.hasCampus),
+              target: _surveyBtnKey, area: _bottomPanelKey, done: () => _co.hasCampus),
         ],
         TutorialStep('Sugar beet',
             'This is what your hexes produce. For a start it is sugar beet: it grows well almost everywhere and every company can use it. '
@@ -28,10 +28,14 @@ extension _MapTutorial on _MapTabState {
         TutorialStep('Find the best spot',
             'Slide to survey the land around the crosshair. The map fills with colours: hotter colours mean better sugar beet. '
             'Drag the map to look around.',
-            target: _surveyBtnKey, done: () => _survey != null),
+            target: _surveyBtnKey, area: _bottomPanelKey, done: () => _survey != null),
+        TutorialStep('The map buttons',
+            'Along the top: the satellite hides or shows the survey colours, and the hexagon hides or shows hexes and Campuses. '
+            'On the right: back to your location, zoom in and zoom out. Two fingers zoom too.',
+            target: _topBarKey),
         TutorialStep('Build your first hex',
             'Drag the map until the crosshair is on a hot spot inside the circle around you. This button lights up when the hex is in range: tap it.',
-            target: _buildBtnKey, done: () => _myHexes.isNotEmpty, poll: _loadHexes),
+            target: _buildBtnKey, area: _bottomPanelKey, done: () => _myHexes.isNotEmpty, poll: _loadHexes),
         if (!guided)
           const TutorialStep('Is it worth it?',
               'Before you build you see the quality, the Worth / hour, the build price and the 90 day lease. $_worthText'),
@@ -39,7 +43,7 @@ extension _MapTutorial on _MapTabState {
             'Everything you lease is here. A lease lasts 90 days: renew it in time, or the hex is gone. New hexes are cheap at first and '
             'reach the full price at Campus 10, so build plenty early.\n\n'
             'A supervisor runs a hex better, so it makes more: +25 % even untrained, up to +200 % with a Master\'s. '
-            'Tap your sugar beet, then Appoint: it always sends your best free supervisor.',
+            'Tap your sugar beet to appoint one.',
             target: tutorialHexesKey, tab: GameTabId.mines,
             done: () => _myHexes.any((m) => m.edu != null), poll: _loadHexes),
         TutorialStep('Storage',
@@ -48,9 +52,9 @@ extension _MapTutorial on _MapTabState {
             target: tutorialStorageKey, tab: GameTabId.warehouse,
             enter: () => _sellBase = _co.credits.toDouble(), done: () => _co.credits > _sellBase, poll: _co.refresh),
         TutorialStep('Market',
-            'Sell to the best buy orders or to the system, or place your own buy orders. The seller pays 5 to 25 % sales tax, '
-            'lowest on items few companies make. Buying is tax-free.\n\n'
-            'Supervisors learn from books: tap Books, then buy 10 from the system.',
+            'Here you buy what you need and sell what you make. Buying is tax-free; sellers pay 5 to 25 % sales tax, '
+            'lowest on items few companies make. You can also place buy orders and let other companies sell to you.\n\n'
+            'Supervisors learn from books. Tap Books to buy some.',
             target: tutorialBooksKey, tab: GameTabId.market,
             done: () => ((_co.stock['books'] as num?) ?? 0) >= 10, poll: _co.refresh),
         const TutorialStep('Campus',
@@ -60,6 +64,11 @@ extension _MapTutorial on _MapTabState {
             'Every Campus level gives 10 supervisors. Send one to a Course with your books: tap Train. Higher steps give a bigger boost. '
             'Appoint always sends the best free one, so recall and appoint again to put a newly trained one on a hex.',
             target: campusTrainKey, tab: GameTabId.specialBuildings, done: () => campusEducated.value > 0),
+        TutorialStep('The education queue',
+            'One supervisor trains in the training slot, the others wait in the queue; more queue places come with Campus levels. '
+            'Drag the waiting ones to change their order, and cancel one to get everything back. Tap here to see yours.',
+            target: campusQueueKey, tab: GameTabId.specialBuildings, enter: () => campusQueueSeen.value = false,
+            done: () => campusQueueSeen.value),
         const TutorialStep('Production',
             'Plants sit inside your Campus and turn raw materials into goods worth more, like wood into lumber into furniture. '
             'They need their inputs and electricity in Storage, so make power with solar farms, wind farms or a power plant.', tab: GameTabId.factories),
