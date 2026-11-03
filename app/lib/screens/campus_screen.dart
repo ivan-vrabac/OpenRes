@@ -689,6 +689,20 @@ class _CampusScreenState extends State<CampusScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   buildDefaultDragHandles: false,
+                  // the row itself while it is dragged: no dark card behind it, just a soft shadow
+                  proxyDecorator: (child, index, animation) => AnimatedBuilder(
+                    animation: animation,
+                    builder: (_, c) => Material(
+                      type: MaterialType.transparency,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.35 * animation.value), blurRadius: 12, offset: const Offset(0, 4)),
+                        ]),
+                        child: c,
+                      ),
+                    ),
+                    child: child,
+                  ),
                   onReorder: (from, to) async {
                     final ids = [for (final q in waiting) q['sup']];
                     final moved = ids.removeAt(from);
