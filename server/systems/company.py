@@ -693,6 +693,9 @@ def install(api) -> None:
             cur = conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
                                "VALUES(?,?,?,?,?,?,?,?)", (hid, lat, lng, op, item, q, iso(now),
                                                            iso(now + datetime.timedelta(days=g.LEASE_DAYS))))
+            if n == 0 and item != g.ENERGY:            # the very first hex: a starter harvest to sell
+                conn.execute("INSERT INTO co_stock(hid, item, qty) VALUES(?,?,?) ON CONFLICT(hid, item) "
+                             "DO UPDATE SET qty=qty+excluded.qty", (hid, item, g.FIRST_HEX_STARTER))
             econ.emit(conn, "hex_built", hid, {"op": op, "item": item}, public=False)
             log(conn, hid, "hex_built", lat=lat, lng=lng, name=g.ITEM_NAMES[item], quality=q, cost=build_price(op, item, row["campus_level"]))
         return {"err": 0, "id": cur.lastrowid, "quality": q}

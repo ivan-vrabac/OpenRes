@@ -526,3 +526,19 @@ def test_education_queue_cancel_refunds_and_reorders():
     gap = datetime.datetime.fromisoformat(q[1]["finish"]) - datetime.datetime.fromisoformat(q[0]["finish"])
     assert abs(gap.total_seconds() - g.education_hours(1) * 3600) < 2        # moved up when the other left
     assert call("/api/v3/education/order", sid, sups="999")["code"] == "bad_input"
+
+
+def test_first_hex_gives_a_starter_harvest():
+    hid, sid = setup_hq("starter", at=(45.62, 16.20))
+    beet = find("sugar_beet", near=(45.62, 16.2012))
+    assert call("/api/v3/hex/build", sid, lat=beet[0], lng=beet[1], plat=beet[0], plng=beet[1],
+                op="farm", item="sugar_beet")["err"] == 0
+    assert call("/api/v3/state", sid)["stock"].get("sugar_beet", 0) >= g.FIRST_HEX_STARTER
+    beet2 = find("sugar_beet", near=(45.62, 16.2018))
+    with main.get_db() as conn:
+        before = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item='sugar_beet'", (hid,)).fetchone()[0]
+    assert call("/api/v3/hex/build", sid, lat=beet2[0], lng=beet2[1], plat=beet2[0], plng=beet2[1],
+                op="farm", item="sugar_beet")["err"] == 0
+    with main.get_db() as conn:
+        after = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item='sugar_beet'", (hid,)).fetchone()[0]
+    assert after - before < g.FIRST_HEX_STARTER                  # only the first one

@@ -278,6 +278,10 @@ EDUCATION = {
 QUEUE_UNLOCKS = (10, 20, 30, 40, 50)         # one more education queue slot at each of these levels
 
 
+# the first hex a company builds puts this much of its product in Central Storage at once, so a new
+# player has something to sell in the tutorial right away (owner 2026-11-03)
+FIRST_HEX_STARTER = 10
+
 # dev server only (docker-compose of P:/Resources-dev): every education takes this many seconds, for testing
 DEV_EDUCATION_SECONDS = float(os.environ.get("DEV_EDUCATION_SECONDS") or 0)
 
