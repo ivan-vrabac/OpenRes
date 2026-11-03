@@ -246,9 +246,7 @@ class _KnobPainter extends CustomPainter {
       ..lineTo(0, radius)
       ..arcToPoint(Offset(radius, 0), radius: Radius.circular(radius))
       ..close();
-    // a black knob, a white icon: the strongest contrast (owner 2026-11-03: black to white, not see-through)
-    canvas.drawPath(body, Paint()..color = on ? Colors.black : Colors.black.withValues(alpha: 0.4));
-    canvas.drawPath(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = base.withValues(alpha: 0.35));
+    canvas.drawPath(body, Paint()..color = base.withValues(alpha: 0.22));
     if (squash <= 0.01) return;
     final gap = _gap * squash, band = _band * squash;
     var x = bw + gap;                         // the chevrons follow the box's (flattening) point
