@@ -639,7 +639,7 @@ class _CampusScreenState extends State<CampusScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
             decoration: BoxDecoration(color: _stepColor(to).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
-              Icon(training ? Icons.school : Icons.hourglass_bottom, size: 18, color: _stepColor(to)),
+              Icon(training ? Icons.school : Icons.hourglass_top, size: 18, color: _stepColor(to)),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
