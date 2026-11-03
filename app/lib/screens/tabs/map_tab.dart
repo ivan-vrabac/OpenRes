@@ -24,7 +24,7 @@ import '../../services/location_service.dart';
 import '../../widgets/live_location_layer.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/slide_confirm.dart';
-import '../../widgets/async_view.dart' show HexPicture;
+import '../../widgets/async_view.dart' show HexPicture, fmtCredits;
 import '../../map_kit/campus_pins.dart';
 import '../../map_kit/heatmap.dart';
 import '../../map_kit/map_objects.dart';
@@ -749,7 +749,11 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                 active: _showMines, tip: 'Hexes and Campuses',
               ),
               ])),
-              const Spacer(),
+              // the top bar hidden: the credits sit here, where spending starts (owner 2026-11-03)
+              Expanded(child: ValueListenableBuilder<bool>(valueListenable: UiLook.showHud, builder: (_, hud, __) => hud
+                  ? const SizedBox.shrink()
+                  : Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text(fmtCredits(co.credits),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber)))))),
               // Navigation
               _mapBtn(Icons.my_location, () {
                 setState(() => _following = true);

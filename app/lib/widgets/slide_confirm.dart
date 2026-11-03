@@ -167,17 +167,19 @@ class _SlideToConfirmState extends State<SlideToConfirm> with TickerProviderStat
                         borderRadius: BorderRadius.circular(widget.radius),
                       )),
                     ),
-                  // the label, centred on the whole track like the button it replaced
-                  Positioned.fill(
+                  // the label, centred in the track beside the knob (owner 2026-11-03: on a narrow phone it ran
+                  // under the knob, the same colour), a little see-through
+                  Positioned(
+                    left: _pad + _bodyW + _point + _tailW, right: _pad, top: 0, bottom: 0,
                     child: Opacity(
                       opacity: (1 - t * 1.6).clamp(0.0, 1.0),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                         Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                color: look ? Colors.white : AppColors.t38)),
+                                color: look ? Colors.white.withValues(alpha: 0.8) : AppColors.t38)),
                         if (widget.sublabel != null)
                           Text(widget.sublabel!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: look ? Colors.white70 : Colors.white24)),
+                              style: TextStyle(fontSize: 11, color: look ? Colors.white60 : Colors.white24)),
                       ]),
                     ),
                   ),
@@ -241,7 +243,9 @@ class _KnobPainter extends CustomPainter {
       ..lineTo(0, radius)
       ..arcToPoint(Offset(radius, 0), radius: Radius.circular(radius))
       ..close();
-    canvas.drawPath(body, Paint()..color = base.withValues(alpha: 0.22));
+    // a dark knob: the white icon on it stands out from the track (owner 2026-11-03)
+    canvas.drawPath(body, Paint()..color = Colors.black.withValues(alpha: on ? 0.38 : 0.2));
+    canvas.drawPath(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = base.withValues(alpha: 0.35));
     if (squash <= 0.01) return;
     final gap = _gap * squash, band = _band * squash;
     var x = bw + gap;                         // the chevrons follow the box's (flattening) point

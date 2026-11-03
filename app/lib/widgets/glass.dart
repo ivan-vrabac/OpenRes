@@ -21,7 +21,10 @@ class UiLook {
   /// The map also runs behind Android's status bar (when the status bar is shown).
   static final underStatusBar = ValueNotifier<bool>(true);
 
-  static Listenable get all => Listenable.merge([showHud, clearTabs, underStatusBar]);
+  /// Tapping the top bar opens the Company card (owner 2026-11-03: an option).
+  static final hudOpensCompany = ValueNotifier<bool>(true);
+
+  static Listenable get all => Listenable.merge([showHud, clearTabs, underStatusBar, hudOpensCompany]);
 
   /// Height the floating top bar takes over the pages (bar + its margins).
   static const double hudInset = 50;
@@ -31,13 +34,15 @@ class UiLook {
     showHud.value = p.getBool('ui_show_hud') ?? true;
     clearTabs.value = p.getBool('ui_clear_tabs') ?? false;
     underStatusBar.value = p.getBool('ui_under_status') ?? true;
+    hudOpensCompany.value = p.getBool('ui_hud_opens_company') ?? true;
   }
 
-  static Future<void> set({bool? hud, bool? clear, bool? underStatus}) async {
+  static Future<void> set({bool? hud, bool? clear, bool? underStatus, bool? hudOpens}) async {
     final p = await SharedPreferences.getInstance();
     if (hud != null) await p.setBool('ui_show_hud', showHud.value = hud);
     if (clear != null) await p.setBool('ui_clear_tabs', clearTabs.value = clear);
     if (underStatus != null) await p.setBool('ui_under_status', underStatusBar.value = underStatus);
+    if (hudOpens != null) await p.setBool('ui_hud_opens_company', hudOpensCompany.value = hudOpens);
   }
 }
 

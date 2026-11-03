@@ -20,7 +20,7 @@ import '../models/tab_config.dart';
 import '../services/location_service.dart';
 import '../services/update_service.dart';
 import '../widgets/update_dialog.dart';
-import '../constants.dart' show fmtNum, kNumDecimals, kInvertAskBid;
+import '../constants.dart' show fmtNum, kInvertAskBid;
 import 'game_screen.dart' show tabMeta;
 
 import '../widgets/glass.dart';
@@ -144,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _AppAppearancePage()))),
           _tile(Icons.thermostat, 'Survey Heatmap', 'Opacity · palette',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _ScanHeatmapPage()))),
-          _tile(Icons.pin, 'Numbers', 'Decimal places in short numbers',
+          _tile(Icons.candlestick_chart_outlined, 'Market colours', 'ASK / BID colours',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _NumbersDisplayPage()))),
         ]),
         const SizedBox(height: 16),
@@ -415,10 +415,18 @@ class _InterfaceSection extends StatelessWidget {
           _settingsSectionHeader('Interface'),
           SwitchListTile(
             title: const Text('Top bar'),
-            subtitle: Text('Company name, Campus level and credits', style: TextStyle(fontSize: 12, color: AppColors.t54)),
+            subtitle: Text(UiLook.showHud.value ? 'Company name, Campus level and credits'
+                : 'Hidden: your credits show in the middle of the map buttons', style: TextStyle(fontSize: 12, color: AppColors.t54)),
             value: UiLook.showHud.value,
             onChanged: (v) => UiLook.set(hud: v),
           ),
+          if (UiLook.showHud.value)
+            SwitchListTile(
+              title: const Text('Tap the top bar to open Company'),
+              subtitle: Text('Your company card with its stats', style: TextStyle(fontSize: 12, color: AppColors.t54)),
+              value: UiLook.hudOpensCompany.value,
+              onChanged: (v) => UiLook.set(hudOpens: v),
+            ),
           SwitchListTile(
             title: const Text('See-through tab bar on the map'),
             subtitle: Text('The map shows under the bottom tabs; other pages bring their own background',
@@ -597,68 +605,11 @@ class _NumbersDisplayPage extends StatefulWidget {
 }
 
 class _NumbersDisplayPageState extends State<_NumbersDisplayPage> {
-  late int _numDecimals;
-
-  @override
-  void initState() {
-    super.initState();
-    _numDecimals = kNumDecimals;
-  }
-
-  Future<void> _setDecimals(int d) async {
-    setState(() => _numDecimals = d);
-    // ignore: invalid_use_of_visible_for_testing_member
-    kNumDecimals = d;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('numDecimals', d);
-  }
-
-  String _preview(int d) {
-    if (d < 0) return '1,234  1,234,567  1,234,567,890';
-    String fmt(double n, String suf) => '${n.toStringAsFixed(d)}$suf';
-    return '${fmt(1.2345, 'K')}  ${fmt(1.2345, 'M')}  ${fmt(1.2345, 'B')}  ${fmt(1.2345, 'T')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(toolbarHeight: 36, title: const Text('Numbers')),
+      appBar: AppBar(toolbarHeight: 36, title: const Text('Market colours')),
       body: ListView(children: [
-        _settingsSectionHeader('Short numbers'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Decimal places',
-                style: TextStyle(fontSize: 13, color: AppColors.t70)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'e.g. ${_preview(_numDecimals)}',
-                style: TextStyle(fontSize: 13, color: AppColors.accent,
-                    fontFamily: 'monospace'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(children: [
-              Text('0', style: TextStyle(color: AppColors.t38, fontSize: 11)),
-              Expanded(
-                child: Slider(
-                  value: _numDecimals < 0 ? 5 : _numDecimals.toDouble(),
-                  min: 0, max: 5, divisions: 5,
-                  label: _numDecimals < 0 ? 'Full' : '$_numDecimals',
-                  onChanged: (v) => _setDecimals(v.round() == 5 ? -1 : v.round()),
-                ),
-              ),
-              Text('Full', style: TextStyle(color: AppColors.t38, fontSize: 11)),
-            ]),
-          ]),
-        ),
         _settingsSectionHeader('Market'),
         SwitchListTile(
           title: const Text('Invert ASK / BID colours'),
@@ -974,7 +925,6 @@ class _NotificationsPageState extends State<_NotificationsPage> {
 
 Future<void> loadNumDecimalsPrefs() async {
   final prefs = await SharedPreferences.getInstance();
-  kNumDecimals = prefs.getInt('numDecimals') ?? 1;
   kNoFpsLimit = prefs.getBool('no_fps_limit') ?? false;
   if (kNoFpsLimit) await applyNoFpsLimit(true);
   kInvertAskBid = prefs.getBool('invert_ask_bid') ?? false;

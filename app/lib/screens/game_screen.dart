@@ -75,7 +75,7 @@ final Map<GameTabId, _TabMeta> tabMeta = {
       build: () => const LuxuryScreen()),
   GameTabId.quests: _TabMeta(label: 'Quests', icon: Icons.emoji_events_outlined,
       build: () => const QuestsScreen(), needsScaffold: true),
-  GameTabId.stats: _TabMeta(label: 'Stats', icon: Icons.bar_chart_outlined,
+  GameTabId.stats: _TabMeta(label: 'Company', icon: Icons.bar_chart_outlined,       // owner 2026-11-03: one name
       build: () => const ProfileScreen(embedded: true), needsScaffold: true),
 };
 
@@ -415,7 +415,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 Positioned(top: under ? statusTop : 0, left: 0, right: 0, child: ValueListenableBuilder<bool>(
                   valueListenable: tutorialLocked,
                   builder: (_, locked, hud) => IgnorePointer(ignoring: locked, child: hud),
-                  child: PlayerHud(onTap: _openStats))),
+                  child: ValueListenableBuilder<bool>(valueListenable: UiLook.hudOpensCompany,
+                      builder: (_, opens, __) => PlayerHud(onTap: opens ? _openStats : null)))),
             ]),
           ),
         ]),
