@@ -971,7 +971,9 @@ const _kClassicStops = <List<int>>[
 Color paletteColorAt(int v, String palette) {
   if (v == 0) return const Color(0x00000000);
   if (palette == 'contrast') {
-    return Color.fromARGB(v, v, v, v);
+    // black (poor) to white (rich), solid: the opacity setting alone decides how much map shows through
+    // (owner 2026-11-03: it went from see-through to white)
+    return Color.fromARGB(255, v, v, v);
   }
   // Cold is a genuine reversal of Classic: dark red at low quality, dark blue at high.
   final lookupV = palette == 'cold' ? (256 - v).clamp(1, 255) : v;
