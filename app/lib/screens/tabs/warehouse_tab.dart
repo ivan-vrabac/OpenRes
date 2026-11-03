@@ -8,6 +8,7 @@ import '../../widgets/async_view.dart' show fmtCredits;
 import '../../widgets/cards.dart';
 import '../../widgets/slide_confirm.dart';
 import '../../widgets/top_banner.dart';
+import '../../widgets/tutorial.dart' show tutorialStorageKey;
 
 import '../../app_colors.dart';
 import '../../widgets/popups.dart';
@@ -115,6 +116,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
     return RefreshIndicator(
       onRefresh: co.refresh,
       child: ListView(
+        key: tutorialStorageKey,
         padding: tabPadding(context, 12),
         children: [
           Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

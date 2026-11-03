@@ -16,6 +16,12 @@ final tutorialLocked = ValueNotifier<bool>(true);
 /// The supervisors on the Campus page, for their card.
 final campusSupervisorsKey = GlobalKey();
 
+/// What the hands-on cards light up: the training buttons on the Campus page, the first resource on the
+/// Hexes tab, the list of Central Storage.
+final campusTrainKey = GlobalKey();
+final tutorialHexesKey = GlobalKey();
+final tutorialStorageKey = GlobalKey();
+
 /// The tutorial running now. The map writes the steps, the game screen shows them over all the tabs.
 final tutorialRun = ValueNotifier<TutorialRun?>(null);
 
@@ -33,7 +39,9 @@ class TutorialStep {
   final GameTabId? tab;                    // the tab it talks about (none: the map)
   final bool more;                         // the More tab, which has no id
   final bool waits;                        // goes on by itself once done: the player does it on the live map
-  const TutorialStep(this.title, this.text, [this.target, this.tab, this.more = false, this.waits = false]);
+  final bool hands;                        // its target works while the card is up (map buttons always do)
+  const TutorialStep(this.title, this.text,
+      [this.target, this.tab, this.more = false, this.waits = false, this.hands = false]);
 }
 
 /// The first steps for a new player (owner 2026-11-01), one card at a time. It covers the whole game, tab
@@ -64,7 +72,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
   /// 2026-11-03), so the player does it for real; Next still goes on.
   bool get _hands {
     final s = widget.steps[_i];
-    return s.target != null && s.tab == null && !s.more;
+    return s.target != null && (s.hands || (s.tab == null && !s.more));
   }
 
   @override
@@ -163,11 +171,14 @@ class _TutorialOverlayState extends State<TutorialOverlay> {
     // its target gone (the location gate replaces the map): out of the way, that screen has to work
     if (waiting && hole == null) return const Positioned.fill(child: Stack());
     // the card stays away from what it talks about
-    final cardOnTop = hole != null && hole.center.dy > height / 2;
+    final cardOnTop = hole != null && hole.center.dy > height / 2 && hole.height < height / 2;
+    final onMap = step.tab == null && !step.more;
     return Positioned.fill(child: Stack(children: [
       if (free) ...[
         // the map stays free; the buttons beside the target and the tab bar below it are closed
         Positioned(left: 0, right: 0, top: hole!.bottom, bottom: 0, child: _closed),
+        // on a tab the top bar stays closed too; on the map everything above is the map
+        if (!onMap) Positioned(left: 0, right: 0, top: 0, height: hole.top, child: _closed),
         Positioned(left: 0, width: hole.left, top: hole.top, height: hole.height, child: _closed),
         Positioned(left: hole.right, right: 0, top: hole.top, height: hole.height, child: _closed),
         Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _Scrim(hole, AppColors.accent, dim: false)))),

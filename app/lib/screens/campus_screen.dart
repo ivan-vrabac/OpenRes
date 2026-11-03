@@ -578,7 +578,7 @@ class _CampusScreenState extends State<CampusScreen> {
       legend,
       if (training != null) ...[const SizedBox(height: 12), training],
       const SizedBox(height: 14),
-      action,
+      KeyedSubtree(key: campusTrainKey, child: action),
     ]));
   }
 

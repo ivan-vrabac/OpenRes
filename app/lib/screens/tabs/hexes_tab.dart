@@ -12,6 +12,7 @@ import '../../widgets/async_view.dart' show HexClipper, HexPicture;
 import '../../widgets/glass.dart' show tabPadding;
 import '../../widgets/slide_confirm.dart';
 import '../../widgets/top_banner.dart';
+import '../../widgets/tutorial.dart' show tutorialHexesKey;
 
 /// Hexes (0.2.3 redo, owner 2026-10-31; the 1.2.3 mine list followed the original game): a summary,
 /// the leases that end soon with one slide to renew them, then a honeycomb of your resources. A
@@ -127,7 +128,7 @@ class _HexesTabState extends State<HexesTab> {
             final w = (c.maxWidth - 16) / 3;
             return Wrap(spacing: 8, runSpacing: 12, alignment: WrapAlignment.center, children: [
               for (final item in order)
-                SizedBox(width: w, child: _ResourceHex(item: item, hexes: groups[item]!, co: co,
+                SizedBox(key: item == order.first ? tutorialHexesKey : null, width: w, child: _ResourceHex(item: item, hexes: groups[item]!, co: co,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => _HexGroupPage(item: item))))),
             ]);

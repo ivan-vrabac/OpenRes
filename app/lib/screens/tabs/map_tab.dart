@@ -80,9 +80,9 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
   late final _world = MapWorld((path, args) => _co.call(path, args), _hexImage);
   _Survey? _survey;
   List<OverlayImage> _cachedHeatmapOverlays = [];
-  String _selectedMineType = 'wood';   // the resource the heatmap and the build button use
+  String _selectedMineType = 'sugar_beet';   // owner 2026-11-03: good for everyone, so the first pick   // the resource the heatmap and the build button use
                                        // (an item key, or 'solar_farm' / 'wind_farm')
-  String _category = 'Raw ores';       // the picker's category
+  String _category = 'Agriculture';    // the picker's category
   final _categoryBtnKey = GlobalKey();
   final _resourceBtnKey = GlobalKey();
   final _surveyBtnKey = GlobalKey();
