@@ -396,9 +396,23 @@ QUEST_MIN_CREDITS = 5000
 STREAK_MATERIALS = [(1, {"books": 10}), (7, {"books": 50}), (14, {"books": 150}), (30, {"books": 500})]
 
 
-def quest_credits(campus_level: int) -> int:
+QUEST_SMOOTH_TO = 10       # up to this Campus level the reward grows a little every level (owner 2026-11-03)
+
+
+def _quest_formula(campus_level: int) -> int:
     nxt = campus_upgrade(min(max(1, campus_level), CAMPUS_MAX - 1))["credits"]
-    return max(QUEST_MIN_CREDITS, int(round(nxt * QUEST_CAMPUS_SHARE, -2)))
+    return int(round(nxt * QUEST_CAMPUS_SHARE, -2))
+
+
+def quest_credits(campus_level: int) -> int:
+    """A quest reward (and the daily reward's unit). From QUEST_MIN_CREDITS at Campus 1 it grows by the same
+    factor every level up to QUEST_SMOOTH_TO, then follows the next Campus level's price: no flat start
+    followed by big jumps."""
+    lv = max(1, campus_level)
+    if lv >= QUEST_SMOOTH_TO:
+        return max(QUEST_MIN_CREDITS, _quest_formula(lv))
+    top = _quest_formula(QUEST_SMOOTH_TO) / QUEST_MIN_CREDITS
+    return int(round(QUEST_MIN_CREDITS * top ** ((lv - 1) / (QUEST_SMOOTH_TO - 1)), -2))
 
 
 def streak_reward(day: int, campus_level: int) -> int:
