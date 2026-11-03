@@ -62,6 +62,7 @@ extension _MapTutorial on _MapTabState {
             'Visit it once a week, standing within 200 m: every missed week lowers your output by 10 %, down to 30 %.', tab: GameTabId.specialBuildings),
         TutorialStep('Train a supervisor',
             'Every Campus level gives 10 supervisors. Send one to a Course with your books: tap Train. Higher steps give a bigger boost. '
+            'A supervisor in training keeps working on its hex at its old level, and gets the new boost when it finishes. '
             'Appoint always sends the best free one, so recall and appoint again to put a newly trained one on a hex.',
             target: campusTrainKey, tab: GameTabId.specialBuildings, done: () => campusEducated.value > 0),
         TutorialStep('The education queue',

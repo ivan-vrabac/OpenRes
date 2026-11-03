@@ -265,7 +265,9 @@ class _HexGroupPageState extends State<_HexGroupPage> {
     final unit = widget.item == 'electricity' ? ' kWh' : '';
     double shown(double r) => widget.item == 'electricity' ? r / 1000 : r;
     final steps = (co.catalog['education'] as List?) ?? const [];
-    return Stack(children: [Scaffold(
+    // the tutorial's Appoint: the back button waits for it too
+    final appointed = hexes.any((m) => m.edu != null);
+    return PopScope(canPop: !_tour || appointed, child: Stack(children: [Scaffold(
       appBar: AppBar(
         toolbarHeight: 40,
         title: Text(choosing ? '${_selected.length} chosen' : co.itemName(widget.item)),
@@ -362,7 +364,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                     (context.read<PlayerProvider>().mines ?? const <Hex>[]).any((m) => m.item == widget.item && m.edu != null)),
           ],
         ),
-    ]);
+    ]));
   }
 
   Widget _hexCard(Company co, Hex m, List steps, String unit, double Function(double) shown, bool choosing,
@@ -426,7 +428,8 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                   const SizedBox(width: 8),
                   Expanded(child: OutlinedButton.icon(
                     key: first ? tutorialAppointKey : null,
-                    onPressed: _busy ? null : () => m.edu == null
+                    // no recalling during the first tutorial (owner 2026-11-03)
+                    onPressed: _busy || (tutorialGuided && m.edu != null) ? null : () => m.edu == null
                         ? _call('/api/v3/supervisors/assign', {'hex': m.id}, 'Supervisor appointed')
                         : _call('/api/v3/supervisors/unassign', {'hex': m.id}, 'The supervisor went back to the Campus'),
                     icon: Icon(m.edu == null ? Icons.person_add_alt : Icons.person_remove_alt_1_outlined, size: 16),

@@ -339,7 +339,9 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(children: [Scaffold(
+    // the tutorial's 10 books: the back button waits for them too
+    final bought = ((context.watch<Company>().stock['books'] as num?) ?? 0) >= 10;
+    return PopScope(canPop: !_tour || bought, child: Stack(children: [Scaffold(
       appBar: AppBar(toolbarHeight: 40, title: Text(_name)),
       body: AsyncView(
         loading: _loading,
@@ -448,7 +450,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
       ),
     ),
       if (_tour) _tutorialCard(),
-    ]);
+    ]));
   }
 
   Widget _tutorialCard() => TutorialOverlay(

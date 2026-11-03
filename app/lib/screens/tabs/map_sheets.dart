@@ -46,7 +46,8 @@ extension _MapSheets on _MapTabState {
       context: context,
       isScrollControlled: true,
       dismissible: !forced,
-      builder: (ctx) => SafeArea(
+      // the back button can't close it either
+      builder: (ctx) => PopScope(canPop: !forced, child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -133,7 +134,7 @@ extension _MapSheets on _MapTabState {
             if (!forced) Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Cancel'))),
           ]),
         ),
-      ),
+      )),
     );
   }
 
