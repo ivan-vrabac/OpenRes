@@ -48,7 +48,7 @@ Future<bool> showSellSheet(BuildContext context, Company co, String item, double
   var drop = 0.0;
   double minPrice() => drop < 0 ? 0 : best * (1 - drop);
 
-  /// (to orders, to the system, credits after tax, left in storage) for the current amount and drop.
+  /// (to orders, to the system, credits before tax, left in storage) for the current amount and drop.
   (double, double, double, double) plan() {
     var left = qty, toOrders = 0.0, toSystem = 0.0, credits = 0.0;
     for (final (price, avail, name) in levels) {
@@ -59,15 +59,17 @@ Future<bool> showSellSheet(BuildContext context, Company co, String item, double
       left -= take;
       if (name == null) { toSystem += take; } else { toOrders += take; }
     }
-    return (toOrders, toSystem, credits * (1 - taxRate), left);
+    return (toOrders, toSystem, credits, left);
   }
 
   final raw = (co.catalog['raw'] as Map?)?.containsKey(item) ?? false;
   final ok = await showAppSheet<bool>(
     context: context,
     builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-      final (toOrders, toSystem, credits, left) = plan();
+      final (_, _, gross, left) = plan();
       final sold = qty - left;
+      final credits = gross * (1 - taxRate);
+      final avg = sold > 0 ? gross / sold : 0.0;      // one price, or the mix of orders and the system
       final more = qty > (levels.first.$3 == null ? double.infinity : levels.first.$2);   // more than the best order takes
       final u = _unit(item);
       String pr(double v) => 'ꞓ${v < 10 ? v.toStringAsFixed(2) : fmtNum(v)}';
@@ -94,17 +96,17 @@ Future<bool> showSellSheet(BuildContext context, Company co, String item, double
               max: shownHave.floorToDouble(),
               onChanged: (v) => set(() => qty = v.roundToDouble()),
             ),
+          // owner 2026-11-03: the sum written out, x × price - tax = total
           Row(children: [
-            Expanded(child: Text('${fmtNum(sold)}$u', style: const TextStyle(fontSize: 16))),
+            Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(
+                '${fmtNum(sold)}$u × ${pr(avg)}${taxRate > 0 ? ' - ${(taxRate * 100).round()}% sales tax' : ''} =',
+                style: const TextStyle(fontSize: 15)))),
+            const SizedBox(width: 8),
             Text('ꞓ${fmtNum(credits.floor())}',
                 style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16)),
           ]),
-          Text([
-            if (toOrders > 0) '${fmtNum(toOrders)} to buy orders',
-            if (toSystem > 0) '${fmtNum(toSystem)} to the system at ${pr(system)}',
-            if (left > 0) '${fmtNum(left)} stays in storage',
-            if (sold > 0 && taxRate > 0) 'after ${(taxRate * 100).round()}% sales tax',
-          ].join(' · '), style: TextStyle(color: left > 0 ? Colors.orangeAccent : AppColors.t54, fontSize: 11)),
+          if (left > 0)
+            Text('${fmtNum(left)}$u stays in storage', style: const TextStyle(color: Colors.orangeAccent, fontSize: 11)),
           const SizedBox(height: 12),
           Row(children: [
             // the lowest price still accepted, asked when the best order can't take everything
