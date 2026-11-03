@@ -219,3 +219,22 @@ def test_sales_tax_is_low_for_rarely_made_items():
         assert all(abs(r - TAX_RATE) < 1e-9 for r in rates.values())
     q = call(M + "overview", player("taxov")[1])
     assert all("taxRate" in i for i in q["items"])
+
+
+def test_storage_sell_sells_what_is_left_when_a_plant_used_some():
+    """Owner 2026-11-03: wood was used by a plant while the sell sheet was open and the sale failed."""
+    s_hid, s_sid = player("partial", 0)
+    put(s_hid, WOOL, 40.6)
+    r = call("/api/v3/sell", s_sid, item=WOOL, qty=100)
+    assert r["err"] == 0 and r["sold"] == 40 and r["unsold"] == 0
+    assert abs(have(s_hid, WOOL) - 0.6) < 1e-6
+    r = call("/api/v3/sell", s_sid, item=WOOL, qty=5)
+    assert r["err"] != 0                                              # nothing whole left
+
+
+def test_overview_best_bid_ignores_your_own_order():
+    p = g.PRICES[WOOL]
+    me, me_sid = player("ovme", 10_000_000)
+    assert call(M + "order", me_sid, item=WOOL, qty=10, price=round(p * 1.3, 2))["err"] == 0
+    items = {e["item"]: e for e in call(M + "overview", me_sid)["items"]}
+    assert "bestBid" not in items[WOOL]

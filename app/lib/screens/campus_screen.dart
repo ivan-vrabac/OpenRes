@@ -46,9 +46,14 @@ class _CampusScreenState extends State<CampusScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSups());
+    // owner 2026-11-03: the upgrade needs must follow storage without a manual reload: fresh on open,
+    // then every 10 s while the Campus is on screen (not under another page)
+    WidgetsBinding.instance.addPostFrameCallback((_) { _loadSups(); _co.refresh(); });
+    var n = 0;
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && (_queue.isNotEmpty)) setState(() {});
+      if (!mounted) return;
+      if (_queue.isNotEmpty) setState(() {});
+      if (++n % 10 == 0 && (ModalRoute.of(context)?.isCurrent ?? true) && !_busy) _co.refresh();
     });
   }
 
@@ -375,7 +380,7 @@ class _CampusScreenState extends State<CampusScreen> {
         ring(Image.asset(itemPicture(e.key), width: 40, height: 40, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 20, color: AppColors.t38)),
             co.itemName(e.key), have(e.key), (e.value as num).toDouble(),
-            '${fmtQty(have(e.key))} / ${fmtQty(e.value as num)}'),
+            '${fmtQty(have(e.key).floor())} / ${fmtQty(e.value as num)}'),
       ring(Icon(Icons.warehouse_outlined, size: 26, color: AppColors.t70), 'Storage', storageLv.toDouble(),
           needStorage.toDouble(), 'Level $storageLv / $needStorage'),
     ];

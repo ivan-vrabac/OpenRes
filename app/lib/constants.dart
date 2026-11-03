@@ -6,10 +6,9 @@ const String kBaseUrl = Branding.apiBaseUrl;
 /// Decimal places of short numbers (owner 2026-11-03: always two, no setting any more).
 const int kNumDecimals = 2;
 
-/// Market colours: ASK red / BID green like a stock ticker; Settings > Numbers & Display can invert.
-bool kInvertAskBid = false;
-Color get kAskColor => kInvertAskBid ? const Color(0xFF4CAF50) : const Color(0xFFEF5350);
-Color get kBidColor => kInvertAskBid ? const Color(0xFFEF5350) : const Color(0xFF4CAF50);
+/// Market colours: ASK red / BID green like a stock ticker.
+const kAskColor = Color(0xFFEF5350);
+const kBidColor = Color(0xFF4CAF50);
 
 /// Short-scale suffixes, biggest first: far past anything played, so no score ever prints in full or
 /// in exponent form (owner 2026-11-03).

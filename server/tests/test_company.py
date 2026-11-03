@@ -104,6 +104,8 @@ def test_build_produce_sell_and_rules():
         rate = market.tax_rate(conn, "wood")
     v = int(int(expected) * g.PRICES["wood"])
     assert sold["credits"] == v - round(v * rate)                     # the seller pays the sales tax
+    rest = call("/api/v3/sell", sid, item="wood", qty=10_000)       # more than there is: sells what is left
+    assert rest["err"] == 0 and rest["sold"] < 10_000 or rest.get("code") == "stock"
     assert call("/api/v3/sell", sid, item="wood", qty=10_000)["code"] == "stock"
 
 

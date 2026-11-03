@@ -264,7 +264,11 @@ def install(api) -> None:
         rates = tax_rates(conn)
         items = {i: {"item": i, "name": g.ITEM_NAMES[i], "systemSell": g.PRICES[i], "systemBuy": sys_buy(i),
                      "owned": mine.get(i, 0.0), "taxRate": rates.get(i, TAX_RATE)} for i in g.ITEM_NAMES if tradable(i)}
-        for r in conn.execute("SELECT item, MAX(price), SUM(qty_open) FROM market_orders WHERE status='open' GROUP BY item"):
+        # what selling brings: your own buy orders don't count (selling never fills them)
+        for r in conn.execute("SELECT o.item, o.price, SUM(o.qty_open) FROM market_orders o "
+                              "JOIN (SELECT item, MAX(price) AS p FROM market_orders WHERE status='open' AND hid<>? "
+                              "GROUP BY item) b ON b.item=o.item AND o.price=b.p "
+                              "WHERE o.status='open' AND o.hid<>? GROUP BY o.item", (hid, hid)):
             if r[0] in items:
                 items[r[0]]["bestBid"], items[r[0]]["bidQty"] = r[1], r[2]
         return {"err": 0, "items": list(items.values()), "taxMin": TAX_MIN, "taxMax": TAX_MAX, "orderDays": ORDER_DAYS}
@@ -479,8 +483,13 @@ def install(api) -> None:
             expire(conn)
             co.collect(conn, hid)
             have = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item=?", (hid, item)).fetchone()
-            if not have or have[0] + 1e-9 < qty:
-                raise econ.GameError("stock", f"Not enough {g.ITEM_NAMES.get(item, item).lower()}")
+            # plants keep using goods while the sell sheet is open (owner 2026-11-03: wood sale failed):
+            # sell what is still there instead of refusing the whole sale
+            qty = min(qty, have[0] if have else 0.0)
+            if item != g.ENERGY:
+                qty = float(int(qty + 1e-9))                    # whole units
+            if qty <= 1e-9:
+                raise econ.GameError("stock", f"No {g.ITEM_NAMES.get(item, item).lower()} left in Central Storage")
             left, got, orders = qty, 0, 0
             if tradable(item):
                 for o in conn.execute("SELECT * FROM market_orders WHERE item=? AND status='open' AND hid<>? "

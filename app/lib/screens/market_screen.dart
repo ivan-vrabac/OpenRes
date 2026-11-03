@@ -67,8 +67,9 @@ class _MarketScreenState extends State<MarketScreen> {
     });
   }
 
+  /// The item page slides up from the bottom like a hex (owner 2026-11-03), not a full screen page.
   Future<void> _open(String item) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => MarketItemScreen(item: item)));
+    await showMarketItemSheet(context, item);
     if (mounted) _load();
   }
 
@@ -226,12 +227,36 @@ class _MarketScreenState extends State<MarketScreen> {
   }
 }
 
+/// The item page as a bottom sheet: drag it up to full height, down to close. The tutorial's books
+/// purchase can't be swiped away.
+Future<void> showMarketItemSheet(BuildContext context, String item) {
+  final tour = tutorialFocus.value == tutorialBooksKey && item == 'books';
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    isDismissible: !tour,
+    enableDrag: !tour,
+    backgroundColor: AppColors.bg,
+    builder: (_) => ChangeNotifierProvider.value(
+      value: context.read<Company>(),
+      child: DraggableScrollableSheet(
+        // the tutorial: full height and fixed, like the old page, so its highlight always finds the button
+        expand: false, initialChildSize: tour ? 1 : 0.8, minChildSize: tour ? 1 : 0.4, maxChildSize: 1,
+        builder: (_, scroll) => MarketItemScreen(item: item, scroll: scroll),
+      ),
+    ),
+  );
+}
+
 /// One item: an order book of BUY orders only. Top: buy from the system; middle: players' buy
 /// orders (highest price first, oldest first at equal price) that you can sell into; bottom: sell
 /// to the system. You can have one buy order per item (edit or cancel it).
 class MarketItemScreen extends StatefulWidget {
   final String item;
-  const MarketItemScreen({super.key, required this.item});
+  final ScrollController? scroll;      // the bottom sheet's
+  const MarketItemScreen({super.key, required this.item, this.scroll});
   @override
   State<MarketItemScreen> createState() => _MarketItemScreenState();
 }
@@ -344,9 +369,9 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
   Widget build(BuildContext context) {
     // the tutorial's 10 books: the back button waits for them too
     final bought = ((context.watch<Company>().stock['books'] as num?) ?? 0) >= 10;
-    return PopScope(canPop: !_tour || bought, child: Stack(children: [Scaffold(
-      appBar: AppBar(toolbarHeight: 40, title: Text(_name)),
-      body: AsyncView(
+    return PopScope(canPop: !_tour || bought, child: Stack(children: [Material(
+      color: Colors.transparent,
+      child: AsyncView(
         loading: _loading,
         error: _error,
         onRetry: _load,
@@ -369,7 +394,7 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
           // buy order, then the buy orders of other companies
           return RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.all(14), children: [
+            child: ListView(controller: widget.scroll, padding: const EdgeInsets.fromLTRB(14, 0, 14, 14), children: [
               Row(children: [
                 GameItemIcon(widget.item, size: 64, hex: raw),
                 const SizedBox(width: 14),

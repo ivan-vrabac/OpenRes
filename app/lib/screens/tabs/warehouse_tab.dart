@@ -24,11 +24,19 @@ class WarehouseTab extends StatefulWidget {
 
 class _WarehouseTabState extends State<WarehouseTab> {
   bool _busy = false;
+  // per item: best buy order of other companies (price, qty), the system price and the sales tax
+  static Map<String, Map<String, dynamic>> _mkt = {};
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<Company>().refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) { context.read<Company>().refresh(); _loadMarket(); });
+  }
+
+  Future<void> _loadMarket() async {
+    final r = await context.read<Company>().call('/api/v1/market/overview');
+    if (!mounted || !r.ok) return;
+    setState(() => _mkt = {for (final e in r.list('items')) e['item'] as String: e});
   }
 
   /// Stored units -> what the player sees (electricity is stored in Wh, shown in kWh).
@@ -37,7 +45,19 @@ class _WarehouseTabState extends State<WarehouseTab> {
 
   double _price(Company co, String item) => ((co.catalog['items']?[item]?['price']) as num?)?.toDouble() ?? 0;
   bool _tradable(Company co, String item) => co.catalog['items']?[item]?['tradable'] == true;
-  double _worth(Company co, MapEntry<String, double> e) => _shown(e.key, e.value) * _price(co, e.key);
+  /// What selling it all now brings (owner 2026-11-03): whole units, the best buy order up to its
+  /// quantity, the rest to the system, less the sales tax. Before the market loads: the system price.
+  double _worth(Company co, MapEntry<String, double> e) {
+    final q = _shown(e.key, e.value).floorToDouble();
+    final m = _mkt[e.key];
+    if (m == null) return q * _price(co, e.key);
+    final sys = (m['systemSell'] as num? ?? _price(co, e.key)).toDouble();
+    final bid = (m['bestBid'] as num?)?.toDouble() ?? 0;
+    final bidQty = (m['bidQty'] as num?)?.toDouble() ?? 0;
+    final toBid = bid > sys ? (q < bidQty ? q : bidQty) : 0.0;
+    final gross = toBid * bid + (q - toBid) * sys;
+    return gross * (1 - (m['taxRate'] as num? ?? 0).toDouble());
+  }
 
   Future<void> _upgrade(Company co) async {
     final st = (co.state['storage'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -84,8 +104,10 @@ class _WarehouseTabState extends State<WarehouseTab> {
   }
 
   /// Sell from Central Storage (the shared sell sheet, also on the Market item page).
-  Future<void> _sell(Company co, String item, double have) =>
-      showSellSheet(context, co, item, have, busy: (b) { if (mounted) setState(() => _busy = b); });
+  Future<void> _sell(Company co, String item, double have) async {
+    await showSellSheet(context, co, item, have, busy: (b) { if (mounted) setState(() => _busy = b); });
+    if (mounted) _loadMarket();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +138,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
     // the tutorial sells the first thing that can be sold
     final firstSale = [for (final g in groups.values) ...g].where((e) => _tradable(co, e.key)).firstOrNull;
     return RefreshIndicator(
-      onRefresh: co.refresh,
+      onRefresh: () => Future.wait([co.refresh(), _loadMarket()]),
       child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, list) => ListView(
         // the tutorial's selling card: the list stays still
         physics: focus == tutorialStorageKey ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
@@ -209,7 +231,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
                 Text('${fmtNum(shown)}${_unit(e.key)}',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber, fontSize: 14)),
                 if (tradable)
-                  Text(fmtCredits(shown * _price(co, e.key)), style: TextStyle(fontSize: 11, color: AppColors.t54)),
+                  Text(fmtCredits(_worth(co, e)), style: TextStyle(fontSize: 11, color: AppColors.t54)),
               ]),
             ]),
           ),

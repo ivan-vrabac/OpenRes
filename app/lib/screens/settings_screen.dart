@@ -20,7 +20,7 @@ import '../models/tab_config.dart';
 import '../services/location_service.dart';
 import '../services/update_service.dart';
 import '../widgets/update_dialog.dart';
-import '../constants.dart' show fmtNum, kInvertAskBid;
+import '../constants.dart' show fmtNum;
 import 'game_screen.dart' show tabMeta;
 
 import '../widgets/glass.dart';
@@ -144,8 +144,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _AppAppearancePage()))),
           _tile(Icons.thermostat, 'Survey Heatmap', 'Opacity · palette',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _ScanHeatmapPage()))),
-          _tile(Icons.candlestick_chart_outlined, 'Market colours', 'ASK / BID colours',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _NumbersDisplayPage()))),
         ]),
         const SizedBox(height: 16),
         const SectionLabel('Game'),
@@ -603,37 +601,6 @@ class _PerformancePageState extends State<_PerformancePage> {
   }
 }
 
-// ── Numbers & Display settings page ───────────────────────────────────────────
-
-class _NumbersDisplayPage extends StatefulWidget {
-  const _NumbersDisplayPage();
-  @override
-  State<_NumbersDisplayPage> createState() => _NumbersDisplayPageState();
-}
-
-class _NumbersDisplayPageState extends State<_NumbersDisplayPage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(toolbarHeight: 36, title: const Text('Market colours')),
-      body: ListView(children: [
-        _settingsSectionHeader('Market'),
-        SwitchListTile(
-          title: const Text('Invert ASK / BID colours'),
-          subtitle: Text(kInvertAskBid ? 'ASK green · BID red' : 'ASK red · BID green',
-              style: TextStyle(color: AppColors.t38, fontSize: 12)),
-          value: kInvertAskBid,
-          onChanged: (v) async {
-            setState(() => kInvertAskBid = v);
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('invert_ask_bid', v);
-          },
-        ),
-      ]),
-    );
-  }
-}
-
 // ── App Appearance settings page ───────────────────────────────────────────────
 
 
@@ -934,7 +901,6 @@ Future<void> loadNumDecimalsPrefs() async {
   final prefs = await SharedPreferences.getInstance();
   kNoFpsLimit = prefs.getBool('no_fps_limit') ?? false;
   if (kNoFpsLimit) await applyNoFpsLimit(true);
-  kInvertAskBid = prefs.getBool('invert_ask_bid') ?? false;
   kCloudOpacity = (prefs.getDouble('res_cloud_opacity') ?? 0.35).clamp(0.10, 0.90);
   await loadRingLooks();
   final raw = prefs.getString('heatmap_scheme') ?? 'classic';
