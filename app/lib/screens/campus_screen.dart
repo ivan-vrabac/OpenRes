@@ -669,8 +669,10 @@ class _CampusScreenState extends State<CampusScreen> {
                   'gives back everything. The one in training can\'t be cancelled.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.t54)),
               const SizedBox(height: 14),
-              for (final l in locked.reversed) place('Unlocks at Campus level $l', Icons.lock_outline),
               if (queue.isNotEmpty) row(queue.first, training: true),
+              const SizedBox(height: 6),
+              Padding(padding: const EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text('Queue:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.t70))),
               if (waiting.isNotEmpty)
                 ReorderableListView(
                   shrinkWrap: true,
@@ -689,7 +691,9 @@ class _CampusScreenState extends State<CampusScreen> {
                       row(waiting[i], training: false, key: ValueKey(waiting[i]['sup']), index: i),
                   ],
                 ),
-              for (var i = queue.length; i < slots; i++) place('Free place', Icons.add_circle_outline),
+              for (var i = queue.isEmpty ? 0 : queue.length - 1; i < slots - (queue.isEmpty ? 0 : 1); i++)
+                place('Free place', Icons.add_circle_outline),
+              for (final l in locked) place('Unlocks at Campus level $l', Icons.lock_outline),
               const SizedBox(height: 4),
               Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
             ]),
