@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../branding.dart';
 import '../../constants.dart';
+import '../../models/player.dart' show Hex;
 import '../../models/player_provider.dart';
 import '../../ring_looks.dart';
 import '../../screens/settings_screen.dart' show kCloudOpacity,

@@ -76,6 +76,19 @@ extension _MapSheets on _MapTabState {
               tile('Build', 'ꞓ${fmtNum(cost)}', color: Colors.amber),
               tile('Lease 90 days, renew', 'ꞓ${fmtNum(here['lease'] as num)}'),
             ]),
+            if (tutorialFocus.value == _buildBtnKey) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.5))),
+                child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Is it worth it?', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
+                  Text('$_worthText Then slide to build.', style: TextStyle(fontSize: 13, height: 1.3)),
+                ]),
+              ),
+            ],
             if (quality < 30)
               const Padding(
                 padding: EdgeInsets.only(top: 6),

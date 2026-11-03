@@ -15,6 +15,7 @@ import '../widgets/popups.dart';
 import '../widgets/price_chart.dart';
 import '../v3/company.dart';
 import '../v3/sell_sheet.dart';
+import '../widgets/tutorial.dart' show tutorialBooksKey, tutorialFocus;
 /// Market (0.2.3 redo, owner 2026-10-31): one page, no tabs. A short tax note, your open buy orders
 /// as a strip of cards, then every tradable item as a card with what you'd get selling it now (the
 /// best buy order or the system) and its sales tax, which is lowest on items few companies make.
@@ -105,7 +106,11 @@ class _MarketScreenState extends State<MarketScreen> {
       onRetry: _load,
       builder: () => RefreshIndicator(
         onRefresh: _load,
-        child: ListView(key: const PageStorageKey('market_items'), padding: tabPadding(context, 12), children: [
+        // the tutorial's books card: the list stays still
+        child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, __) => ListView(
+            key: const PageStorageKey('market_items'), padding: tabPadding(context, 12),
+            physics: focus == tutorialBooksKey ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+            children: [
           Row(children: [
             Icon(Icons.receipt_long_outlined, size: 14, color: AppColors.t54),
             const SizedBox(width: 6),
@@ -168,7 +173,7 @@ class _MarketScreenState extends State<MarketScreen> {
           ),
           const SizedBox(height: 8),
           for (final e in shown) _itemCard(e, raw.containsKey(e['item'])),
-        ]),
+        ])),
       ),
     );
   }
@@ -179,6 +184,7 @@ class _MarketScreenState extends State<MarketScreen> {
     final tax = (e['taxRate'] as num? ?? 0).toDouble();
     final orders = (e['bestBid'] as num? ?? 0) > (e['systemSell'] as num? ?? 0);
     return Padding(
+      key: id == 'books' ? tutorialBooksKey : null,
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: Colors.white.withValues(alpha: 0.05),

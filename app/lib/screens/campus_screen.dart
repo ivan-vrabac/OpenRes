@@ -68,6 +68,8 @@ class _CampusScreenState extends State<CampusScreen> {
     final sv = r.data['now'] as String?;
     if (sv != null) _skew = parseUtc(sv).difference(DateTime.now().toUtc());
     setState(() => _sups = r.data);
+    final by = (r.data['byStep'] as List? ?? const []).cast<num>();
+    campusEducated.value = _queue.length + by.skip(1).fold<num>(0, (a, b) => a + b).toInt();
     if (r.data['allEducated'] == true) {
       final dm = await _co.call('/api/v3/darkmatter');
       if (mounted && dm.ok) setState(() => _dm = dm.data);

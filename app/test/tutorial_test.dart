@@ -7,7 +7,7 @@ void main() {
         home: Scaffold(body: Stack(children: [
           Align(key: target, alignment: Alignment.bottomCenter, child: const SizedBox(width: 50, height: 50)),
           TutorialOverlay(onDone: done, steps: [
-            TutorialStep('One', 'first', target),
+            TutorialStep('One', 'first', target: target),
             const TutorialStep('Two', 'second'),
           ]),
         ])),
@@ -46,7 +46,7 @@ void main() {
           SizedBox(key: far, height: 100),
           const SizedBox(height: 800),
         ]),
-        TutorialOverlay(onDone: () {}, steps: [TutorialStep('Far', 'text', far), const TutorialStep('After', 'next')]),
+        TutorialOverlay(onDone: () {}, steps: [TutorialStep('Far', 'text', target: far), const TutorialStep('After', 'next')]),
       ])),
     ));
     await t.pump(const Duration(milliseconds: 400));
@@ -68,7 +68,7 @@ void main() {
           Align(alignment: Alignment.bottomRight, child: SizedBox(key: onPage, width: 50, height: 50)),
           const SizedBox(),
         ]),
-        TutorialOverlay(onDone: () {}, steps: [TutorialStep('On map', 'text', onPage), const TutorialStep('After', 'next')]),
+        TutorialOverlay(onDone: () {}, steps: [TutorialStep('On map', 'text', target: onPage), const TutorialStep('After', 'next')]),
       ])),
     ));
     await t.pump(const Duration(milliseconds: 400));
@@ -80,30 +80,33 @@ void main() {
     expect(pages.page, 1);
   });
 
-  group('waiting for the Campus', () {
+  group('guided', () {
     late ValueNotifier<bool> placed;
     final target = GlobalKey();
-    var mapTaps = 0, tabTaps = 0;
+    var mapTaps = 0, tabTaps = 0, topTaps = 0;
 
     Future<void> campus(WidgetTester t) async {
       placed = ValueNotifier(false);
-      mapTaps = tabTaps = 0;
+      mapTaps = tabTaps = topTaps = 0;
       await t.pumpWidget(MaterialApp(
         home: Scaffold(body: Stack(children: [
           Positioned.fill(child: GestureDetector(onTap: () => mapTaps++, behavior: HitTestBehavior.opaque)),
+          Positioned(left: 0, right: 0, top: 0, height: 40,
+              child: GestureDetector(onTap: () => topTaps++, behavior: HitTestBehavior.opaque)),
           Positioned(left: 0, right: 0, bottom: 0, height: 60,
               child: GestureDetector(onTap: () => tabTaps++, behavior: HitTestBehavior.opaque)),
           Positioned(left: 100, right: 100, bottom: 70, height: 50, child: SizedBox(key: target)),
-          TutorialOverlay(onDone: () {}, changes: placed, passed: () => placed.value, steps: [
+          TutorialOverlay(onDone: () {}, guided: true, changes: placed, steps: [
             const TutorialStep('Welcome', 'hello'),
-            TutorialStep('Place', 'slide', target, null, false, true),
+            TutorialStep('Place', 'slide', target: target, done: () => placed.value),
             const TutorialStep('After', 'next'),
           ]),
         ])),
       ));
     }
 
-    testWidgets('no skipping, the map is free, the tab bar is not, placing goes on by itself', (t) async {
+    testWidgets('no skipping or going back; the map is free, its top buttons and the tab bar are not; done goes on',
+        (t) async {
       await campus(t);
       expect(find.text('Skip tutorial'), findsNothing);
       await t.tap(find.text('Next'));
@@ -111,9 +114,11 @@ void main() {
       await t.pump();
       expect(find.text('Place'), findsOneWidget);
       expect(find.text('Next'), findsNothing);
-      expect(find.text('Skip tutorial'), findsNothing);
+      expect(find.text('Back'), findsNothing);
       await t.tapAt(const Offset(400, 400));
       expect(mapTaps, 1);
+      await t.tapAt(const Offset(400, 10));
+      expect(topTaps, 0);
       await t.tapAt(const Offset(400, 590));
       await t.pump();
       expect(tabTaps, 0);
@@ -124,12 +129,22 @@ void main() {
       placed.value = true;
       await t.pump();
       expect(find.text('After'), findsOneWidget);
-      expect(find.text('Skip tutorial'), findsNothing);       // the last card has none
-      await t.tap(find.text('Back'));
-      await t.pump();
-      expect(find.text('Next'), findsOneWidget);              // done: a normal card now
+      expect(find.text('Back'), findsNothing);
+      await t.pumpWidget(const SizedBox());                   // ends its timers
+    });
+
+    testWidgets('read from Settings a task is a plain card', (t) async {
+      placed = ValueNotifier(false);
+      await t.pumpWidget(MaterialApp(home: Scaffold(body: Stack(children: [
+        SizedBox(key: target, width: 50, height: 50),
+        TutorialOverlay(onDone: () {}, steps: [
+          TutorialStep('Place', 'slide', target: target, done: () => placed.value),
+          const TutorialStep('After', 'next'),
+        ]),
+      ]))));
+      expect(find.text('Next'), findsOneWidget);
       expect(find.text('Skip tutorial'), findsOneWidget);
-      await t.pumpWidget(const SizedBox());                   // ends its timer
+      await t.pumpWidget(const SizedBox());
     });
   });
 }

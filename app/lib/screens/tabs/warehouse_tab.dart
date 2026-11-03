@@ -8,7 +8,7 @@ import '../../widgets/async_view.dart' show fmtCredits;
 import '../../widgets/cards.dart';
 import '../../widgets/slide_confirm.dart';
 import '../../widgets/top_banner.dart';
-import '../../widgets/tutorial.dart' show tutorialStorageKey;
+import '../../widgets/tutorial.dart' show tutorialFocus, tutorialStorageKey;
 
 import '../../app_colors.dart';
 import '../../widgets/popups.dart';
@@ -113,10 +113,13 @@ class _WarehouseTabState extends State<WarehouseTab> {
       'Special': [for (final e in entries) if (special.contains(e.key)) e],
     };
 
+    // the tutorial sells the first thing that can be sold
+    final firstSale = [for (final g in groups.values) ...g].where((e) => _tradable(co, e.key)).firstOrNull;
     return RefreshIndicator(
       onRefresh: co.refresh,
-      child: ListView(
-        key: tutorialStorageKey,
+      child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, list) => ListView(
+        // the tutorial's selling card: the list stays still
+        physics: focus == tutorialStorageKey ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
         padding: tabPadding(context, 12),
         children: [
           Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -160,19 +163,20 @@ class _WarehouseTabState extends State<WarehouseTab> {
           for (final g in groups.entries)
             if (g.value.isNotEmpty) ...[
               SectionLabel(g.key),
-              for (final e in g.value) _itemCard(co, e, cap),
+              for (final e in g.value) _itemCard(co, e, cap, key: identical(e, firstSale) ? tutorialStorageKey : null),
               const SizedBox(height: 12),
             ],
         ],
-      ),
+      )),
     );
   }
 
-  Widget _itemCard(Company co, MapEntry<String, double> e, double cap) {
+  Widget _itemCard(Company co, MapEntry<String, double> e, double cap, {Key? key}) {
     final shown = _shown(e.key, e.value);
     final tradable = _tradable(co, e.key);
     final apart = e.key == 'ta180m';
     return Padding(
+      key: key,
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: Colors.white.withValues(alpha: 0.05),

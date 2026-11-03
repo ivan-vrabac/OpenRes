@@ -309,6 +309,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _goToTab(int index) {
     if (index == _currentIndex) return;
+    // one slide only (owner 2026-11-03): a far tab first jumps next to the target, so the pages in
+    // between are never built and drawn on the way
+    if (_pageCtrl.hasClients && (index - _currentIndex).abs() > 1) {
+      _pageCtrl.jumpToPage(index > _currentIndex ? index : index + 2);
+    }
     _pageCtrl.animateToPage(
       index + 1,
       duration: const Duration(milliseconds: 300),
@@ -372,7 +377,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         // over everything, tab bar too: while it runs only its cards change the tab
         ValueListenableBuilder<TutorialRun?>(valueListenable: tutorialRun, builder: (_, run, __) => run == null
             ? const SizedBox.shrink()
-            : TutorialOverlay(steps: run.steps, onStep: _tutorialTab, changes: run.changes, passed: run.passed, onDone: () {
+            : TutorialOverlay(key: ObjectKey(run), steps: run.steps, onStep: _tutorialTab, changes: run.changes,
+                guided: run.guided, onDone: () {
                 _toTab(GameTabId.map);
                 run.onDone();
                 _offerStreak();
