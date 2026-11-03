@@ -38,7 +38,7 @@ class _CampusScreenState extends State<CampusScreen> {
   DateTime get _serverNow => DateTime.now().toUtc().add(_skew);
 
   /// Time left as text: never "expired", a finished one is "done".
-  static String _left(Duration d) => d.inSeconds <= 0 ? 'done' : fmtDuration(d.inSeconds / 86400);                              // the education step the player chose to train for                  // only the Visit button waits for this
+  static String _left(Duration d) => d.inSeconds <= 0 ? '' : fmtDuration(d.inSeconds / 86400);                              // the education step the player chose to train for                  // only the Visit button waits for this
   Timer? _tick;
 
   Company get _co => context.read<Company>();
@@ -643,8 +643,8 @@ class _CampusScreenState extends State<CampusScreen> {
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text(training ? 'In training · ${_left(left)}'
-                        : 'Waiting · done in ${left.inSeconds <= 0 ? 'a moment' : _left(left)}',
+                Text(training ? (left.inSeconds > 0 ? 'In training · ${_left(left)}' : 'In training')
+                        : (left.inSeconds > 0 ? 'Waiting · ready in ${_left(left)}' : 'Waiting'),
                     style: TextStyle(fontSize: 11, color: AppColors.t54)),
               ])),
               if (!training) ...[
@@ -721,6 +721,17 @@ class _CampusScreenState extends State<CampusScreen> {
                     final ids = [for (final q in waiting) q['sup']];
                     final moved = ids.removeAt(from);
                     ids.insert(to > from ? to - 1 : to, moved);
+                    // show the new order and its times at once, the server's answer follows
+                    final list = (_sups?['queue'] as List? ?? const []).cast<Map<String, dynamic>>();
+                    if (list.length > 1) {
+                      final rest = [for (final id in ids) list.skip(1).firstWhere((q) => q['sup'] == id)];
+                      var at = parseUtc(list.first['finish'] as String);
+                      for (final q in rest) {
+                        at = at.add(Duration(milliseconds: ((steps[(q['to'] as num).toInt()]['hours'] as num) * 3600000).round()));
+                        q['finish'] = at.toIso8601String().replaceAll('Z', '');
+                      }
+                      setSheet(() => _sups!['queue'] = [list.first, ...rest]);
+                    }
                     final r = await _co.call('/api/v3/education/order', {'sups': ids.join(',')});
                     if (!r.ok && ctx.mounted) AppNotify.show(ctx, r.message ?? 'Could not move it. Try again.', isError: true);
                     await reload();
