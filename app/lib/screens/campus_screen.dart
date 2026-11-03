@@ -600,11 +600,25 @@ class _CampusScreenState extends State<CampusScreen> {
 
   /// The education queue: places still locked by the Campus level on top, the class below. The first one is
   /// in training; the others can be dragged into another order or cancelled for a full refund.
-  void _queueSheet(List<Map<String, dynamic>> steps) {
-    showAppSheet<void>(
+  Future<void> _queueSheet(List<Map<String, dynamic>> steps) async {
+    // the times count down every second; when the one in training is done the queue reloads by itself
+    void Function(void Function())? redraw;
+    var reloading = false;
+    final tick = Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (redraw == null) return;
+      final q = _queue;
+      if (!reloading && q.isNotEmpty && !parseUtc(q.first['finish'] as String).isAfter(_serverNow)) {
+        reloading = true;
+        await _loadSups();
+        reloading = false;
+      }
+      try { redraw?.call(() {}); } catch (_) {}
+    });
+    await showAppSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        redraw = setSheet;
         final s = _sups ?? const {};
         final slots = (s['slots'] as num?)?.toInt() ?? 1;
         final level = (s['campusLevel'] as num?)?.toInt() ?? 1;
@@ -625,7 +639,7 @@ class _CampusScreenState extends State<CampusScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
             decoration: BoxDecoration(color: _stepColor(to).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
-              Icon(training ? Icons.school : Icons.hourglass_empty, size: 18, color: _stepColor(to)),
+              Icon(training ? Icons.school : Icons.hourglass_bottom, size: 18, color: _stepColor(to)),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -725,6 +739,8 @@ class _CampusScreenState extends State<CampusScreen> {
         ));
       }),
     );
+    redraw = null;
+    tick.cancel();
   }
 
   static Color _stepColor(int k) => const [
