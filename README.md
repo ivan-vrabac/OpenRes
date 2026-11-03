@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/ivan-vrabac/OpenRes/actions/workflows/ci.yml/badge.svg)](https://github.com/ivan-vrabac/OpenRes/actions/workflows/ci.yml)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
+[![Get it on Google Play](https://img.shields.io/badge/Google%20Play-Get%20OpenRes-34A853?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=resources.vrabac.eu)
 
 A self-hostable location-based business game, with its source open for non-commercial use.
 You walk around the real world, survey for resources, lease hexes, run plants, grow your
@@ -16,6 +17,11 @@ Made by **Ivan Vrabac** ([COPYRIGHT.md](COPYRIGHT.md)).
 
 > **Artwork notice**: some pictures in the repository are generated placeholders (flat
 > coloured shapes with short labels). See [COPYRIGHT.md](COPYRIGHT.md).
+
+## Support the project
+
+If you enjoy OpenRes, you can support me by buying the app on [Google Play](https://play.google.com/store/apps/details?id=resources.vrabac.eu).
+And if you like the code, a star on this repository helps more people find it.
 
 ## Quick start
 
