@@ -10,6 +10,8 @@ Items have text keys ("iron_ore", "books"). Quantities are whole units, except e
 """
 from __future__ import annotations
 
+import os
+
 
 # ── Raw items: where they come from and how fast ───────────────────────────────────────────────
 # Income tiers: what a hex earns per hour at 100 % quality without a supervisor.
@@ -274,6 +276,14 @@ EDUCATION = {
     4: ("Master's", 2.00, 12, 1_000, 20_000_000),
 }
 QUEUE_UNLOCKS = (10, 20, 30, 40, 50)         # one more education queue slot at each of these levels
+
+
+# dev server only (docker-compose of P:/Resources-dev): every education takes this many seconds, for testing
+DEV_EDUCATION_SECONDS = float(os.environ.get("DEV_EDUCATION_SECONDS") or 0)
+
+
+def education_hours(step: int) -> float:
+    return DEV_EDUCATION_SECONDS / 3600 if DEV_EDUCATION_SECONDS else EDUCATION[step][2]
 
 
 def queue_slots(campus_level: int) -> int:

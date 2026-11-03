@@ -31,7 +31,7 @@ LIMITS = {
     "/api/v1/market/system": (30, 60), "/api/v1/market/cancel": (20, 60),
     "/api/v3/plants/build": (20, 60), "/api/v3/plants/upgrade": (60, 60), "/api/v3/plants/run": (60, 60),
     "/api/v3/plants/recipe": (30, 60), "/api/v3/supervisors/assign": (60, 60),
-    "/api/v3/supervisors/unassign": (60, 60), "/api/v3/education/start": (30, 60),
+    "/api/v3/supervisors/unassign": (60, 60), "/api/v3/education/start": (30, 60), "/api/v3/education/cancel": (30, 60), "/api/v3/education/order": (30, 60),
     "/api/v3/campus/upgrade": (20, 60), "/api/v3/storage/upgrade": (20, 60),
     "/api/v1/quests/claim": (20, 60), "/api/v1/account/rename": (5, 3600),
     "/api/v3/integrity/report": (6, 3600),

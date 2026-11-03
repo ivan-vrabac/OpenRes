@@ -451,7 +451,7 @@ class _CampusScreenState extends State<CampusScreen> {
     int count(int k) => k < byStep.length ? byStep[k] : 0;
     int ready(int k) => k == 0 ? 0 : count(k - 1) - (queuedFor[k] ?? 0);
     final choices = [for (var k = 1; k < steps.length; k++) if (ready(k) > 0) k];
-    final pick = choices.contains(_pick) ? _pick! : (choices.isEmpty ? null : choices.first);
+    final pick = choices.contains(_pick) ? _pick : (choices.isEmpty ? null : choices.first);
 
     // the team by education, as one bar
     final bar = Row(children: [
@@ -502,39 +502,40 @@ class _CampusScreenState extends State<CampusScreen> {
       );
     }
 
-    // one action: train the next one
+    // one action: four fixed steps; a locked one says why, a step everyone has passed goes away
+    final shown = [for (var k = 1; k < steps.length; k++) if ([for (var j = 0; j < k; j++) count(j)].fold(0, (a, b) => a + b) > 0) k];
     Widget action;
-    if (pick == null) {
-      action = Text(count(steps.length - 1) == total ? 'Everyone has the highest education.'
-              : 'Everyone who can be trained is already in class.',
-          textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.t54));
+    if (shown.isEmpty) {
+      action = Text('Everyone has the highest education.', textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: AppColors.t54));
     } else {
-      final st = steps[pick];
-      final needBooks = (st['books'] as num).toDouble();
-      final cost = (st['credits'] as num).toDouble();
-      final why = queue.length >= slots ? 'The class is full: wait until it ends'
+      final st = pick == null ? null : steps[pick];
+      final needBooks = st == null ? 0.0 : (st['books'] as num).toDouble();
+      final cost = st == null ? 0.0 : (st['credits'] as num).toDouble();
+      final why = st == null ? 'Everyone who can be trained is already in the queue'
+          : queue.length >= slots ? 'The queue is full: wait for a place'
           : books < needBooks ? 'Needs ${fmtNum(needBooks)} books, you have ${fmtNum(books)}'
           : co.credits < cost ? 'Needs ${fmtCredits(cost)}'
           : null;
       action = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (choices.length > 1) ...[
-          Wrap(spacing: 8, alignment: WrapAlignment.center, children: [
-            for (final k in choices)
-              ChoiceChip(
-                label: Text('${steps[k]['name']}  +${((steps[k]['boost'] as num) * 100).round()} %'),
-                selected: k == pick,
-                onSelected: (_) => setState(() => _pick = k),
-              ),
-          ]),
-          const SizedBox(height: 8),
-        ],
+        Row(children: [
+          for (final k in shown) ...[
+            if (k != shown.first) const SizedBox(width: 6),
+            Expanded(child: _stepButton(steps[k]['name'] as String, _stepColor(k),
+                selected: k == pick, locked: ready(k) <= 0,
+                onTap: () => ready(k) <= 0
+                    ? AppNotify.show(context, 'You have no eligible supervisors for this training', isError: true)
+                    : setState(() => _pick = k))),
+          ],
+        ]),
+        const SizedBox(height: 10),
         FilledButton.icon(
-          onPressed: why == null && !_busy ? () => _educate(pick) : null,
+          onPressed: why == null && !_busy ? () => _educate(pick!) : null,
           icon: const Icon(Icons.school_outlined, size: 18),
-          label: Text('Train one for ${st['name']}'),
+          label: Text(st == null ? 'Train' : 'Train one for ${st['name']}'),
         ),
         const SizedBox(height: 6),
-        Text(why ?? '${_hours(st['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)} · +${((st['boost'] as num) * 100).round()} % on a hex',
+        Text(why ?? '${_hours(st!['hours'] as num)} · ${fmtNum(needBooks)} books · ${fmtCredits(cost)} · +${((st['boost'] as num) * 100).round()} % on a hex',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: why == null ? AppColors.t60 : Colors.orangeAccent)),
       ]);
@@ -545,6 +546,16 @@ class _CampusScreenState extends State<CampusScreen> {
         Text('$total', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1)),
         const SizedBox(width: 8),
         Expanded(child: Text('supervisors · $onHexes on hexes', style: TextStyle(fontSize: 13, color: AppColors.t60))),
+        IconButton(
+          icon: Badge(
+            isLabelVisible: queue.isNotEmpty,
+            label: Text('${queue.length}'),
+            child: Icon(Icons.format_list_numbered, size: 20, color: AppColors.accent),
+          ),
+          tooltip: 'Education queue',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _queueSheet(steps),
+        ),
         IconButton(
           icon: Icon(Icons.info_outline, size: 20, color: AppColors.accent),
           tooltip: 'How supervisors work',
@@ -560,6 +571,132 @@ class _CampusScreenState extends State<CampusScreen> {
       const SizedBox(height: 14),
       action,
     ]));
+  }
+
+  Widget _stepButton(String name, Color color, {required bool selected, required bool locked, required VoidCallback onTap}) {
+    return Material(
+      color: selected ? color.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.05),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: selected ? color : Colors.white12, width: selected ? 1.5 : 1)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: SizedBox(height: 44, child: Stack(alignment: Alignment.center, children: [
+          Opacity(opacity: locked ? 0.35 : 1, child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? color : null))),
+          if (locked) Icon(Icons.lock, size: 18, color: AppColors.t70),
+        ])),
+      ),
+    );
+  }
+
+  /// The education queue: places still locked by the Campus level on top, the class below. The first one is
+  /// in training; the others can be dragged into another order or cancelled for a full refund.
+  void _queueSheet(List<Map<String, dynamic>> steps) {
+    showAppSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        final s = _sups ?? const {};
+        final slots = (s['slots'] as num?)?.toInt() ?? 1;
+        final level = (s['campusLevel'] as num?)?.toInt() ?? 1;
+        final locked = [for (final l in (s['slotLevels'] as List? ?? const [])) if ((l as num).toInt() > level) l.toInt()];
+        final queue = _queue;
+        final waiting = queue.skip(1).toList();
+        Future<void> reload() async {
+          await _loadSups();
+          if (ctx.mounted) setSheet(() {});
+        }
+
+        Widget row(Map<String, dynamic> q, {required bool training, Key? key, int? index}) {
+          final to = (q['to'] as num).toInt();
+          final left = parseUtc(q['finish'] as String).difference(DateTime.now().toUtc());
+          return Container(
+            key: key,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+            decoration: BoxDecoration(color: _stepColor(to).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+            child: Row(children: [
+              Icon(training ? Icons.school : Icons.hourglass_empty, size: 18, color: _stepColor(to)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${steps[to]['name']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(training ? 'In training · ${left.isNegative ? 'done' : fmtDuration(left.inSeconds / 86400)}'
+                        : 'Waiting · done in ${left.isNegative ? 'a moment' : fmtDuration(left.inSeconds / 86400)}',
+                    style: TextStyle(fontSize: 11, color: AppColors.t54)),
+              ])),
+              if (!training) ...[
+                IconButton(
+                  tooltip: 'Cancel, full refund',
+                  icon: const Icon(Icons.close, size: 20, color: Colors.redAccent),
+                  onPressed: () async {
+                    final r = await _co.call('/api/v3/education/cancel', {'sup': q['sup']});
+                    if (!ctx.mounted) return;
+                    AppNotify.show(ctx, r.ok ? 'Cancelled: ${fmtNum(r.data['books'] as num)} books and '
+                        '${fmtCredits(r.data['credits'] as num)} back' : (r.message ?? 'Could not cancel. Try again.'),
+                        isError: !r.ok);
+                    await _co.refresh();
+                    await reload();
+                  },
+                ),
+                ReorderableDragStartListener(index: index!, child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.drag_handle))),
+              ],
+            ]),
+          );
+        }
+
+        Widget place(String text, IconData icon) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white12), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Icon(icon, size: 18, color: AppColors.t38),
+                const SizedBox(width: 10),
+                Text(text, style: TextStyle(fontSize: 13, color: AppColors.t54)),
+              ]),
+            );
+
+        return SafeArea(child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.85),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Education queue', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+              const SizedBox(height: 4),
+              Text('One trains at a time, the rest wait their turn. Drag to change the order; cancelling a waiting one '
+                  'gives back everything. The one in training can\'t be cancelled.',
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.t54)),
+              const SizedBox(height: 14),
+              for (final l in locked.reversed) place('Unlocks at Campus level $l', Icons.lock_outline),
+              if (queue.isNotEmpty) row(queue.first, training: true),
+              if (waiting.isNotEmpty)
+                ReorderableListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  onReorder: (from, to) async {
+                    final ids = [for (final q in waiting) q['sup']];
+                    final moved = ids.removeAt(from);
+                    ids.insert(to > from ? to - 1 : to, moved);
+                    final r = await _co.call('/api/v3/education/order', {'sups': ids.join(',')});
+                    if (!r.ok && ctx.mounted) AppNotify.show(ctx, r.message ?? 'Could not move it. Try again.', isError: true);
+                    await reload();
+                  },
+                  children: [
+                    for (var i = 0; i < waiting.length; i++)
+                      row(waiting[i], training: false, key: ValueKey(waiting[i]['sup']), index: i),
+                  ],
+                ),
+              for (var i = queue.length; i < slots; i++) place('Free place', Icons.add_circle_outline),
+              const SizedBox(height: 4),
+              Center(child: TextButton(onPressed: () => popIfCurrent(ctx), child: const Text('Close'))),
+            ]),
+          ),
+        ));
+      }),
+    );
   }
 
   static Color _stepColor(int k) => const [

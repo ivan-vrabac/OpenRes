@@ -495,3 +495,34 @@ def test_a_visit_every_8_hours_and_a_new_campus_can_visit_at_once():
         conn.commit()
     assert call("/api/v3/state", sid)["campus"]["nextVisit"] is None
     assert call("/api/v3/campus/visit", sid, lat=at[0], lng=at[1])["err"] == 0
+
+
+def test_education_queue_cancel_refunds_and_reorders():
+    hid, sid = setup_hq("edq", at=(45.21, 16.61))
+    campus_level(hid, 20)                                    # 3 places in class
+    with main.get_db() as conn:
+        co.ensure_supervisors(conn, hid, 20)
+        conn.execute("UPDATE players SET credits=? WHERE hID=?", (10 ** 9, hid))
+        conn.commit()
+    put(hid, "books", 100)
+    sups = [s["id"] for s in call("/api/v3/supervisors", sid)["supervisors"]][:3]
+    for x in sups:
+        assert call("/api/v3/education/start", sid, sup=x)["err"] == 0
+    q = call("/api/v3/supervisors", sid)["queue"]
+    assert [e["sup"] for e in q] == sups and call("/api/v3/supervisors", sid)["slotLevels"] == [10, 20, 30, 40, 50]
+    assert call("/api/v3/education/cancel", sid, sup=sups[0])["code"] == "in_training"
+    assert call("/api/v3/education/order", sid, sups=f"{sups[2]},{sups[1]}")["err"] == 0
+    assert [e["sup"] for e in call("/api/v3/supervisors", sid)["queue"]] == [sups[0], sups[2], sups[1]]
+    with main.get_db() as conn:
+        before = conn.execute("SELECT credits FROM players WHERE hID=?", (hid,)).fetchone()[0]
+        books = conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item='books'", (hid,)).fetchone()[0]
+    r = call("/api/v3/education/cancel", sid, sup=sups[2])
+    assert r["err"] == 0 and r["credits"] == g.EDUCATION[1][4] and r["books"] == g.EDUCATION[1][3]
+    with main.get_db() as conn:
+        assert conn.execute("SELECT credits FROM players WHERE hID=?", (hid,)).fetchone()[0] == before + g.EDUCATION[1][4]
+        assert conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item='books'", (hid,)).fetchone()[0] == books + g.EDUCATION[1][3]
+    q = call("/api/v3/supervisors", sid)["queue"]
+    assert [e["sup"] for e in q] == [sups[0], sups[1]]
+    gap = datetime.datetime.fromisoformat(q[1]["finish"]) - datetime.datetime.fromisoformat(q[0]["finish"])
+    assert abs(gap.total_seconds() - g.education_hours(1) * 3600) < 2        # moved up when the other left
+    assert call("/api/v3/education/order", sid, sups="999")["code"] == "bad_input"

@@ -949,8 +949,9 @@ def install_campus(api) -> None:
                 "byStep": [sum(1 for s in sups if s["edu"] == k) for k in range(5)],
                 "supervisors": sups, "queue": queue, "slots": g.queue_slots(row["campus_level"]),
                 "allEducated": total == g.CAMPUS_MAX * g.SUPERVISORS_PER_LEVEL and maxed == total,
-                "steps": [{"name": n, "boost": b, "hours": hrs, "books": bk, "credits": c}
-                          for n, b, hrs, bk, c in g.EDUCATION.values()]}
+                "slotLevels": list(g.QUEUE_UNLOCKS), "campusLevel": row["campus_level"],
+                "steps": [{"name": n, "boost": b, "hours": g.education_hours(k), "books": bk, "credits": c}
+                          for k, (n, b, _h, bk, c) in g.EDUCATION.items()]}
 
     @api.endpoint("/api/v3/supervisors/assign")
     def supervisors_assign(conn, hid, form):
@@ -1002,7 +1003,8 @@ def install_campus(api) -> None:
             if len(queue) >= g.queue_slots(row["campus_level"]):
                 raise econ.GameError("queue", "The education queue is full")
             step = sup["edu"] + 1
-            _name, _boost, hours, books, cost = g.EDUCATION[step]
+            _name, _boost, _h, books, cost = g.EDUCATION[step]
+            hours = g.education_hours(step)
             take_stock(conn, hid, "books", books)
             pay(conn, hid, cost, "education")
             conn.execute("UPDATE players SET xp=COALESCE(xp,0)+? WHERE hID=?",
@@ -1014,6 +1016,59 @@ def install_campus(api) -> None:
             econ.emit(conn, "education_started", hid, {"step": step}, public=False)
             log(conn, hid, "education", step=g.EDUCATION[step][0], cost=cost, books=books)
         return {"err": 0, "step": step, "finish": iso(finish)}
+
+    def class_rows(conn, hid):
+        return conn.execute("SELECT id, sup_id, to_step, finish_at FROM co_education WHERE hid=? ORDER BY finish_at",
+                            (hid,)).fetchall()
+
+    def retime(conn, rows) -> None:
+        """One after another: the first keeps its time (it is in training), each next one starts when the one
+        before it ends."""
+        prev = None
+        for i, r in enumerate(rows):
+            if i == 0:
+                prev = parse(r["finish_at"])
+                continue
+            prev = prev + datetime.timedelta(hours=g.education_hours(r["to_step"]))
+            conn.execute("UPDATE co_education SET finish_at=? WHERE id=?", (iso(prev), r["id"]))
+
+    @api.endpoint("/api/v3/education/cancel")
+    def education_cancel(conn, hid, form):
+        """A supervisor waiting in the queue leaves it: books and credits back in full. The one in training
+        can't be cancelled."""
+        sup_id = int_arg(form, "sup")
+        with econ.tx(conn):
+            row = collect(conn, hid)
+            rows = class_rows(conn, hid)
+            idx = next((i for i, r in enumerate(rows) if r["sup_id"] == sup_id), None)
+            if idx is None:
+                raise econ.GameError("not_found", "This supervisor isn't in the queue")
+            if idx == 0:
+                raise econ.GameError("in_training", "This training has started and can't be cancelled")
+            r = rows[idx]
+            name, _b, _h, books, cost = g.EDUCATION[r["to_step"]]
+            conn.execute("INSERT INTO co_stock(hid, item, qty) VALUES(?,?,?) ON CONFLICT(hid, item) "
+                         "DO UPDATE SET qty=qty+excluded.qty", (hid, "books", books))
+            econ.credit(conn, hid, cost, "education_refund", str(sup_id))
+            conn.execute("UPDATE players SET xp=MAX(0, COALESCE(xp,0)-?) WHERE hID=?",
+                         (books * g.PRICES["books"] * g.XP_PER_CREDIT["education"], hid))
+            conn.execute("DELETE FROM co_education WHERE id=?", (r["id"],))
+            retime(conn, [x for x in rows if x["id"] != r["id"]])
+            log(conn, hid, "education_cancelled", step=name, cost=cost, books=books)
+        return {"err": 0, "books": books, "credits": cost}
+
+    @api.endpoint("/api/v3/education/order")
+    def education_order(conn, hid, form):
+        """New order of the waiting supervisors (`sups`, comma separated); the one in training stays first."""
+        order = [int(x) for x in (form.get("sups") or "").split(",") if x.strip().lstrip("-").isdigit()]
+        with econ.tx(conn):
+            collect(conn, hid)
+            rows = class_rows(conn, hid)
+            waiting = {r["sup_id"]: r for r in rows[1:]}
+            if sorted(order) != sorted(waiting) or len(set(order)) != len(order):
+                raise econ.GameError("bad_input", "The queue changed: open it again")
+            retime(conn, rows[:1] + [waiting[s] for s in order])
+        return {"err": 0}
 
 
 _add_log = None          # main.add_proto, set by install(): the player's activity log (7 days)
@@ -1111,8 +1166,8 @@ def install_views(api) -> None:
                 "raw": {item: {"op": op, "tier": tier, "unlock": g.TIER_UNLOCK[tier]}
                         for op, (_n, _l, items, _u) in g.OPERATIONS.items() if op != "fishing_port"
                         for item, (tier, _r) in items.items()},
-                "education": [{"name": n, "boost": b, "hours": h, "books": bk, "credits": c}
-                              for n, b, h, bk, c in g.EDUCATION.values()],
+                "education": [{"name": n, "boost": b, "hours": g.education_hours(k), "books": bk, "credits": c}
+                              for k, (n, b, _h, bk, c) in g.EDUCATION.items()],
                 "campusStages": [{"from": lv, "name": n} for lv, n in g.CAMPUS_STAGES], "campusMax": g.CAMPUS_MAX,
                 "leaseDays": g.LEASE_DAYS, "leaseCriticalDays": g.LEASE_CRITICAL_DAYS,
                 "surveyRadius": {"perLevel": g.SURVEY_RADIUS_STEP},
