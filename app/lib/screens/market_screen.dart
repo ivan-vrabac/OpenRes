@@ -235,7 +235,9 @@ Future<void> showMarketItemSheet(BuildContext context, String item) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    showDragHandle: true,
+    // Flutter keeps the handle draggable even with enableDrag off: the tutorial gets no handle at all
+    // (owner 2026-11-03: swiped the Books step away)
+    showDragHandle: !tour,
     isDismissible: !tour,
     enableDrag: !tour,
     backgroundColor: AppColors.bg,
