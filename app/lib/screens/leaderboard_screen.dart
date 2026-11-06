@@ -368,18 +368,20 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
           value: all ? 'ꞓ${_short(r['perHour'] as num)}' : _short((r['perHour'] as num).round()),
           middle: Text('${r['count']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(
+          // owner 2026-11-06: the buttons never move: no check mark, fixed width, and the item list's place is kept
+          SizedBox(height: 48, child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
             child: Row(children: [
-              SegmentedButton<String>(
+              SizedBox(width: 210, child: SegmentedButton<String>(
                 segments: const [ButtonSegment(value: 'all', label: Text('All')),
                   ButtonSegment(value: 'raw', label: Text('Hexes')), ButtonSegment(value: 'product', label: Text('Plants'))],
                 selected: {_kind},
+                showSelectedIcon: false,
                 style: const ButtonStyle(visualDensity: VisualDensity.compact),
                 onSelectionChanged: (v) { setState(() { _kind = v.first; _item = null; }); load(); },
-              ),
+              )),
               const SizedBox(width: 8),
-              if (!all) Expanded(
+              if (all) const Expanded(child: SizedBox.shrink()) else Expanded(
                 child: DropdownButton<String>(
                   isExpanded: true,
                   value: options.contains(item) ? item : null,
@@ -394,7 +396,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
                 ),
               ),
             ]),
-          ),
+          )),
           controls(),
           if (all) _note('Everything a company makes in an hour (hexes and plants), valued at market prices.'),
           _infoRow(all ? 'Hexes + levels' : _kind == 'raw' ? 'Hexes' : 'Levels', all ? 'Value / h' : 'Output / h'),

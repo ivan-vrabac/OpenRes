@@ -16,3 +16,9 @@ def test_supervisors_queue_and_efficiency():
     assert g.queue_slots(1) == 1 and g.queue_slots(10) == 2 and g.queue_slots(50) == 6
     assert g.efficiency(6.9) == 1.0 and g.efficiency(7) == 0.9 and g.efficiency(100) == 0.3
     assert g.campus_stage(1) == "Temporary camp" and g.campus_stage(50) == "Corporate campus"
+
+
+def test_book_rewards_grow_with_the_campus():
+    """Owner 2026-11-06: books x (1 + level // 5) for quests and the daily reward."""
+    assert [g.quest_books(lv) for lv in (1, 4, 5, 10, 25, 50)] == [10, 10, 20, 30, 60, 110]
+    assert g.streak_materials(1, 1) == {"books": 10} and g.streak_materials(30, 10) == {"books": 1500}

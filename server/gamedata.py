@@ -435,8 +435,18 @@ def streak_reward(day: int, campus_level: int) -> int:
     return int(quest_credits(campus_level) * [c for d, c in STREAK_REWARD if day >= d][-1])
 
 
-def streak_materials(day: int) -> dict:
-    return [m for d, m in STREAK_MATERIALS if day >= d][-1]
+def books_factor(campus_level: int) -> int:
+    """Book rewards grow with the Campus (owner 2026-11-06): x1 at levels 1-4, x2 from 5, x3 from 10, ... x11 at 50."""
+    return 1 + max(0, campus_level) // 5
+
+
+def quest_books(campus_level: int) -> int:
+    return QUEST_BOOKS * books_factor(campus_level)
+
+
+def streak_materials(day: int, campus_level: int = 1) -> dict:
+    return {k: v * books_factor(campus_level) if k == "books" else v
+            for k, v in [m for d, m in STREAK_MATERIALS if day >= d][-1].items()}
 
 
 def streak_bonus(day: int, campus_level: int) -> int:

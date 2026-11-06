@@ -1137,7 +1137,7 @@ def streak_status(row, now=None) -> dict:
     return {"day": day, "current": current, "claimed": claimed, "missedOne": bool(missed and current),
             "credits": g.streak_reward(day, row["campus_level"]),
             "bonus": g.streak_bonus(day, row["campus_level"]),
-            "materials": g.streak_materials(day),
+            "materials": g.streak_materials(day, row["campus_level"]),
             "nextBonus": {"day": nxt, "credits": g.streak_bonus(nxt, row["campus_level"])},
             "best": max(row["streak_best"] if "streak_best" in row.keys() else 0, current)}
 
@@ -1151,7 +1151,8 @@ def install_streak(api) -> None:
         with econ.tx(conn):
             row = collect(conn, hid)
         return {"err": 0, **streak_status(row),
-                "table": [{"from": d, "credits": g.streak_reward(d, row["campus_level"]), "materials": g.streak_materials(d)}
+                "table": [{"from": d, "credits": g.streak_reward(d, row["campus_level"]),
+                           "materials": g.streak_materials(d, row["campus_level"])}
                           for d, _ in g.STREAK_REWARD],
                 "bonuses": [{"every": e, "credits": g.quest_credits(row["campus_level"]) * t} for e, t in g.STREAK_BONUS]}
 
