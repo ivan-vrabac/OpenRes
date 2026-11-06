@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""server/data/countries.wkb.gz from Natural Earth (public domain, naturalearthdata.com): the 1:10m
-countries, simplified to ~100 m, one geometry per two-letter country code. countries.py uses it to
-give a Campus the country it stands in (owner 2026-11-06).
+"""server/data/countries.wkb.gz: country borders from OpenStreetMap (owner 2026-11-06), for countries.py.
 
-    python tools/make_countries.py <ne_10m_admin_0_countries.geojson>
+Source: geo-maps "countries-coastline-10m" (simonepri/geo-maps v0.6.0): OpenStreetMap country borders
+clipped at the coastline, 10 m resolution. Data (c) OpenStreetMap contributors, ODbL 1.0
+(https://www.openstreetmap.org/copyright); so is the file made here.
 
-The file is gzipped: per country 2 bytes of code, 4 bytes of length (little endian), then its WKB.
+    python tools/make_countries.py <countries-coastline-10m.geo.json>
+
+Two fixes on top: Antarctica reaches the South Pole (the source, like web maps, stops at 85.05 S), and
+Crimea is Ukraine as the UN recognises it (the source has it in both Ukraine and Russia: Russia's piece
+there, the only one inside CRIMEA_BOX, is dropped).
+
+Codes: the source has ISO 3166 alpha-3 codes, tools/iso3_to_iso2.json turns them into the two-letter codes
+of the flag pictures. The file is gzipped: per country 2 bytes of code, 4 bytes of length (little endian),
+then its WKB.
 """
 import gzip
 import json
@@ -17,26 +25,30 @@ from pathlib import Path
 import shapely
 from shapely.geometry import shape
 
-OUT = Path(__file__).resolve().parent.parent / "server" / "data" / "countries.wkb.gz"
+HERE = Path(__file__).resolve().parent
+OUT = HERE.parent / "server" / "data" / "countries.wkb.gz"
 
-# Natural Earth areas without an ISO code that clearly belong to one; the rest (disputed reefs,
-# glaciers, Bir Tawil) are left out and take the nearest country.
-EXTRA = {"Dhekelia": "gb", "Akrotiri": "gb", "Somaliland": "so", "N. Cyprus": "cy",
-         "Cyprus U.N. Buffer Zone": "cy", "USNB Guantanamo Bay": "cu"}
+
+CRIMEA_BOX = (32.3, 44.2, 36.8, 46.3)          # west, south, east, north: the peninsula and Sevastopol
 
 
 def main(path):
+    a3to2 = json.load(open(HERE / "iso3_to_iso2.json", encoding="utf-8"))
     parts = defaultdict(list)
     for f in json.load(open(path, encoding="utf-8"))["features"]:
-        p = f["properties"]
-        cc = str(p.get("ISO_A2_EH") or "").lower()
-        if len(cc) != 2 or not cc.isalpha():
-            cc = EXTRA.get(p.get("NAME"), "")
-        if cc:
-            parts[cc].append(shape(f["geometry"]).buffer(0))
+        parts[a3to2[f["properties"]["A3"]]].append(shape(f["geometry"]))
+    geoms = {cc: shapely.make_valid(shapely.union_all(g)) if len(g) > 1 else g[0] for cc, g in parts.items()}
+    geoms["aq"] = shapely.union(geoms["aq"], shapely.box(-180, -90, 180, -85.0))
+    # the source has Crimea twice, in Ukraine and in Russia: drop Russia's pieces there
+    box = shapely.box(*CRIMEA_BOX)
+    ru = shapely.get_parts(geoms["ru"])
+    drop = [i for i, g in enumerate(ru) if box.contains(g)]
+    print("Crimea: dropped", len(drop), "Russian pieces,", round(sum(ru[i].area for i in drop) * 111 * 111 * 0.72), "km2;",
+          "Ukraine covers Simferopol:", geoms["ua"].contains(shapely.Point(34.1, 44.95)))
+    geoms["ru"] = shapely.multipolygons([g for i, g in enumerate(ru) if i not in set(drop)])
     out = b""
-    for cc, geoms in sorted(parts.items()):
-        wkb = shapely.to_wkb(shapely.simplify(shapely.union_all(geoms), 0.001, preserve_topology=True))
+    for cc, g in sorted(geoms.items()):
+        wkb = shapely.to_wkb(g)
         out += cc.encode() + struct.pack("<I", len(wkb)) + wkb
     data = gzip.compress(out, 9)
     OUT.write_bytes(data)

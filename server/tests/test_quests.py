@@ -581,5 +581,9 @@ def test_countries_on_both_sides_of_tricky_borders():
                            (48.9850, -123.0600): "us", (49.0150, -123.0800): "ca",  # Point Roberts
                            (37.9300, 126.6800): "kr", (37.9700, 126.5500): "kp",    # the DMZ
                            (22.3200, 114.1700): "hk", (22.5450, 114.0600): "cn",
-                           (43.9356, 12.4473): "sm", (-29.3150, 27.4850): "ls"}.items():
+                           (43.9356, 12.4473): "sm", (-29.3150, 27.4850): "ls",
+                           (41.9022, 12.4568): "va", (43.7440, 7.4220): "fr",       # the Vatican; Beausoleil by Monaco
+                           (47.6960, 8.6880): "de", (45.9690, 8.9710): "it",        # Busingen, Campione (in Switzerland)
+                           (51.4400, 4.9300): "be", (45.8470, 15.6800): "si",       # Baarle-Hertog; Obrezje
+                           (44.95, 34.1): "ua", (45.04, 38.98): "ru"}.items():      # Crimea is Ukraine (UN)
         assert countries.country_at(lat, lng) == cc, (lat, lng, cc)
