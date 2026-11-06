@@ -834,14 +834,15 @@ def install(api) -> None:
 
     @api.endpoint("/api/v3/map")
     def map_view(conn, hid, form):
-        """Everything on the map in an area, in one answer: the Campuses (biggest first, yours always),
+        """Everything on the map in an area, in one answer: the Campuses (yours always, then the biggest; at the same
+        level the one with more invested, then the older company),
         and the hexes in full (`detail`=1, up close, nearest the centre first) or as flat [lat, lng, ...]
         dots for the clouds (`detail`=0). `more` = the answer was cut off at a limit."""
         s, w = float_arg(form, "south", lo=-90, hi=90), float_arg(form, "west", lo=-180, hi=180)
         n, e = float_arg(form, "north", lo=-90, hi=90), float_arg(form, "east", lo=-180, hi=180)
         campuses = conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name FROM co_state c "
                                 "JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 AND c.campus_lat BETWEEN ? AND ? "
-                                "AND c.campus_lng BETWEEN ? AND ? ORDER BY c.hid=? DESC, c.campus_level DESC LIMIT ?",
+                                "AND c.campus_lng BETWEEN ? AND ? ORDER BY c.hid=? DESC, c.campus_level DESC, p.xp DESC, p.created_at LIMIT ?",
                                 (s, n, w, e, hid, MAP_CAMPUSES)).fetchall()
         res = {"err": 0, "more": len(campuses) == MAP_CAMPUSES,
                "campuses": [{"own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
@@ -1187,7 +1188,7 @@ def install_views(api) -> None:
         best = {}
         for r in conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name, p.country_code "
                               "FROM co_state c JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 "
-                              "AND c.campus_lat IS NOT NULL ORDER BY c.campus_level DESC, c.hid"):
+                              "AND c.campus_lat IS NOT NULL ORDER BY c.campus_level DESC, p.xp DESC, p.created_at, c.hid"):
             cc = (r["country_code"] or "").lower()
             key = cc or f"{r['campus_lat'] // 10}:{r['campus_lng'] // 10}"
             if key not in best:

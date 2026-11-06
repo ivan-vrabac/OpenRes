@@ -570,3 +570,26 @@ def test_company_names_real_letters_only():
                 "ab", "a" * 26, "Z\u0351\u036b\u0343\u036a alg"):
         assert names.name_problem(bad), repr(bad)
     assert names.name_problem("Rоugh Diamonds") == "Use one alphabet in your company name"   # a Cyrillic o
+
+
+def test_every_day_has_one_quick_quest():
+    """Owner 2026-11-06: one of the day's quests is always quick (renew 1, trade 1 or the Campus visit)."""
+    for i in range(12):
+        hid, sid, _ = new_player(f"qeasy{i}")
+        qs = call(Q, sid)["quests"]
+        quick = [q for q in qs if q["code"] in quests.EASY and q["target"] == 1]
+        assert len(qs) == quests.DAILY_COUNT and quick, qs
+
+
+def test_visit_is_not_dealt_while_it_is_closed():
+    hid = new_player("qvisit")[0]
+    import gamedata as g
+    now = datetime.datetime.combine(econ.utcnow().date(), datetime.time(22, 0))      # 2 h before midnight
+    with main.get_db() as conn:                      # visited just now: closed for 8 h, past midnight
+        conn.execute("INSERT INTO co_state(hid, campus_level, visit_at) VALUES(?,?,?) ON CONFLICT(hid) DO UPDATE SET "
+                     "campus_level=1, visit_at=excluded.visit_at", (hid, 1, now.isoformat()))
+        assert g.VISIT_EVERY_HOURS > 2
+        assert not quests.doable(conn, hid, "visit", now)
+        conn.execute("UPDATE co_state SET visit_at=NULL WHERE hid=?", (hid,))
+        assert quests.doable(conn, hid, "visit", now)
+        conn.rollback()

@@ -117,10 +117,16 @@ def test_campus_and_country_boards():
             conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
         conn.commit()
     _active(a, 10)
-    _active(b, 2)                                       # level 30 but rarely here: 30 x 0.2 = 6 < 12
+    _active(b, 2)                                       # owner 2026-11-06: the level decides, not activity
     rankings._cache.clear()
     rows = {x["name"][:4]: x for x in call("/api/v1/rank/campus", a_sid)["rows"] if x["name"].startswith("rkm")}
-    assert rows["rkm1"]["level"] == 12 and rows["rkm2"]["level"] == 30 and rows["rkm1"]["rank"] < rows["rkm2"]["rank"]
+    assert rows["rkm1"]["level"] == 12 and rows["rkm2"]["level"] == 30 and rows["rkm2"]["rank"] < rows["rkm1"]["rank"]
+    with main.get_db() as conn:                         # the same level: the more active company first
+        conn.execute("UPDATE co_state SET campus_level=30 WHERE hid=?", (a,))
+        conn.commit()
+    rankings._cache.clear()
+    rows = {x["name"][:4]: x for x in call("/api/v1/rank/campus", a_sid)["rows"] if x["name"].startswith("rkm")}
+    assert rows["rkm1"]["rank"] < rows["rkm2"]["rank"]
     c = call("/api/v1/rank/countries", a_sid)
     qq = next(x for x in c["rows"] if x["country"] == "qq")
     assert qq["companies"] == 2 and qq["isMe"] and c["myRank"] == qq["rank"]

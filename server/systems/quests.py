@@ -50,6 +50,9 @@ def campus_level(conn, hid) -> int:
     r = conn.execute("SELECT campus_level FROM co_state WHERE hid=?", (hid,)).fetchone()
     return max(1, r[0] if r else 1)
 STREAK_MILESTONES = ((7, 5), (30, 10))     # (every N days, quest rewards)
+# owner 2026-11-06: one quest a day is always quick, so the day is easy to keep going: renew one lease (only when
+# a lease can be renewed today), one market trade, or the Campus visit (only when it is allowed today)
+EASY = ("renew", "trade", "visit")
 
 
 # code: ((title for 1, title for more), event type, target); a target (lo, hi) varies per player and day
@@ -142,6 +145,11 @@ def doable(conn, hid, code, now) -> bool:
         return False
     if code == "renew":
         return renewable(conn, hid, now) > 0
+    if code == "visit":                         # the weekly visit: only when it opens before midnight
+        from .company import next_visit, parse
+        row = conn.execute("SELECT visit_at FROM co_state WHERE hid=?", (hid,)).fetchone()
+        nxt = next_visit(row, now) if row else None
+        return nxt is None or parse(nxt) < _midnight_after(now)
     if code == "educate":
         return conn.execute("SELECT 1 FROM co_supervisors WHERE hid=? AND edu<4", (hid,)).fetchone() is not None
     if code == "build_hexes":
@@ -178,11 +186,15 @@ def repair(conn, hid, day, rows, now) -> None:
                 conn.execute("UPDATE daily_quests SET target=? WHERE id=?", (reachable, q["id"]))
         elif not doable(conn, hid, q["code"], now):
             spare = [c for c in available(conn, hid, now) if c not in have]
+            easy = q["code"] in EASY and q["target"] == 1          # the day's quick one stays quick
+            if easy and any(c in EASY for c in spare):
+                spare = [c for c in spare if c in EASY]
             if spare:
                 code = pick(hid, day, spare)[0]
                 have.add(code)
+                target = 1 if easy and code in EASY else fit_target(conn, hid, code, target_of(code, hid, day), now)
                 conn.execute("UPDATE daily_quests SET code=?, assigned_at=?, target=? WHERE id=?",
-                             (code, now.isoformat(), fit_target(conn, hid, code, target_of(code, hid, day), now), q["id"]))
+                             (code, now.isoformat(), target, q["id"]))
 
 
 def assign_today(conn, hid, now=None) -> None:
@@ -201,11 +213,13 @@ def assign_today(conn, hid, now=None) -> None:
     if rows:
         repair(conn, hid, day, rows, now)
         return
-    for code in pick(hid, day, available(conn, hid, now)):
+    can = available(conn, hid, now)
+    easy = [c for c in can if c in EASY]
+    first = pick(hid, day, easy)[0] if easy else None
+    deal = ([(first, 1)] if first else []) +         [(c, fit_target(conn, hid, c, target_of(c, hid, day), now)) for c in pick(hid, day, [c for c in can if c != first])]
+    for code, target in deal[:DAILY_COUNT]:
         conn.execute("INSERT OR IGNORE INTO daily_quests(hid, day, code, assigned_at, expires_at, target) "
-                     "VALUES(?,?,?,?,?,?)", (hid, day, code, now.isoformat(),
-                                             _midnight_after(now).isoformat(),
-                                             fit_target(conn, hid, code, target_of(code, hid, day), now)))
+                     "VALUES(?,?,?,?,?,?)", (hid, day, code, now.isoformat(), _midnight_after(now).isoformat(), target))
 
 
 def deal_all(conn, now=None) -> int:

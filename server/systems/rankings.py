@@ -4,7 +4,7 @@
              for good (Campus, plants, storage, hexes, education: the players.xp column counts exactly
              those credits). Activity = share of days played (the last 100 days), so a company that
              stops playing slides down instead of staying on top for ever.
-  campus     Campus level x activity (the same weighting: no hall of fame of the earliest players).
+  campus     Campus level; at the same level the more active company first, then the older one.
   hexes      hexes held now (leases run out when a company stops renewing, so it stays current).
   countries  the overall scores of every company of a country added up.
   tantalum   Tantalum-180m made in total (the endgame).
@@ -89,12 +89,14 @@ def _overall(conn):
 
 
 def campus_rows(conn):
-    """(score, activity %, hid, campus level), best first: the level weighted by activity."""
+    """(score, activity %, hid, campus level), best first. Owner 2026-11-06: the level decides; activity only
+    orders companies at the same level, then the older company first. The score is the level."""
     act = activity_of(conn)
-    rows = [(round(lvl * act.get(hid, 0), 2), round(act.get(hid, 0) * 100), hid, lvl)
-            for hid, lvl in conn.execute("SELECT hid, campus_level FROM co_state WHERE campus_level > 0")]
-    rows.sort(key=lambda x: (-x[0], -x[3]))
-    return rows
+    rows = [(lvl, round(act.get(hid, 0) * 100), hid, lvl, created or "")
+            for hid, lvl, created in conn.execute("SELECT c.hid, c.campus_level, p.created_at FROM co_state c "
+                                                  "JOIN players p ON p.hID=c.hid WHERE c.campus_level > 0")]
+    rows.sort(key=lambda x: (-x[3], -act.get(x[2], 0), x[4]))
+    return [r[:4] for r in rows]
 
 
 def hex_rows(conn):
