@@ -54,13 +54,13 @@ def test_country_filter_recounts_ranks_and_pages():
     for i in range(3):
         hid, sid, _ = new_player(f"rkc{i}")
         with main.get_db() as conn:
-            conn.execute("UPDATE players SET country_code=?, xp=? WHERE hID=?", ("zz" if i != 1 else "yy", 10**9 - i, hid))
+            conn.execute("UPDATE players SET country_code=?, xp=? WHERE hID=?", ("qx" if i != 1 else "yy", 10**9 - i, hid))
             conn.commit()
         ids.append((hid, sid))
     rankings._cache.clear()
     r = call("/api/v1/rank/players", ids[2][1], country=1)
     assert r["countryFilter"] and [x["rank"] for x in r["rows"]] == list(range(1, len(r["rows"]) + 1))
-    assert all(x["country"] == "zz" for x in r["rows"]) and r["myRank"] == 2      # #3 overall, #2 in country
+    assert all(x["country"] == "qx" for x in r["rows"]) and r["myRank"] == 2      # #3 overall, #2 in country
     assert len(call("/api/v1/rank/players", ids[2][1])["rows"]) <= rankings.TOP + 1
 
 

@@ -35,6 +35,7 @@ import datetime
 import math
 
 
+import countries
 import econ
 import gamedata as g
 import world
@@ -217,6 +218,11 @@ def migrate(conn) -> None:
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_last TEXT")
     if "streak_best" not in cols:                # the longest daily reward streak (the Streak achievement)
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_best INTEGER NOT NULL DEFAULT 0")
+    if "campus_cc" not in cols:                  # the country the Campus stands in (owner 2026-11-06)
+        conn.execute("ALTER TABLE co_state ADD COLUMN campus_cc TEXT")
+    for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state "
+                          "WHERE campus_lat IS NOT NULL AND campus_cc IS NULL").fetchall():
+        set_campus_country(conn, r["hid"], r["campus_lat"], r["campus_lng"])
     # Campus compounds placed with the neighbours at the corners (overlapping): put them edge to edge
     for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state WHERE campus_level>0").fetchall():
         cells = conn.execute("SELECT lat, lng FROM co_hexes WHERE hid=? AND op='campus'", (r["hid"],)).fetchall()
@@ -228,6 +234,14 @@ def migrate(conn) -> None:
         for a, b in want:
             conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, built_at) VALUES(?,?,?,?,?)",
                          (r["hid"], a, b, "campus", built or iso(utcnow())))
+
+
+def set_campus_country(conn, hid, lat, lng) -> str:
+    """The company's country is where its Campus stands (owner 2026-11-06); "zz" is international waters."""
+    cc = countries.country_at(lat, lng)
+    conn.execute("UPDATE co_state SET campus_cc=? WHERE hid=?", (cc, hid))
+    conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
+    return cc
 
 
 def state_row(conn, hid):
@@ -556,6 +570,7 @@ def install(api) -> None:
             conn.execute("UPDATE co_state SET campus_level=1, campus_lat=?, campus_lng=?, last_visit=? WHERE hid=?",
                          (lat, lng, now, hid))
             ensure_supervisors(conn, hid, 1)
+            set_campus_country(conn, hid, lat, lng)
             econ.emit(conn, "campus_placed", hid, {}, public=False)
             log(conn, hid, "campus_placed", lat=lat, lng=lng)
         return {"err": 0, "level": 1}
@@ -1101,6 +1116,7 @@ def finish_move(conn, hid, move, when) -> None:
     conn.execute("UPDATE co_state SET campus_lat=?, campus_lng=?, last_move=? WHERE hid=?",
                  (move["lat"], move["lng"], iso(when), hid))
     conn.execute("DELETE FROM co_moves WHERE hid=?", (hid,))
+    set_campus_country(conn, hid, move["lat"], move["lng"])
     econ.emit(conn, "campus_moved", hid, {}, public=False)
     log(conn, hid, "campus_moved", lat=move["lat"], lng=move["lng"])
 
@@ -1204,7 +1220,8 @@ def install_views(api) -> None:
                               "FROM co_state c JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 "
                               "AND c.campus_lat IS NOT NULL ORDER BY c.campus_level DESC, p.xp DESC, p.created_at, c.hid"):
             cc = (r["country_code"] or "").lower()
-            key = cc or f"{r['campus_lat'] // 10}:{r['campus_lng'] // 10}"
+            # no country, or international waters: the biggest per 10 degree square
+            key = cc if cc and cc != countries.INTERNATIONAL else f"{cc}{r['campus_lat'] // 10}:{r['campus_lng'] // 10}"
             if key not in best:
                 best[key] = {"country": cc, "own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
                             "lng": r["campus_lng"], "name": r["company_name"]}

@@ -112,7 +112,7 @@ def country_rows(conn):
     """(score, companies, country) of every country, best first."""
     acc = {}
     for score, _a, _hid, _v, cc in overall_rows(conn):
-        if cc and score > 0:
+        if cc and cc != "zz" and score > 0:            # zz: international waters, no country
             v = acc.setdefault(cc, [0, 0])
             v[0] += score
             v[1] += 1

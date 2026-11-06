@@ -531,3 +531,39 @@ def test_new_quest_kinds_count_their_actions():
     for t in ("supervisor_appointed", "market_order", "survey_far"):
         _events(hid, t, 3)
     assert all(q["claimable"] for q in call(Q, sid)["quests"])
+
+
+def test_countries_of_places_around_the_world():
+    """Owner 2026-11-06: the country comes from the map; out at sea past 370 km it is international (zz)."""
+    import countries
+    for (lat, lng), cc in {(45.81, 15.98): "hr", (43.40, 16.20): "hr", (39.03, 125.75): "kp", (90, 0): "zz",
+                           (-90, 0): "aq", (-77.85, 166.67): "aq", (0, -150): "zz", (-48.88, -123.39): "zz",
+                           (78.2, 15.6): "no", (42.66, 21.16): "xk", (21.3, -157.85): "us"}.items():
+        assert countries.country_at(lat, lng) == cc, (lat, lng)
+
+
+def test_the_campus_decides_the_country_not_the_ip():
+    from helpers import client
+    hid, sid, _ = new_player("qcc")
+
+    def country():
+        with main.get_db() as conn:
+            return conn.execute("SELECT country_code FROM players WHERE hID=?", (hid,)).fetchone()[0]
+
+    client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "CA"})
+    assert country() == "ca"                                       # no Campus yet: the IP
+    assert call("/api/v3/campus/place", sid, lat=45.81, lng=15.98, plat=45.81, plng=15.98)["err"] == 0
+    assert country() == "hr"                                       # built in Zagreb
+    client.post("/api/v3/me", data={"sid": sid}, headers={"CF-IPCountry": "AT"})
+    assert country() == "hr"                                       # a holiday in Austria changes nothing
+
+
+def test_international_waters_are_no_country_on_the_board():
+    from systems import rankings
+    hid, sid, _ = new_player("qzz", credits=10**9)
+    with main.get_db() as conn:
+        conn.execute("UPDATE players SET country_code='zz', xp=? WHERE hID=?", (10**9, hid))
+        conn.commit()
+    rankings._cache.clear()
+    rows = call("/api/v1/rank/countries", sid)["rows"]
+    assert all(r["country"] != "zz" or r["rank"] is None for r in rows)

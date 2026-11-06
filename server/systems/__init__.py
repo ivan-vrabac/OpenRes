@@ -43,12 +43,14 @@ _countries: dict = {}                     # hid: the country last saved, so a re
 
 def see_country(conn, hid: str, header: str | None) -> None:
     """Cloudflare says where a request comes from (CF-IPCountry, from the IP address): that is the company's
-    country. XX is unknown, T1 is Tor; without the header (dev server, tests) what is saved stays."""
+    country until it has a Campus (then the Campus's place decides, owner 2026-11-06). XX is unknown, T1 is
+    Tor; without the header (dev server, tests) what is saved stays."""
     cc = (header or "").strip().lower()
     if not hid or len(cc) != 2 or not cc.isalpha() or cc in ("xx", "t1") or _countries.get(hid) == cc:
         return
     try:
-        conn.execute("UPDATE players SET country_code=? WHERE hID=? AND COALESCE(country_code,'')!=?", (cc, hid, cc))
+        conn.execute("UPDATE players SET country_code=? WHERE hID=? AND COALESCE(country_code,'')!=? AND NOT EXISTS("
+                     "SELECT 1 FROM co_state WHERE hid=? AND campus_cc IS NOT NULL)", (cc, hid, cc, hid))
         conn.commit()
         _countries[hid] = cc
     except sqlite3.OperationalError:              # busy: the next request tries again

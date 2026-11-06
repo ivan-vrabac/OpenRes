@@ -297,7 +297,7 @@ class _CountryBoardState extends _BoardState<_CountryBoard> {
                 'assets/images_countryflags/$cc.png', width: 24, height: 16, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox(width: 24))),
             const SizedBox(width: 8),
-            Expanded(flex: 4, child: Text(cc.toUpperCase(), style: TextStyle(fontSize: 13,
+            Expanded(flex: 4, child: Text(cc == 'zz' ? 'Intl. waters' : cc.toUpperCase(), style: TextStyle(fontSize: 13,
                 color: isMe ? AppColors.accent : AppColors.fg, fontWeight: isMe ? FontWeight.bold : FontWeight.normal))),
             Expanded(flex: 4, child: Text('${r['companies']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
             SizedBox(width: 92, child: Text(_short(r['score'] as num), textAlign: TextAlign.right,
