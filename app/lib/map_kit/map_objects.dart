@@ -31,7 +31,11 @@ class _MapObjectsLayerState extends State<MapObjectsLayer> {
   void _syncTimer() {
     final run = widget.world.scene.hasCountdowns;
     if (run && _timer == null) {
-      _timer = Timer.periodic(const Duration(milliseconds: 250), (_) => _tick.value++);
+      // owner 2026-11-06: it kept repainting 4 times a second after the last ring ran out; now it stops
+      _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        _tick.value++;
+        _syncTimer();
+      });
     } else if (!run) {
       _timer?.cancel();
       _timer = null;
@@ -77,6 +81,16 @@ class _MapObjectsPainter extends CustomPainter {
       required this.frame, required this.accent, required Listenable repaint}) : super(repaint: repaint);
 
   static final _atlasPaint = Paint()..filterQuality = FilterQuality.medium;
+  // the sprite buffers per hex picture, kept between frames (a new pair every frame churned memory)
+  static final _buffers = <String, (Float32List, Float32List)>{};
+
+  static (Float32List, Float32List) _buffer(String key, int n) {
+    final b = _buffers[key];
+    if (b != null && b.$1.length >= n * 4) return b;
+    final made = (Float32List(n * 4), Float32List(n * 4));
+    _buffers[key] = made;
+    return made;
+  }
   static final _textCache = <String, TextPainter>{};
 
   static TextPainter _text(String s, double size, Color color) {
@@ -115,7 +129,7 @@ class _MapObjectsPainter extends CustomPainter {
       final d = e.value;
       final tile = HexTiles.get(e.key, frame);
       final n = d.length ~/ 3;
-      final xf = Float32List(n * 4), rects = Float32List(n * 4);
+      final (xf, rects) = _buffer(e.key, n);
       var k = 0;
       for (var i = 0; i < n; i++) {
         final px = 2 * kHexRadiusM * d[3 * i + 2] * scale;
@@ -127,8 +141,11 @@ class _MapObjectsPainter extends CustomPainter {
         }
         final s = px / HexTiles.w;
         xf[4 * k] = s;
+        xf[4 * k + 1] = 0;
         xf[4 * k + 2] = sx - px / 2;
         xf[4 * k + 3] = sy - px * 0.433;
+        rects[4 * k] = 0;
+        rects[4 * k + 1] = 0;
         rects[4 * k + 2] = HexTiles.w;
         rects[4 * k + 3] = tile.height.toDouble();
         k++;

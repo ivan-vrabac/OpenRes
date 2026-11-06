@@ -39,6 +39,12 @@ class MapWorld extends ChangeNotifier {
   bool _boxDetail = false;
   bool _boxCut = false;      // the answer hit a server limit
   DateTime? _boxAt;
+  // owner 2026-11-06: asking again for the same area sends what the server called it ("sig"); with
+  // nothing changed there the answer is {"same": 1} and nothing is read or rebuilt. A full answer at
+  // least every [_fullEvery] anyway (names, the lease days).
+  String? _sig, _acrossSig;
+  DateTime? _fullAt;
+  static const _fullEvery = Duration(minutes: 5);
 
   LatLngBounds? _view;
   LatLngBounds? _across;     // the view's part beyond the date line, on the other end of the longitudes
@@ -134,16 +140,33 @@ class MapWorld extends ChangeNotifier {
         final view = _view!;
         final zoom = _zoom;
         final detail = zoom >= kHexZoom;
-        final box = _withMargin(view, detail);
-        final across = _across == null ? null : _withMargin(_across!, detail);
+        // the same area as last time, only older: ask with its sig (the view stays inside it, so keep it)
+        final old = _box;
+        final sameArea = old != null && _boxDetail == detail && _inside(view, old) &&
+            (_across == null || (_acrossBox != null && _inside(_across!, _acrossBox!))) &&
+            _fullAt != null && DateTime.now().difference(_fullAt!) < _fullEvery;
+        final box = sameArea ? old : _withMargin(view, detail);
+        final across = _across == null ? null : (sameArea ? _acrossBox : _withMargin(_across!, detail));
         final r = await _fetch('/api/v3/map', {'south': box.south, 'west': box.west,
-            'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0});
+            'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0, if (sameArea) 'sig': _sig});
         if (_gone) return;
         if (!r.ok) { _dirty = true; break; }        // what is known stays; the next want tries again
         final ra = across == null ? null : await _fetch('/api/v3/map', {'south': across.south, 'west': across.west,
-            'north': across.north, 'east': across.east, 'detail': detail ? 1 : 0});
+            'north': across.north, 'east': across.east, 'detail': detail ? 1 : 0, if (sameArea) 'sig': _acrossSig});
         if (_gone) return;
         if (ra != null && !ra.ok) { _dirty = true; break; }
+        _sig = r.data['sig'] as String?;
+        _acrossSig = ra?.data['sig'] as String?;
+        if (r.data['same'] == 1 && (ra == null || ra.data['same'] == 1)) {
+          _boxAt = DateTime.now();                  // still right: nothing to read or draw again
+          continue;
+        }
+        if (r.data['same'] == 1 || ra?.data['same'] == 1) {
+          _fullAt = null;                           // one half same, one changed: ask for both in full
+          _dirty = true;
+          continue;
+        }
+        if (!sameArea) _fullAt = DateTime.now();
         _merge(r, box, detail, also: ra == null ? null : (ra, across!));
         _box = box;
         _acrossBox = across;
@@ -250,7 +273,11 @@ class MapScene {
   final List<CampusMark> sites;       // Campuses being moved, at their new place
   const MapScene({this.tiles = const {}, this.marks = const [], this.campuses = const [], this.sites = const []});
 
-  bool get hasCountdowns => marks.any((m) => m.overlapUntil != null);
+  /// A shared-hex ring is still running down (an expired one needs no more frames).
+  bool get hasCountdowns {
+    final now = DateTime.now();
+    return marks.any((m) => m.overlapUntil != null && m.overlapUntil!.isAfter(now));
+  }
 
   factory MapScene.of(List<Map<String, dynamic>> hexes, List<Map<String, dynamic>> campuses,
       List<Map<String, dynamic>> moves, String Function(Map<String, dynamic>) picture) {

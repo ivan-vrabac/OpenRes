@@ -225,6 +225,7 @@ def migrate(conn) -> None:
     for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state "
                           "WHERE campus_lat IS NOT NULL AND campus_cc IS NULL").fetchall():
         set_campus_country(conn, r["hid"], r["campus_lat"], r["campus_lng"])
+    map_triggers(conn)
     # Campus compounds placed with the neighbours at the corners (overlapping): put them edge to edge
     for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state WHERE campus_level>0").fetchall():
         cells = conn.execute("SELECT lat, lng FROM co_hexes WHERE hid=? AND op='campus'", (r["hid"],)).fetchall()
@@ -245,6 +246,69 @@ def set_campus_country(conn, hid, lat, lng, cc: str | None = None) -> str:
     conn.execute("UPDATE co_state SET campus_cc=? WHERE hid=?", (cc, hid))
     conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
     return cc
+
+
+# ── map versions: "nothing changed here" without sending the map again (owner 2026-11-06) ──────────
+# Every change the map shows (a hex built, renewed, gone; a Campus placed, levelled, moved; a supervisor on a
+# hex) bumps the version of its 0.1 degree square, by triggers, so no code path can forget it. The map answer
+# carries `sig`, the highest version in its area; the app sends it back and gets {"same": 1} while it holds.
+
+def _floor10(v):
+    """floor(v * 10) in plain SQL (FLOOR is not in every SQLite build)."""
+    x = f"(({v}) * 10)"
+    return f"(CAST({x} AS INTEGER) - ({x} < CAST({x} AS INTEGER)))"
+
+
+def _cell_sql(lat, lng):
+    return f"(({_floor10(lat)} + 900) * 4000 + {_floor10(lng)} + 1800)"
+
+
+def _bump(lat, lng):
+    return (f"INSERT INTO map_ver(cell, ver) VALUES({_cell_sql(lat, lng)}, "
+            f"(SELECT COALESCE(MAX(ver), 0) + 1 FROM map_ver)) "
+            f"ON CONFLICT(cell) DO UPDATE SET ver=excluded.ver;")
+
+
+def map_triggers(conn) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS map_ver (cell INTEGER PRIMARY KEY, ver INTEGER NOT NULL)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_map_ver_ver ON map_ver(ver)")
+    hexes = {"ins": _bump("NEW.lat", "NEW.lng"), "del": _bump("OLD.lat", "OLD.lng"),
+             "upd": _bump("OLD.lat", "OLD.lng") + _bump("NEW.lat", "NEW.lng")}
+    stmts = [
+        f"CREATE TRIGGER IF NOT EXISTS mv_hex_ins AFTER INSERT ON co_hexes BEGIN {hexes['ins']} END",
+        f"CREATE TRIGGER IF NOT EXISTS mv_hex_del AFTER DELETE ON co_hexes BEGIN {hexes['del']} END",
+        f"CREATE TRIGGER IF NOT EXISTS mv_hex_upd AFTER UPDATE ON co_hexes BEGIN {hexes['upd']} END",
+        f"CREATE TRIGGER IF NOT EXISTS mv_move_ins AFTER INSERT ON co_moves BEGIN {hexes['ins']} END",
+        f"CREATE TRIGGER IF NOT EXISTS mv_move_del AFTER DELETE ON co_moves BEGIN {hexes['del']} END",
+        # a Campus placed, levelled or moved (its old and new square; one without a place changes nothing)
+        "CREATE TRIGGER IF NOT EXISTS mv_campus_upd AFTER UPDATE OF campus_level, campus_lat, campus_lng ON co_state "
+        "WHEN NEW.campus_lat IS NOT NULL OR OLD.campus_lat IS NOT NULL BEGIN "
+        + _bump("COALESCE(OLD.campus_lat, NEW.campus_lat)", "COALESCE(OLD.campus_lng, NEW.campus_lng)")
+        + _bump("COALESCE(NEW.campus_lat, OLD.campus_lat)", "COALESCE(NEW.campus_lng, OLD.campus_lng)") + " END",
+        # a supervisor put on or taken off a hex (its owner sees the education on it)
+        "CREATE TRIGGER IF NOT EXISTS mv_sup_upd AFTER UPDATE OF hex_id, edu ON co_supervisors BEGIN "
+        "INSERT INTO map_ver(cell, ver) SELECT " + _cell_sql("h.lat", "h.lng") + ", "
+        "(SELECT COALESCE(MAX(ver), 0) + 1 FROM map_ver) FROM co_hexes h WHERE h.id IN (OLD.hex_id, NEW.hex_id) "
+        "ON CONFLICT(cell) DO UPDATE SET ver=excluded.ver; END",
+        "CREATE TRIGGER IF NOT EXISTS mv_sup_del AFTER DELETE ON co_supervisors WHEN OLD.hex_id IS NOT NULL BEGIN "
+        "INSERT INTO map_ver(cell, ver) SELECT " + _cell_sql("h.lat", "h.lng") + ", "
+        "(SELECT COALESCE(MAX(ver), 0) + 1 FROM map_ver) FROM co_hexes h WHERE h.id = OLD.hex_id "
+        "ON CONFLICT(cell) DO UPDATE SET ver=excluded.ver; END",
+    ]
+    for st in stmts:
+        conn.execute(st)
+
+
+def map_sig(conn, s, w, n, e) -> str:
+    """The highest version of the squares in the area (a few squares up close; far out the whole table)."""
+    rows = range(int(math.floor(s * 10)), int(math.floor(n * 10)) + 1)
+    c0, c1 = int(math.floor(w * 10)) + 1800, int(math.floor(e * 10)) + 1800
+    if len(rows) * (c1 - c0 + 1) > 400:
+        v = conn.execute("SELECT MAX(ver) FROM map_ver").fetchone()[0]
+    else:
+        v = max((conn.execute("SELECT MAX(ver) FROM map_ver WHERE cell BETWEEN ? AND ?",
+                              ((r + 900) * 4000 + c0, (r + 900) * 4000 + c1)).fetchone()[0] or 0) for r in rows)
+    return str(v or 0)
 
 
 def state_row(conn, hid):
@@ -863,11 +927,15 @@ def install(api) -> None:
         dots for the clouds (`detail`=0). `more` = the answer was cut off at a limit."""
         s, w = float_arg(form, "south", lo=-90, hi=90), float_arg(form, "west", lo=-180, hi=180)
         n, e = float_arg(form, "north", lo=-90, hi=90), float_arg(form, "east", lo=-180, hi=180)
+        # owner 2026-11-06: the app asks again every 30 s; when nothing changed in the area it gets no data
+        sig = map_sig(conn, s, w, n, e)
+        if form.get("sig") == sig:
+            return {"err": 0, "same": 1, "sig": sig}
         campuses = conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name FROM co_state c "
                                 "JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 AND c.campus_lat BETWEEN ? AND ? "
                                 "AND c.campus_lng BETWEEN ? AND ? ORDER BY c.hid=? DESC, c.campus_level DESC, p.xp DESC, p.created_at LIMIT ?",
                                 (s, n, w, e, hid, MAP_CAMPUSES)).fetchall()
-        res = {"err": 0, "more": len(campuses) == MAP_CAMPUSES,
+        res = {"err": 0, "sig": sig, "more": len(campuses) == MAP_CAMPUSES,
                "campuses": [{"own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
                              "lng": r["campus_lng"], "name": r["company_name"]} for r in campuses]}
         # a Campus being moved: its new place is a construction site, taken like hexes

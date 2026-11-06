@@ -436,12 +436,26 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     return '${(m / 1000).toStringAsFixed(1)} km';
   }
 
+  // the snap list, made again only when the hexes change or a second passed (the 30 s share rings run
+  // down): the crosshair asks every frame (owner 2026-11-06: rebuilding 8000 of them a frame stuttered)
+  List<SnapHex> _snapList = const [];
+  List<Map<String, dynamic>>? _snapListFor;
+  DateTime _snapListAt = DateTime(2000);
+
   /// Where a hex or the Campus would go at [target] (map_kit/snap.dart).
-  LatLng _snapBuildPos(LatLng target) => snapBuildPos(target, [
+  LatLng _snapBuildPos(LatLng target) {
+    final now = DateTime.now();
+    if (!identical(_snapListFor, _world.hexes) || now.difference(_snapListAt).inMilliseconds > 1000) {
+      _snapList = [
         for (final m in _world.hexes)
           SnapHex(LatLng((m['lat'] as num).toDouble(), (m['lng'] as num).toDouble()),
               own: m['isMine'] == true, sharedOpen: _overlapOpen(m)),
-      ]);
+      ];
+      _snapListFor = _world.hexes;
+      _snapListAt = now;
+    }
+    return snapBuildPos(target, _snapList);
+  }
 
   static bool _overlapOpen(Map<String, dynamic> m) {
     if (m['isMine'] == true) return false;

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import '../constants.dart';
 
@@ -19,6 +20,11 @@ class ApiResult {
 /// Client for the server's game systems (social, market, quests, cargo, ...).
 /// Every endpoint takes the session id and form fields and answers zlib-compressed JSON
 /// `{err: 0, ...}` or `{err: 1, code, msg}`.
+Map<String, dynamic> _decode(List<int> bytes) =>
+    jsonDecode(utf8.decode(ZLibDecoder().convert(bytes))) as Map<String, dynamic>;
+
+const _bigAnswer = 16 * 1024;          // zipped bytes
+
 class GameApi {
   static Future<ApiResult> call(String path, String sid,
       [Map<String, Object?> params = const {}]) async {
@@ -33,7 +39,10 @@ class GameApi {
       if (r.statusCode != 200) {
         return ApiResult(const {}, code: 'http_${r.statusCode}', message: 'Server error (${r.statusCode})');
       }
-      final m = jsonDecode(utf8.decode(ZLibDecoder().convert(r.bodyBytes))) as Map<String, dynamic>;
+      // a big answer (the map in a built-up city) is unpacked off the screen's thread, so the app never
+      // freezes while it reads one (owner 2026-11-06)
+      final bytes = r.bodyBytes;
+      final m = bytes.length > _bigAnswer ? await Isolate.run(() => _decode(bytes)) : _decode(bytes);
       if ((m['err'] ?? 0) != 0) {
         return ApiResult(m, code: (m['code'] ?? 'error').toString(),
             message: (m['msg'] ?? 'Could not do that. Try again.').toString());

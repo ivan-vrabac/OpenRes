@@ -89,4 +89,35 @@ void main() {
     final at = snapBuildPos(offset(here, 5, 0), hexes);
     expect(metres(at, here), closeTo(25.98, 0.05));
   });
+
+  test('a fully built city snaps in milliseconds, not seconds (owner 2026-11-06)', () {
+    // 8000 hexes edge to edge, like the map holds in central Zagreb: no free spot near the crosshair
+    final d = 15 * math.sqrt(3);
+    final hexes = <SnapHex>[
+      for (var q = -45; q < 45; q++)
+        for (var r = -45; r < 45; r++)
+          if ((q * q + r * r + q * r) < 2000)
+            SnapHex(offset(here, d * (q + r * 0.5), d * r * math.sqrt(3) / 2)),
+    ];
+    expect(hexes.length, greaterThan(6000));
+    final watch = Stopwatch()..start();
+    for (var i = 0; i < 60; i++) {                       // one second of frames
+      snapBuildPos(offset(here, i * 1.0, 0), hexes);
+    }
+    expect(watch.elapsedMilliseconds, lessThan(1000), reason: '60 snaps took ${watch.elapsedMilliseconds} ms');
+    final w2 = Stopwatch()..start();
+    snapCampusPos(here, [for (final h in hexes) h.pos]);
+    expect(w2.elapsedMilliseconds, lessThan(500));
+  });
+
+  test('next to a built-up block the crosshair still finds the free spot beside it', () {
+    final d = 15 * math.sqrt(3);
+    final block = [for (var q = -5; q <= 5; q++) for (var r = -5; r <= 0; r++)
+                     SnapHex(offset(here, d * (q + r * 0.5), d * r * math.sqrt(3) / 2))];
+    final at = snapBuildPos(offset(here, 0, d * 0.6), block);        // just east of the block's edge
+    for (final h in block) {
+      expect(metres(at, h.pos), greaterThanOrEqualTo(hexMinDist(h.pos, at) - 0.2));
+    }
+    expect(metres(at, offset(here, 0, d * 0.6)), lessThan(30));
+  });
 }

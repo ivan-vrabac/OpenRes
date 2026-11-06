@@ -44,17 +44,30 @@ double hexMinDist(LatLng from, LatLng to) {
   return kHexRadiusM * math.sqrt(3) / math.cos(phi);
 }
 
-/// Where a hex aimed at [target] should go among [hexes].
+/// How far around the target a snap looks: a hex further away can neither block the target nor a free
+/// spot worth moving to. Owner 2026-11-06: looking at every known hex (8000 in a built-up city) against
+/// every other one froze the app for seconds (Android "not responding"); now only the few close by.
+const double kSnapReachM = 150;
+
+/// A Campus needs room for 7 cells, so its free spot may be further out (a whole block away).
+const double kCampusSnapReachM = 220;
+
+/// Where a hex aimed at [target] should go among [hexes] (the nearest free spot within [kSnapReachM]).
 LatLng snapBuildPos(LatLng target, List<SnapHex> hexes) {
-  final ownSpots = {for (final h in hexes) if (h.own) '${h.pos.latitude},${h.pos.longitude}'};
+  final near = [for (final h in hexes) if (_distM(h.pos, target) < kSnapReachM) h];
+  final ownSpots = {for (final h in near) if (h.own) '${h.pos.latitude},${h.pos.longitude}'};
   final blocking = <LatLng>[];
-  for (final h in hexes) {
+  for (final h in near) {
     final shared = h.sharedOpen && !ownSpots.contains('${h.pos.latitude},${h.pos.longitude}');
     if (shared && _distM(h.pos, target) < kHexRadiusM) return h.pos;
     if (!shared) blocking.add(h.pos);
   }
   if (blocking.isEmpty) return target;
-  bool free(LatLng p) => blocking.every((m) => _distM(p, m) >= hexMinDist(m, p) - 0.1);
+  // a spot is free when no blocking hex is closer than the hex rule allows; only those within 31 m can be
+  bool free(LatLng p) => blocking.every((m) {
+        final d = _distM(p, m);
+        return d >= 31 || d >= hexMinDist(m, p) - 0.1;
+      });
   if (free(target)) return target;
   LatLng? best;
   var bestD = double.infinity;
@@ -79,7 +92,7 @@ List<LatLng> campusCells(LatLng c) => [c, for (final d in _dirs) _offset(c, _edg
 /// target that would overlap anything moves to the nearest spot where all 7 fit against the hexes
 /// around it. A Campus never shares a hex.
 LatLng snapCampusPos(LatLng target, List<LatLng> hexes) {
-  final near = [for (final h in hexes) if (_distM(h, target) < 220) h];
+  final near = [for (final h in hexes) if (_distM(h, target) < kCampusSnapReachM) h];
   bool free(LatLng c) {
     // a hex further than this from the centre can't touch any of the 7 cells
     final close = [for (final h in near) if (_distM(h, c) < 2 * _edge + 16) h];
@@ -96,7 +109,8 @@ LatLng snapCampusPos(LatLng target, List<LatLng> hexes) {
       }
     }
   }
-  final byDist = spots.values.toList()..sort((a, b) => _distM(a, target).compareTo(_distM(b, target)));
+  final byDist = [for (final c in spots.values) if (_distM(c, target) < kCampusSnapReachM) c]
+    ..sort((a, b) => _distM(a, target).compareTo(_distM(b, target)));
   for (final c in byDist) {
     if (free(c)) return c;
   }

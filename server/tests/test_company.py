@@ -561,3 +561,46 @@ def test_catalog_says_which_map_tiles():
     t = call("/api/v3/catalog", sid)["tiles"]
     assert t["url"].startswith("https://") and "{z}" in t["url"] and "{x}" in t["url"] and "{y}" in t["url"]
     assert "OpenStreetMap" in t["attribution"] and t["maxZoom"] == 19
+
+
+def test_map_answers_same_while_nothing_changed():
+    """Owner 2026-11-06: the app asks every 30 s; with nothing new in the area it gets no data, and any
+    change there (a hex, a Campus, a hex gone, a supervisor) makes it send the map again."""
+    hid, sid = setup_hq("msame", at=(17.3, 17.3))
+    box = dict(south=17.29, west=17.29, north=17.31, east=17.31)
+    first = call("/api/v3/map", sid, **box)
+    assert first["err"] == 0 and first["sig"] and "hexes" in first
+    again = call("/api/v3/map", sid, sig=first["sig"], **box)
+    assert again == {"err": 0, "same": 1, "sig": first["sig"]}
+    # far away changes don't count
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, built_at) VALUES(?,?,?,?,?)",
+                     (hid, -30.0, 100.0, "campus", "2026-01-01"))
+        conn.commit()
+    assert call("/api/v3/map", sid, sig=first["sig"], **box).get("same") == 1
+    # a hex in the area: the map again
+    with main.get_db() as conn:
+        conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                     "VALUES(?,?,?,?,?,?,?,?)", (hid, 17.3005, 17.3005, "logging_camp", "wood", 50, "2026-01-01", "2027-01-01"))
+        hx = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.commit()
+    changed = call("/api/v3/map", sid, sig=first["sig"], **box)
+    assert "same" not in changed and changed["sig"] != first["sig"]
+    sig = changed["sig"]
+    assert call("/api/v3/map", sid, sig=sig, **box).get("same") == 1
+    for change in ("UPDATE co_hexes SET lease_until='2027-02-01' WHERE id=?",          # renewed
+                   "UPDATE co_state SET campus_level=campus_level+1 WHERE hid=(SELECT hid FROM co_hexes WHERE id=?)",
+                   "DELETE FROM co_hexes WHERE id=?"):                                 # gone
+        with main.get_db() as conn:
+            conn.execute(change, (hx,))
+            conn.commit()
+        r = call("/api/v3/map", sid, sig=sig, **box)
+        assert "same" not in r, change
+        sig = r["sig"]
+    # the cells sit in the right squares on both sides of 0 (south and west of Greenwich too)
+    from systems import company as comp
+    with main.get_db() as conn:
+        for lat, lng in ((-0.05, -0.05), (0.05, 0.05), (-33.9, 18.4), (40.7, -74.0)):
+            got = conn.execute("SELECT " + comp._cell_sql(repr(lat), repr(lng))).fetchone()[0]
+            want = (math.floor(lat * 10) + 900) * 4000 + math.floor(lng * 10) + 1800
+            assert got == want, (lat, lng, got, want)

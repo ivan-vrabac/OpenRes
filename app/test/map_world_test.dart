@@ -23,6 +23,7 @@ class Server {
   bool down = false;
   bool cut = false;
   Completer<void>? gate;
+  int? version;                              // set: answers carry a sig and say "same" while it holds
 
   bool _in(Map<String, dynamic> m, Map<String, Object?> a) =>
       (m['lat'] as num) >= (a['south'] as num) && (m['lat'] as num) <= (a['north'] as num) &&
@@ -34,11 +35,14 @@ class Server {
     final g = gate;
     if (g != null) await g.future;
     if (down) return const ApiResult({}, code: 'net', message: 'no network');
+    final v = version;
+    if (v != null && a['sig'] == '$v') return ApiResult({'same': 1, 'sig': '$v'});
     final inside = hexes.where((h) => _in(h, a)).toList();
     return ApiResult({
       'campuses': campuses.where((c) => _in(c, a)).toList(),
       'moves': moving.where((m) => _in(m, a)).toList(),
       'more': cut,
+      if (v != null) 'sig': '$v',
       if (a['detail'] == 1) 'hexes': inside
       else 'dots': [for (final h in inside) ...[h['lat'], h['lng']]],
     });
@@ -97,6 +101,27 @@ void main() {
     w.want(at(45, 16), 15);                  // only the timer calls this: same view, nothing moved
     await settle();
     expect(w.hexes, hasLength(2));
+  });
+
+  test('the same area asked again: "same" keeps everything and rebuilds nothing (owner 2026-11-06)', () async {
+    srv.version = 1;
+    srv.hexes.add(hex(1, 45, 16));
+    w.want(at(45, 16), 15);
+    await settle();
+    final scene = w.scene;
+    var notified = 0;
+    w.addListener(() => notified++);
+    w.refresh();                             // as the 30 s timer would
+    await settle();
+    expect(srv.calls.last['sig'], '1');
+    expect(w.hexes.map((h) => h['id']), [1]);
+    expect(identical(w.scene, scene), isTrue);
+    expect(notified, 0);
+    srv.hexes.add(hex(2, 45.001, 16));       // something changed there
+    srv.version = 2;
+    w.refresh();
+    await settle();
+    expect(w.hexes.map((h) => h['id']), unorderedEquals([1, 2]));
   });
 
   test('moving inside the margin needs no request', () async {
