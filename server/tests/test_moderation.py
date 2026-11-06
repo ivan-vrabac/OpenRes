@@ -115,6 +115,8 @@ def test_cheat_signals_suspects_archive_and_wipe(modpw):
     d = call("/api/v1/mod/reports", "", mod_password=modpw)
     me = next(x for x in d["suspects"] if x["name"] == name)
     assert me["kinds"] == {"teleport": 1, "mock_gps": 1} and me["campus"] == 1
+    assert me["risk"] == 8 and me["riskLevel"] == "medium"             # 3 for the jump, 5 for fake GPS
+    assert M.risk_of({"mock_gps": 3}, 0, None) == (15, "high") and M.risk_of({}, 0, True) == (0, "low")
     pid = me["pid"]
     c = call("/api/v1/mod/company", "", mod_password=modpw, pid=pid)
     assert c["name"] == name and len(c["signals"]) == 2 and "km/h" in next(s for s in c["signals"]

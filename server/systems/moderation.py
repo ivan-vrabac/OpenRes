@@ -34,6 +34,19 @@ RETENTION_LIMITS = {
     "cheat_signals": ("Cheat signals (jumps, device checks, fake GPS)", 365, 365),
 }
 RETENTION_MIN = 30
+# spoofing risk (owner 2026-11-06): points per unreviewed signal, per other company on the same phone, and for a
+# failed device check; 0-4 low, 5-14 medium, 15+ high
+RISK_POINTS = {"teleport": 3, "mock_gps": 5, "integrity": 4}
+RISK_SAME_PHONE = 2
+RISK_FAILED_CHECK = 5
+RISK_LEVELS = ((15, "high"), (5, "medium"), (0, "low"))
+
+
+def risk_of(kinds: dict, same_phone: int, integrity_ok) -> tuple[int, str]:
+    pts = sum(RISK_POINTS.get(k, 1) * n for k, n in kinds.items()) + RISK_SAME_PHONE * same_phone
+    if integrity_ok is False:
+        pts += RISK_FAILED_CHECK
+    return pts, next(name for floor, name in RISK_LEVELS if pts >= floor)
 # a company's game, wiped by a moderator (the account, its ban, reports and cheat signals stay)
 GAME_TABLES = ("co_state", "co_moves", "co_hexes", "co_supervisors", "co_education", "co_stock", "co_plants",
                "co_luxury", "daily_quests", "streak_rewards", "achievements")
@@ -304,8 +317,11 @@ def install(api) -> None:
                                            "GROUP BY hid ORDER BY COUNT(*) DESC, MAX(ts) DESC LIMIT 200").fetchall():
             kinds = dict(conn.execute("SELECT kind, COUNT(*) FROM cheat_signals WHERE hid=? AND reviewed=0 GROUP BY kind",
                                       (hid_,)).fetchall())
+            short = _profile_short(conn, hid_)
+            pts, level = risk_of(kinds, short["sameDevice"], short["integrityOk"])
             suspects.append({"name": name_of(conn, hid_), "pid": social.pid_of(conn, hid_), "signals": n_, "last": last,
-                             "kinds": kinds, **_profile_short(conn, hid_)})
+                             "kinds": kinds, "risk": pts, "riskLevel": level, **short})
+        suspects.sort(key=lambda x: -x["risk"])          # stable: then the most signals, the latest
         archived = [{"name": name_of(conn, r[0]), "pid": social.pid_of(conn, r[0]), "signals": r[1], "last": r[2]}
                     for r in conn.execute("SELECT hid, COUNT(*), MAX(ts) FROM cheat_signals WHERE reviewed=1 GROUP BY hid "
                                           "ORDER BY MAX(ts) DESC LIMIT 100")]
