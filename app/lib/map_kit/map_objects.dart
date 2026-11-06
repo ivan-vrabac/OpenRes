@@ -19,7 +19,7 @@ const double kCampusWidthM = 75, kCampusHeightM = 77.94;      // the Campus pict
 class MapObjectsLayer extends StatefulWidget {
   final MapWorld world;
   final Color frame, accent;
-  final bool showHexes;              // false: the view is too crowded, clouds are drawn instead
+  final bool showHexes;              // false: the view is too crowded, clouds are drawn instead (and nothing else)
   const MapObjectsLayer({super.key, required this.world, required this.frame, required this.accent,
       this.showHexes = true});
   @override
@@ -124,7 +124,9 @@ class _MapObjectsPainter extends CustomPainter {
     final cx = mercX(center.longitude), cy = mercY(center.latitude);
     final halfW = size.width / 2, halfH = size.height / 2;
     if (zoom < kHexZoom) return;              // further out both are clouds
-    if (showHexes) _hexes(canvas, size, scene, scale, cx, cy, halfW, halfH);
+    // owner 2026-11-06: clouds and hexes never overlap; where clouds are drawn, no Campus or site either
+    if (!showHexes) return;
+    _hexes(canvas, size, scene, scale, cx, cy, halfW, halfH);
     _campuses(canvas, size, scene, scale, cx, cy, halfW, halfH);
     _sites(canvas, size, scene, scale, cx, cy, halfW, halfH);
   }

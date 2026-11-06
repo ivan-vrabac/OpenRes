@@ -689,7 +689,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
           if (_showMines || _placingCampus)
             ValueListenableBuilder<LatLng?>(valueListenable: _live, builder: (ghCtx, _, __) {
               final cam = MapCamera.of(ghCtx);
-              if (cam.zoom < kHexZoom) return const SizedBox.shrink();
+              // no build ghost over clouds: far out, or a view too crowded for hexes (owner 2026-11-06)
+              if (cam.zoom < kHexZoom || _world.crowdedFor(cam.visibleBounds)) return const SizedBox.shrink();
               // Recompute browse position from current camera centre (not stale _mapCenter).
               final camCenter = cam.center;
               // the hex you would build on: shown exactly while its centre is inside the range circle
