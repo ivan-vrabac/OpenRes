@@ -52,6 +52,10 @@ void _openProfile(BuildContext context, Map<String, dynamic> r) {
 
 /// The rank: a medal for the first three.
 Widget _rankMark(Map<String, dynamic> r, bool isMe) {
+  if (r['rank'] == null) {                     // not on this board (yet): owner 2026-11-06
+    return Text('N/A', textAlign: TextAlign.right, style: TextStyle(color: AppColors.accent, fontSize: 11,
+        fontWeight: FontWeight.bold));
+  }
   final n = (r['rank'] as num).toInt();
   final medal = n == 1 ? Colors.amber : n == 2 ? const Color(0xFFCFD8DC) : n == 3 ? const Color(0xFFCD7F32) : null;
   if (medal == null) {
@@ -165,50 +169,25 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
     );
   }
 
-  /// The board: your own row pinned on top (rank, flag, score and how far behind the one above you), then the
-  /// top 100 with your row highlighted when you are in it. [gapText] writes the gap in the board's unit.
+  /// The board (owner 2026-11-06): the header, then your own row first (highlighted, above #1; rank N/A when
+  /// you are not on this board), then the top 100, where your row is highlighted too.
   Widget list(List<Map<String, dynamic>> rows, Widget Function(Map<String, dynamic>) tile,
       {Widget? header, String Function(num gap)? gapText}) {
     final top = (data?['top'] as num? ?? 100).toInt();
     final me = rows.where((r) => r['isMe'] == true).firstOrNull;
-    final shown = rows.where((r) => (r['rank'] as num) <= top).toList();
+    final shown = [
+      if (me != null) me,
+      ...rows.where((r) => r['rank'] != null && (r['rank'] as num) <= top),
+    ];
     final h = header != null ? 1 : 0;
-    return Column(children: [
-      if (me != null) _meCard(me, tile, gapText ?? (g) => _short(g)),
-      Expanded(child: RefreshIndicator(
-        onRefresh: load,
-        child: ListView.separated(
-          itemCount: shown.length + h,
-          separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white10),
-          itemBuilder: (_, i) => h == 1 && i == 0 ? header! : tile(shown[i - h]),
-        ),
-      )),
-    ]);
-  }
-
-  Widget _meCard(Map<String, dynamic> me, Widget Function(Map<String, dynamic>) tile, String Function(num) gapText) {
-    final rank = (me['rank'] as num).toInt();
-    final gap = data?['gap'] as num?;
-    final total = data?['total'] as num?;
-    final line = rank == 1
-        ? 'You are first${total != null && total > 1 ? ' of ${fmtNum(total)}' : ''}'
-        : gap == null ? '' : gap <= 0 ? 'Level with #${rank - 1}' : '${gapText(gap)} behind #${rank - 1}';
-    return Container(
-      margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6)),
+    return RefreshIndicator(
+      onRefresh: load,
+      child: ListView.separated(
+        itemCount: shown.length + h,
+        separatorBuilder: (_, i) => Divider(height: me != null && i == h ? 6 : 1,
+            thickness: me != null && i == h ? 2 : 1, color: me != null && i == h ? AppColors.accent.withValues(alpha: 0.4) : Colors.white10),
+        itemBuilder: (_, i) => h == 1 && i == 0 ? header! : tile(shown[i - h]),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        tile(me),
-        if (line.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(56, 0, 10, 6),
-            child: Text(line, style: TextStyle(fontSize: 11, color: AppColors.accent)),
-          ),
-      ]),
     );
   }
 }

@@ -54,7 +54,9 @@ class _QuestsScreenState extends State<QuestsScreen> {
       final extra = ms.isEmpty
           ? ''
           : ' · Streak: ${fmtCredits(ms.fold<num>(0, (a, m) => a + (m['credits'] as num? ?? 0)))}';
-      AppNotify.show(context, 'Reward: ${fmtCredits(r.data['credits'] as num)}$extra');
+      final books = (r.data['books'] as num? ?? 0);
+      AppNotify.show(context, 'Reward: ${fmtCredits(r.data['credits'] as num)}'
+          '${books > 0 ? ' and ${books.round()} books' : ''}$extra');
       context.read<PlayerProvider>().refresh();
       context.read<Company>().refresh();
     }
@@ -94,6 +96,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
         final qs = (d['quests'] as List).cast<Map<String, dynamic>>();
         final daily = (d['daily'] as Map?)?.cast<String, dynamic>();
         final reward = (d['reward'] as Map<String, dynamic>? ?? const {})['credits'] as num? ?? 0;
+        final books = (d['reward'] as Map<String, dynamic>? ?? const {})['books'] as num? ?? 0;
         final co = context.read<Company>();
         final today = qs.isEmpty ? '' : qs.map((q) => q['day'] as String).reduce((a, b) => a.compareTo(b) > 0 ? a : b);
         final done = qs.where((q) => q['day'] == today && q['claimed'] == true).length;
@@ -115,7 +118,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
             if (qs.isEmpty)
               Padding(padding: const EdgeInsets.all(24),
                   child: Center(child: Text('No quests right now', style: TextStyle(color: AppColors.t54)))),
-            for (final q in qs) _questCard(q, reward),
+            for (final q in qs) _questCard(q, reward, books),
             const SizedBox(height: 10),
             Text('Quests are extra: each one pays when you finish it, and one is always quick. They end at '
                 'midnight (UTC) and new ones come every day. They don\'t affect your streak.',
@@ -126,7 +129,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
     );
   }
 
-  Widget _questCard(Map<String, dynamic> q, num reward) {
+  Widget _questCard(Map<String, dynamic> q, num reward, num books) {
     final (icon, color) = _look(q['code'] as String);
     final claimed = q['claimed'] == true;
     final progress = (q['progress'] as num).toDouble(), target = (q['target'] as num).toDouble();
@@ -155,6 +158,15 @@ class _QuestsScreenState extends State<QuestsScreen> {
               '${progress.toInt()} of ${target.toInt()}',
               if (!claimed) _left(q['expiresAt'] as String),
             ].join(' · '), style: TextStyle(fontSize: 11, color: AppColors.t54)),
+            if (books > 0 && !claimed)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(children: [
+                  const Icon(Icons.menu_book_outlined, size: 12, color: Colors.amber),
+                  const SizedBox(width: 3),
+                  Text('+ ${books.round()} books', style: const TextStyle(fontSize: 11, color: Colors.amber)),
+                ]),
+              ),
           ])),
           const SizedBox(width: 8),
           if (!claimed)

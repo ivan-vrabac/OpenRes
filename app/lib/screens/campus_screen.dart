@@ -894,11 +894,12 @@ Future<void> showCampusLevels(BuildContext context) async {
               ),
             ]),
             const SizedBox(height: 6),
+            Flexible(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (!open(page))
               Container(
-                height: 5 * 92,
+                height: 320,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.lock_outline, size: 48, color: AppColors.t38),
                   const SizedBox(height: 10),
@@ -907,48 +908,81 @@ Future<void> showCampusLevels(BuildContext context) async {
                 ]),
               )
             else
-              for (final l in shown)
-                Builder(builder: (_) {
-                  final lvl = (l['level'] as num).toInt();
-                  final cost = l['cost'] as Map<String, dynamic>?;
-                  return Container(
-                    height: 84,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: lvl == cur ? cs.primary.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: lvl == cur ? cs.primary : cs.outline.withValues(alpha: 0.5)),
-                    ),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(campusPicture(lvl), width: 64, height: 66, fit: BoxFit.contain,
-                            cacheWidth: 128, gaplessPlayback: true),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: SingleChildScrollView(
-                        physics: const ClampingScrollPhysics(),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Level $lvl · ${l['stage']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text('${l['supervisors']} supervisors · ${l['queueSlots']} education slot'
-                              '${(l['queueSlots'] as num) > 1 ? 's' : ''} · surveys up to ${fmtNum((l['surveyRadius'] as num) / 1000)} km',
-                              style: TextStyle(fontSize: 12, color: AppColors.t70)),
-                          for (final (what, list) in _CampusScreenState._unlocks(co, lvl))
-                            Text('$what: $list', style: TextStyle(fontSize: 12, color: AppColors.accent)),
-                          if (cost != null)
-                            Text('Costs ꞓ${fmtNum(cost['credits'] as num)}, '
-                                '${(cost['materials'] as Map).entries.map((e) => '${fmtNum(e.value as num)} ${co.itemName(e.key as String).toLowerCase()}').join(', ')}'
-                                ', storage level ${cost['storage']}',
-                                style: TextStyle(fontSize: 11, color: AppColors.t54)),
-                        ]),
-                      )),
-                    ]),
-                  );
-                }),
+              for (final l in shown) _levelCard(co, cs, l, cur),
+            ]))),
           ]),
         ),
       );
     }),
+  );
+}
+
+/// A distance for people: 100 m, 950 m, 1.5 km, 5 km.
+String _dist(num m) => m < 1000 ? '${m.round()} m'
+    : '${(m / 1000).toStringAsFixed(m % 1000 == 0 ? 0 : 1)} km';
+
+/// One Campus level in the levels sheet: the picture, what it gives, what it unlocks and what it costs.
+Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
+  final lvl = (l['level'] as num).toInt();
+  final cost = l['cost'] as Map<String, dynamic>?;
+  final here = lvl == cur, done = lvl < cur;
+  final slots = (l['queueSlots'] as num).toInt();
+  Widget chip(IconData icon, String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(8)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 13, color: AppColors.t54),
+          const SizedBox(width: 4),
+          Text(text, style: TextStyle(fontSize: 11, color: AppColors.t70)),
+        ]),
+      );
+  final unlocks = _CampusScreenState._unlocks(co, lvl);
+  return Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: here ? cs.primary.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: here ? cs.primary : cs.outline.withValues(alpha: 0.4)),
+    ),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.asset(campusPicture(lvl), width: 64, height: 66, fit: BoxFit.contain, cacheWidth: 128, gaplessPlayback: true),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('Level $lvl', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(l['stage'] as String? ?? '', overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: AppColors.t54))),
+          if (here) Text('You', style: TextStyle(fontSize: 11, color: cs.primary, fontWeight: FontWeight.bold))
+          else if (done) Icon(Icons.check, size: 16, color: Colors.greenAccent.withValues(alpha: 0.8)),
+        ]),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          chip(Icons.groups_outlined, '${l['supervisors']} supervisors'),
+          chip(Icons.school_outlined, '$slots education slot${slots == 1 ? '' : 's'}'),
+          chip(Icons.radar, 'Surveys ${_dist(l['surveyRadius'] as num)}'),
+        ]),
+        for (final (what, list) in unlocks)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.lock_open, size: 14, color: AppColors.accent),
+              const SizedBox(width: 4),
+              Expanded(child: Text('$what: $list', style: TextStyle(fontSize: 12, color: AppColors.accent))),
+            ]),
+          ),
+        if (cost != null) ...[
+          const SizedBox(height: 6),
+          Text('To reach it: ꞓ${fmtNum(cost['credits'] as num)}'
+              '${(cost['materials'] as Map).entries.map((e) => ', ${fmtNum(e.value as num)} ${co.itemName(e.key as String).toLowerCase()}').join()}'
+              ', Central Storage level ${cost['storage']}',
+              style: TextStyle(fontSize: 11, color: AppColors.t54)),
+        ],
+      ])),
+    ]),
   );
 }

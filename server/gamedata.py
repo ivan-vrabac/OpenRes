@@ -408,6 +408,7 @@ STREAK_MATERIALS = [(1, {"books": 10}), (7, {"books": 50}), (14, {"books": 150})
 # owner 2026-11-06: ONE streak, the daily reward's. The bonuses the quest streak used to pay come on these days:
 # every 7th day of the streak 5 quest rewards more, every 30th day 10 more (both on day 210, 420, ...)
 STREAK_BONUS = [(7, 5), (30, 10)]
+QUEST_BOOKS = 10           # owner 2026-11-06: every quest also pays books (education needs them)
 EXPLORE_M = 1000           # the "explore" quest: a survey at least this far from your Campus
 
 

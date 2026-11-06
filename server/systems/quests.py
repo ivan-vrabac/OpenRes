@@ -353,7 +353,7 @@ def install(api) -> None:
         from .company import streak_status
         row = conn.execute("SELECT * FROM co_state WHERE hid=?", (hid,)).fetchone()
         daily = streak_status(row, now) if row else None
-        return {"err": 0, "quests": view(conn, hid, now), "reward": {"credits": quest_credits(level)},
+        return {"err": 0, "quests": view(conn, hid, now), "reward": {"credits": quest_credits(level), "books": g.QUEST_BOOKS},
                 "endsAt": _midnight_after(now).isoformat(), "daily": daily,
                 "streak": daily["current"] if daily else 0}
 
@@ -377,8 +377,11 @@ def install(api) -> None:
                 raise econ.GameError("already_claimed", "Reward already claimed")
             credits = quest_credits(campus_level(conn, hid))
             econ.credit(conn, hid, credits, "quest_reward", str(qid))
+            from .company import add_stock
+            st = conn.execute("SELECT storage_level FROM co_state WHERE hid=?", (hid,)).fetchone()
+            books = add_stock(conn, hid, "books", g.QUEST_BOOKS, st[0] if st else 1)       # as far as room allows
             econ.emit(conn, "quest_completed", hid, {"code": q["code"]}, public=False)
             conn.execute("INSERT OR IGNORE INTO achievements(hid, code, title, ts) VALUES(?,?,?,?)",
                          (hid, "first_quest", "Completed a daily quest", now.isoformat()))
         # owner 2026-11-06: quests are a side hustle, each pays on its own; the streak is the daily reward's
-        return {"err": 0, "credits": credits, "milestones": []}
+        return {"err": 0, "credits": credits, "books": books, "milestones": []}

@@ -194,14 +194,22 @@ def install(api) -> None:
                 "gap": _gap(rows, me), "countryFilter": form.get("country") == "1" and bool(mine_cc)}
         return part, meta
 
+    def with_me(conn, hid, out, meta, **zero):
+        """Your own row is always there (owner 2026-11-06): without a place on this board, rank None (N/A)."""
+        if meta.get("myRank") is None and not any(r.get("isMe") for r in out):
+            me = refs(conn, [hid], hid).get(hid)
+            if me:
+                out.append({"rank": None, **me, **zero, "country": countries(conn).get(hid, ""), "isMe": True})
+        return out
+
     @api.endpoint("/api/v1/rank/players")
     def players(conn, hid, form):
         rows = overall_rows(conn)
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
         # owner 2026-11-06: activity stays hidden from players (and the value, which would give it away)
-        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0],
-                                            "country": r[4] or "", "isMe": r[2] == hid} for n, r in part]}
+        return {"err": 0, **meta, "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "score": r[0],
+                                            "country": r[4] or "", "isMe": r[2] == hid} for n, r in part], meta, score=0)}
 
     @api.endpoint("/api/v1/rank/campus")
     def campus(conn, hid, form):
@@ -209,8 +217,9 @@ def install(api) -> None:
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
         cc = countries(conn)
-        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0], "level": r[3],
-                                            "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part]}
+        return {"err": 0, **meta, "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "score": r[0], "level": r[3],
+                                            "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part],
+                                                  meta, score=0, level=0)}
 
     @api.endpoint("/api/v1/rank/hexes")
     def hexes(conn, hid, form):
@@ -218,8 +227,9 @@ def install(api) -> None:
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
         cc = countries(conn)
-        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "hexes": r[0], "items": r[1],
-                                            "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part]}
+        return {"err": 0, **meta, "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "hexes": r[0], "items": r[1],
+                                            "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part],
+                                                  meta, hexes=0, items=0)}
 
     @api.endpoint("/api/v1/rank/countries")
     def country_board(conn, hid, form):
@@ -232,7 +242,8 @@ def install(api) -> None:
         return {"err": 0, "myCountry": mine, "myRank": None if me is None else me + 1, "total": len(rows), "top": TOP,
                 "gap": _gap(rows, me),
                 "rows": [{"rank": i + 1, "country": r[2], "score": r[0], "companies": r[1], "isMe": r[2] == mine}
-                         for i, r in part]}
+                         for i, r in part] + ([{"rank": None, "country": mine, "score": 0, "companies": 0, "isMe": True}]
+                                              if mine and me is None else [])}
 
     @api.endpoint("/api/v1/rank/tantalum")
     def tantalum(conn, hid, form):
@@ -245,8 +256,8 @@ def install(api) -> None:
         cc = countries(conn)
         mine = conn.execute("SELECT produced FROM co_luxury WHERE hid=?", (hid,)).fetchone()
         return {"err": 0, **meta, "myMg": round(mine[0], 3) if mine else 0,
-                "rows": [{"rank": n, **rf[r[2]], "mg": r[0], "investedMg": r[1], "country": cc.get(r[2], ""),
-                          "isMe": r[2] == hid} for n, r in part]}
+                "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "mg": r[0], "investedMg": r[1], "country": cc.get(r[2], ""),
+                          "isMe": r[2] == hid} for n, r in part], meta, mg=0, investedMg=0)}
 
     @api.endpoint("/api/v1/rank/resource")
     def resource(conn, hid, form):
@@ -259,8 +270,8 @@ def install(api) -> None:
             cc = countries(conn)
             return {"err": 0, **meta, "kind": kind, "item": None, "options": options,
                     "names": {i: g.ITEM_NAMES[i] for i in RAW + PRODUCTS},
-                    "rows": [{"rank": n, **rf[r[2]], "perHour": r[0], "count": r[1], "country": cc.get(r[2], ""),
-                              "isMe": r[2] == hid} for n, r in part]}
+                    "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "perHour": r[0], "count": r[1],
+                              "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part], meta, perHour=0, count=0)}
         if kind not in options:
             raise econ.GameError("bad_input", "Choose raw materials or products")
         item = (form.get("item") or options[kind][0]).strip()
@@ -272,5 +283,5 @@ def install(api) -> None:
         cc = countries(conn)
         return {"err": 0, **meta, "kind": kind, "item": item, "options": options,
                 "names": {i: g.ITEM_NAMES[i] for i in RAW + PRODUCTS},
-                "rows": [{"rank": n, **rf[r[2]], "perHour": r[0], "count": r[1], "country": cc.get(r[2], ""),
-                          "isMe": r[2] == hid} for n, r in part]}
+                "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "perHour": r[0], "count": r[1],
+                          "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part], meta, perHour=0, count=0)}

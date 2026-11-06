@@ -193,3 +193,15 @@ def test_boards_show_the_top_100_and_your_own_row():
     ranks = [x["rank"] for x in r["rows"]]
     assert ranks[:100] == list(range(1, 101)) and ranks[-1] == r["myRank"] and r["rows"][-1]["isMe"]
     assert len(r["rows"]) == 101 and r["gap"] is not None and r["gap"] >= 0
+
+
+def test_your_row_is_there_even_with_nothing_on_the_board():
+    """Owner 2026-11-06: Tantalum, hexes, output: your row shows, rank N/A (None) when you have none."""
+    hid, sid, name = new_player("rkna")
+    rankings._cache.clear()
+    for path, extra in [("/api/v1/rank/tantalum", {}), ("/api/v1/rank/hexes", {}),
+                        ("/api/v1/rank/resource", {"kind": "all"}), ("/api/v1/rank/resource", {"kind": "raw"}),
+                        ("/api/v1/rank/campus", {})]:
+        rows = call(path, sid, **extra)["rows"]
+        mine = [r for r in rows if r["isMe"]]
+        assert len(mine) == 1 and mine[0]["rank"] is None and mine[0]["name"] == name, (path, mine)
