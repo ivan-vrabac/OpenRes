@@ -163,8 +163,8 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
             onSelected: (v) { setState(() => country = v); load(); },
           ),
         const SizedBox(width: 8),
-        Expanded(child: Text(note ?? 'Top ${d['top'] ?? 100}', style: TextStyle(color: AppColors.t54, fontSize: 12),
-            overflow: TextOverflow.ellipsis)),
+        Expanded(child: Text(note ?? 'Top ${d['top'] ?? 100} · updates every 5 minutes',
+            style: TextStyle(color: AppColors.t54, fontSize: 12), overflow: TextOverflow.ellipsis)),
       ]),
     );
   }
@@ -307,7 +307,7 @@ class _CountryBoardState extends _BoardState<_CountryBoard> {
       }, header: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Text('Top ${data!['top'] ?? 100}', style: TextStyle(color: AppColors.t54, fontSize: 12)),
+          child: Text('Top ${data!['top'] ?? 100} · updates every 5 minutes', style: TextStyle(color: AppColors.t54, fontSize: 12)),
         ),
         _note('The overall scores of every company of a country added up.'),
         _infoRow('Companies', 'Score', who: 'Country'),
@@ -334,7 +334,7 @@ class _LuxuryBoardState extends _BoardState<_LuxuryBoard> {
       return list(rows, gapText: (g) => fmtMass(g), (r) => _row(context, r, value: fmtMass(r['mg'] as num),
           middle: Text(fmtMass(r['investedMg'] as num? ?? 0), style: TextStyle(fontSize: 12, color: AppColors.t70))),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
-        controls(note: 'Top 100 · you have made ${fmtMass(data!['myMg'] as num? ?? 0)}'),
+        controls(note: 'Top 100 · updates every 5 minutes · you made ${fmtMass(data!['myMg'] as num? ?? 0)}'),
         _infoRow('In research', 'Made in total'),
       ]));
     });
