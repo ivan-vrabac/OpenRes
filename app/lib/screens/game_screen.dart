@@ -25,6 +25,7 @@ import 'factory_screen.dart';
 import 'market_screen.dart';
 import 'achievements_screen.dart';
 import 'leaderboard_screen.dart';
+import '../widgets/picture_cache.dart';
 import 'campus_screen.dart';
 import 'luxury_screen.dart';
 import 'profile_screen.dart';
@@ -128,7 +129,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       // Android 13+ asks once; without it no notification can show
       NotificationService.requestPermission().whenComplete(() => ChatBridge.configure(prov.sid));
       Legal.report(prov.sid);                     // the server keeps who accepted which terms
-      Future.delayed(const Duration(seconds: 2), () { if (mounted) warmFlags(context); });   // leaderboard flags
+      // the leaderboard flags and the game's pictures, decoded in the background: they never pop in
+      Future.delayed(const Duration(seconds: 2), () async {
+        if (mounted) await warmGamePictures(context);
+        if (mounted) await warmFlags(context);
+      });
       ChatBridge.reportDevice(prov.sid);          // multi-account detection (hashed device ID)
       IntegrityCheck.start(prov.sid);             // real app on a real device?
       PlayGames.start(prov.sid);                  // achievements recorded, and on to Play Games

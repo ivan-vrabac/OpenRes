@@ -4,6 +4,8 @@ import 'dart:async';
 import '../widgets/async_view.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/player_provider.dart';
+import '../services/kept.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/top_banner.dart';
 import '../constants.dart';
@@ -37,9 +39,22 @@ class _FactoryScreenState extends State<FactoryScreen> {
 
   Company get _co => context.read<Company>();
 
+  String get _keptKey => Kept.key(context.read<PlayerProvider>().player?.hid ?? '', 'plants');
+
   @override
   void initState() {
     super.initState();
+    // the plants as last seen (owner 2026-11-06: a spinner every time): at once, then refreshed
+    final kept = Kept.now(_keptKey);
+    if (kept != null) {
+      _plants = (kept['plants'] as List).cast<Map<String, dynamic>>();
+      _loading = false;
+    } else {
+      Kept.fromDisk(_keptKey).then((d) {
+        if (d == null || !mounted || _plants != null) return;
+        setState(() { _plants = (d['plants'] as List).cast<Map<String, dynamic>>(); _loading = false; });
+      });
+    }
     SharedPreferences.getInstance().then((p) {
       if (mounted) setState(() => _order = p.getStringList(_kOrder) ?? []);
     });
@@ -54,12 +69,15 @@ class _FactoryScreenState extends State<FactoryScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
+    if (!silent && _plants == null) setState(() => _loading = true);
     final r = await _co.call('/api/v3/plants');
     if (!mounted) return;
     setState(() {
       _loading = false;
-      if (r.ok) _plants = r.list('plants');
+      if (r.ok) {
+        _plants = r.list('plants');
+        Kept.save(_keptKey, {'plants': _plants});
+      }
     });
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../models/player_provider.dart';
+import '../services/kept.dart';
 import '../services/game_api.dart';
 import '../widgets/async_view.dart';
 import '../widgets/glass.dart' show tabPadding;
@@ -42,10 +43,28 @@ class _MarketScreenState extends State<MarketScreen> {
 
   String get _sid => context.read<PlayerProvider>().sid;
 
+  String get _keptKey => Kept.key(context.read<PlayerProvider>().player?.hid ?? '', 'market');
+
   @override
   void initState() {
     super.initState();
+    if (_items.isEmpty) _fromDisk();
     _load();
+  }
+
+  /// The list from the app's last run (owner 2026-11-06): shown at once while the fresh one comes.
+  Future<void> _fromDisk() async {
+    final d = await Kept.fromDisk(_keptKey);
+    if (d == null || !mounted || _items.isNotEmpty) return;
+    setState(() { _show(d); _loading = false; });
+  }
+
+  void _show(Map<String, dynamic> d) {
+    _items = (d['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    _orders = (d['orders'] as List? ?? const []).cast<Map<String, dynamic>>();
+    _taxMin = (d['taxMin'] as num? ?? 0.05).toDouble();
+    _taxMax = (d['taxMax'] as num? ?? 0.25).toDouble();
+    _cItems = _items; _cOrders = _orders;
   }
 
   /// Refreshes values in place: the spinner only shows on the very first load.
@@ -58,12 +77,11 @@ class _MarketScreenState extends State<MarketScreen> {
     if (!mounted) return;
     setState(() {
       _loading = false;
-      if (!res[0].ok) { _error = res[0].message; return; }
-      _items = res[0].list('items');
-      _taxMin = (res[0].data['taxMin'] as num? ?? 0.05).toDouble();
-      _taxMax = (res[0].data['taxMax'] as num? ?? 0.25).toDouble();
-      _orders = res[1].list('orders');
-      _cItems = _items; _cOrders = _orders;
+      if (!res[0].ok) { if (_items.isEmpty) _error = res[0].message; return; }
+      final d = {'items': res[0].list('items'), 'orders': res[1].list('orders'),
+                 'taxMin': res[0].data['taxMin'], 'taxMax': res[0].data['taxMax']};
+      _show(d);
+      Kept.save(_keptKey, d);
     });
   }
 

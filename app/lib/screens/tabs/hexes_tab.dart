@@ -345,7 +345,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                         onSelected: (_) => _pickSort(s))),
                 const Spacer(),
                 if (!choosing)
-                  Text('Hold to choose', style: TextStyle(fontSize: 11, color: AppColors.t38)),
+                  Text('Hold to select', style: TextStyle(fontSize: 11, color: AppColors.t38)),
               ]),
               const SizedBox(height: 8),
               for (final m in hexes) _hexCard(co, m, steps, unit, shown, choosing, first: identical(m, hexes.first)),
