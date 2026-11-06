@@ -25,7 +25,7 @@ import '../../services/location_service.dart';
 import '../../widgets/live_location_layer.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/slide_confirm.dart';
-import '../../widgets/async_view.dart' show HexPicture, fmtCredits;
+import '../../widgets/async_view.dart' show CreditsIcon, HexPicture;
 import '../../map_kit/campus_pins.dart';
 import '../../map_kit/heatmap.dart';
 import '../../map_kit/map_objects.dart';
@@ -793,8 +793,14 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
               Expanded(child: AnimatedBuilder(animation: Listenable.merge([UiLook.showHud, UiLook.hideBalance]),
                   builder: (_, __) => UiLook.showHud.value || UiLook.hideBalance.value
                   ? const SizedBox.shrink()
-                  : Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text(fmtCredits(co.credits),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber)))))),
+                  // the same look as in the top bar (owner 2026-11-06: it was yellow here)
+                  : Center(child: FittedBox(fit: BoxFit.scaleDown, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      CreditsIcon(size: 15, color: AppColors.t54),
+                      const SizedBox(width: 3),
+                      Text('ꞓ${fmtNum(co.credits)}', style: TextStyle(fontSize: 12,
+                          color: co.credits < 0 ? Colors.redAccent : AppColors.t70,
+                          fontWeight: co.credits < 0 ? FontWeight.bold : null)),
+                    ]))))),
               // Navigation
               _mapBtn(Icons.my_location, () {
                 setState(() => _following = true);
