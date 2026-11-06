@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'luxury_screen.dart' show fmtMass;
 import 'package:provider/provider.dart';
@@ -104,6 +105,29 @@ Widget _row(BuildContext context, Map<String, dynamic> r, {Widget? middle, requi
   );
 }
 
+// The flags as the boards show them: decoded this wide (the image cache knows them by path and width).
+const _rowFlagW = 54, _countryFlagW = 72;
+var _flagsWarm = false;
+
+/// Decode every flag once, at the sizes the leaderboards use, so they never pop in (owner 2026-11-06: even
+/// after the app was closed). Called a moment after the game opens; about 2 MB.
+Future<void> warmFlags(BuildContext context) async {
+  if (_flagsWarm) return;
+  _flagsWarm = true;
+  try {
+    final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    final flags = manifest.listAssets().where((a) => a.startsWith('assets/images_countryflags/'));
+    for (final path in flags) {
+      if (!context.mounted) return;
+      for (final w in const [_rowFlagW, _countryFlagW]) {
+        await precacheImage(ResizeImage.resizeIfNeeded(w, null, AssetImage(path)), context);
+      }
+    }
+  } catch (_) {
+    _flagsWarm = false;                       // try again next time
+  }
+}
+
 /// A small country flag before a name (nothing when the country is unknown).
 Widget _flag(String? cc) => cc == null || cc.isEmpty
     ? const SizedBox.shrink()
@@ -111,7 +135,7 @@ Widget _flag(String? cc) => cc == null || cc.isEmpty
         padding: const EdgeInsets.only(right: 6),
         child: ClipRRect(borderRadius: BorderRadius.circular(2), child: Image.asset(
             'assets/images_countryflags/${cc.toLowerCase()}.png', width: 18, height: 12, fit: BoxFit.cover,
-            cacheWidth: 54, gaplessPlayback: true,              // decoded small: shows at once, stays cached
+            cacheWidth: _rowFlagW, gaplessPlayback: true,       // decoded small: shows at once, stays cached
             errorBuilder: (_, __, ___) => const SizedBox.shrink())),
       );
 
@@ -335,7 +359,7 @@ class _CountryBoardState extends _BoardState<_CountryBoard> {
             const SizedBox(width: 8),
             ClipRRect(borderRadius: BorderRadius.circular(2), child: Image.asset(
                 'assets/images_countryflags/$cc.png', width: 24, height: 16, fit: BoxFit.cover,
-                cacheWidth: 72, gaplessPlayback: true,
+                cacheWidth: _countryFlagW, gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => const SizedBox(width: 24))),
             const SizedBox(width: 8),
             Expanded(flex: 4, child: Text(cc == 'zz' ? 'Intl. waters' : cc.toUpperCase(), style: TextStyle(fontSize: 13,

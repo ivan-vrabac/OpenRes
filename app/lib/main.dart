@@ -34,6 +34,8 @@ Widget _failedPage(FlutterErrorDetails details) => GestureDetector(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // room for the warmed leaderboard flags (512 small ones) next to the game's other pictures
+  PaintingBinding.instance.imageCache.maximumSize = 2000;
   if (kReleaseMode) ErrorWidget.builder = _failedPage;
   await loadNumDecimalsPrefs();
   await NotificationService.init();
