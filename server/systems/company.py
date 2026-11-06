@@ -530,7 +530,10 @@ def install(api) -> None:
                 "hexes": hexes, "maxHexes": g.MAX_HEXES, "expiringSoon": expiring,
                 "survey": survey, "surveyNext": row["survey_next"],
                 "surveyMaxRadius": g.survey_max_radius(max(1, lv)),
-                "supervisors": lv * g.SUPERVISORS_PER_LEVEL}
+                "supervisors": lv * g.SUPERVISORS_PER_LEVEL,
+                # the Campus page shows "appointed / all" at once, before its supervisor list loads
+                "appointed": conn.execute("SELECT COUNT(*) FROM co_supervisors WHERE hid=? AND hex_id IS NOT NULL",
+                                          (hid,)).fetchone()[0]}
 
     @api.endpoint("/api/v3/campus/place")
     def campus_place(conn, hid, form):

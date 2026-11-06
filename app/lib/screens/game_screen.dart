@@ -414,7 +414,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               if (hud)
                 Positioned(top: under ? statusTop : 0, left: 0, right: 0, child: ValueListenableBuilder<bool>(
                   valueListenable: tutorialLocked,
-                  builder: (_, locked, hud) => IgnorePointer(ignoring: locked, child: hud),
+                  builder: (_, locked, hud) => ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus,
+                      builder: (_, focus, __) => IgnorePointer(ignoring: locked || focus != null, child: hud)),
                   child: ValueListenableBuilder<bool>(valueListenable: UiLook.hudOpensCompany,
                       builder: (_, opens, __) => PlayerHud(onTap: opens ? _openStats : null)))),
             ]),
@@ -452,7 +453,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 return SizedBox(
                   width: tabW,
                   child: InkWell(
-                    onTap: () { if (!tutorialLocked.value) _goToTab(i); },
+                    // a tutorial task (a card waiting for one tap) keeps the player on its tab (owner 2026-11-06)
+                    onTap: () { if (!tutorialLocked.value && tutorialFocus.value == null) _goToTab(i); },
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

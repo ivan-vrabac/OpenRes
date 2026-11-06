@@ -169,7 +169,11 @@ class _CampusScreenState extends State<CampusScreen> {
           await _loadSups();
         },
         // all of it built, so the tutorial can scroll to the supervisors
-        child: ListView(padding: tabPadding(context, 12, underAppBar: ModalRoute.of(context)?.canPop == true), cacheExtent: 5000, children: [
+        // a tutorial task here (Train, the queue): the page stays still, only the lit button works
+        child: ValueListenableBuilder<GlobalKey?>(valueListenable: tutorialFocus, builder: (_, focus, __) => ListView(
+            physics: focus == campusTrainKey || focus == campusQueueKey
+                ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+            padding: tabPadding(context, 12, underAppBar: ModalRoute.of(context)?.canPop == true), cacheExtent: 5000, children: [
           if (!co.hasCampus)
             _noCampus()
           else ...[
@@ -193,7 +197,7 @@ class _CampusScreenState extends State<CampusScreen> {
             const SectionLabel('Location'),
             _moveCard(co),
           ],
-        ]),
+        ])),
       ),
     );
   }
@@ -216,7 +220,7 @@ class _CampusScreenState extends State<CampusScreen> {
     final lv = co.campusLevel;
     final s = _sups;
     final total = (s?['total'] as num?)?.toInt() ?? (co.state['supervisors'] as num?)?.toInt() ?? 0;
-    final assigned = (s?['assigned'] as num?)?.toInt();
+    final assigned = (s?['assigned'] as num?)?.toInt() ?? (co.state['appointed'] as num?)?.toInt();
     final eff = (co.efficiency * 100).round();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Stack(children: [
