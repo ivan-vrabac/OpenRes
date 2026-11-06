@@ -385,6 +385,9 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
                 child: DropdownButton<String>(
                   isExpanded: true,
                   isDense: true,                       // fits the fixed row (owner 2026-11-06: it was cut off)
+                  // a small scrolling menu at the button, not the whole screen (owner 2026-11-06)
+                  menuMaxHeight: MediaQuery.sizeOf(context).height * 0.4,
+                  borderRadius: BorderRadius.circular(12),
                   hint: const Text('Choose an item'),
                   value: options.contains(item) ? item : null,
                   items: [
