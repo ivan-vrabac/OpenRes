@@ -461,9 +461,19 @@ def collect(conn, hid):
         eff = efficiency(row, now) * (1 + g.DARK_MATTER_BONUS * row["dm_level"])
         made: dict[str, float] = {}
         finish_education(conn, hid, now)
-        for h in conn.execute(HEX_ROWS + " WHERE h.hid=? AND h.op!='campus'", (hid,)):
-            end = min(now, parse(h["lease_until"]) or now)
-            hours = (end - last).total_seconds() / 3600
+        # owner 2026-11-07: added up in the database, not hex by hex (10 000 hexes held the write lock for up to
+        # 0.3 s). A hex makes quality x a rate of its operation and item x its supervisor's boost, so the hexes
+        # still leased the whole time count as one sum of qualities per (operation, item, education)...
+        full = (now - last).total_seconds() / 3600
+        for op, item, edu, quality in conn.execute(
+                "SELECT h.op, h.item, s.edu, SUM(h.quality) FROM co_hexes h LEFT JOIN co_supervisors s ON s.hex_id = h.id "
+                "WHERE h.hid=? AND h.op!='campus' AND (h.lease_until IS NULL OR h.lease_until>=?) "
+                "GROUP BY h.op, h.item, s.edu", (hid, iso(now))):
+            boost = 1 + (g.EDUCATION[edu][1] if edu is not None else 0)
+            made[item] = made.get(item, 0) + rate_per_hour(op, item, quality) * boost * full
+        # ...and the few whose lease ran out meanwhile count up to its end, one by one
+        for h in conn.execute(HEX_ROWS + " WHERE h.hid=? AND h.op!='campus' AND h.lease_until<?", (hid, iso(now))):
+            hours = (min(now, parse(h["lease_until"])) - last).total_seconds() / 3600
             if hours <= 0:
                 continue
             boost = 1 + (g.EDUCATION[h["edu"]][1] if h["edu"] is not None else 0)
@@ -513,9 +523,11 @@ def hex_value_per_hour(op, item, quality) -> float:
 def income_per_hour(conn, hid, row) -> dict:
     eff = efficiency(row, utcnow()) * (1 + g.DARK_MATTER_BONUS * row["dm_level"])
     out: dict[str, float] = {}
-    for h in conn.execute(HEX_ROWS + " WHERE h.hid=? AND h.op!='campus'", (hid,)):
-        boost = 1 + (g.EDUCATION[h["edu"]][1] if h["edu"] is not None else 0)
-        out[h["item"]] = out.get(h["item"], 0) + rate_per_hour(h["op"], h["item"], h["quality"]) * boost * eff
+    for op, item, edu, quality in conn.execute(        # summed in the database, like collect()
+            "SELECT h.op, h.item, s.edu, SUM(h.quality) FROM co_hexes h LEFT JOIN co_supervisors s ON s.hex_id = h.id "
+            "WHERE h.hid=? AND h.op!='campus' GROUP BY h.op, h.item, s.edu", (hid,)):
+        boost = 1 + (g.EDUCATION[edu][1] if edu is not None else 0)
+        out[item] = out.get(item, 0) + rate_per_hour(op, item, quality) * boost * eff
     return out
 
 

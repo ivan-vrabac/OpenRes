@@ -668,3 +668,52 @@ def test_a_cut_off_map_says_which_box_it_filled(monkeypatch):
     assert inside and inside <= got                         # nothing inside the cover is missing
     assert sum(r["clouds"][2::3]) >= 900                    # and clouds of the whole area come with it
     assert "cover" not in call("/api/v3/map", sid, south=-20.0002, west=29.9998, north=-19.9998, east=30.0002)
+
+
+def test_collecting_many_hexes_in_the_database_matches_hex_by_hex(monkeypatch):
+    """Owner 2026-11-07: production is added up in the database, not hex by hex. It must give exactly what the
+    old way gave: every operation, quality and supervisor education, leases running out during the time or before."""
+    import random
+    hid, sid = setup_hq("collsum", at=(-33.5, 25.5))
+    rnd = random.Random(11)
+    t0 = datetime.datetime(2026, 11, 7, 12, 0, 0)
+    last, now = t0, t0 + datetime.timedelta(hours=7, minutes=13)
+    ops = [(op, next(i for i in items if i != g.ENERGY) if any(i != g.ENERGY for i in items) else g.ENERGY)
+           for op, (_n, _l, items, _u) in g.OPERATIONS.items()]
+    with main.get_db() as conn:
+        conn.execute("UPDATE co_state SET last_collect=?, storage_level=50 WHERE hid=?", (co.iso(last), hid))
+        hexes = []
+        for k in range(400):
+            op, item = ops[k % len(ops)]
+            lease = rnd.choice([now + datetime.timedelta(days=30), now + datetime.timedelta(days=30),
+                                last + datetime.timedelta(minutes=rnd.randint(1, 430)),      # runs out in the time
+                                last - datetime.timedelta(hours=2)])                         # ran out before it
+            cur = conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                               "VALUES(?,?,?,?,?,?,?,?)", (hid, -33.5 + k * 0.0003, 25.6, op, item, rnd.randint(1, 100),
+                                                          co.iso(last - datetime.timedelta(days=3)), co.iso(lease)))
+            hexes.append(cur.lastrowid)
+        for k, hx in enumerate(hexes[::3]):                                                  # supervisors on some
+            conn.execute("INSERT INTO co_supervisors(hid, edu, hex_id) VALUES(?,?,?)", (hid, k % len(g.EDUCATION), hx))
+        conn.commit()
+        row = co.state_row(conn, hid)
+        eff = co.efficiency(row, now) * (1 + g.DARK_MATTER_BONUS * row["dm_level"])
+        want: dict = {}                                                                        # the old way, hex by hex
+        for h in conn.execute(co.HEX_ROWS + " WHERE h.hid=? AND h.op!='campus'", (hid,)):
+            hours = (min(now, co.parse(h["lease_until"])) - last).total_seconds() / 3600
+            if hours <= 0:
+                continue
+            boost = 1 + (g.EDUCATION[h["edu"]][1] if h["edu"] is not None else 0)
+            want[h["item"]] = want.get(h["item"], 0) + co.rate_per_hour(h["op"], h["item"], h["quality"]) * boost * hours
+    got: dict = {}
+    monkeypatch.setattr(co, "utcnow", lambda: now)
+    monkeypatch.setattr(co, "add_stock", lambda c, h, item, q, lv: got.__setitem__(item, got.get(item, 0) + q))
+    monkeypatch.setattr(co, "PRODUCTION_HOOKS", [])
+    with main.get_db() as conn:
+        co.collect(conn, hid)
+        conn.commit()
+        left = conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus' AND lease_until<?",
+                            (hid, co.iso(now))).fetchone()[0]
+    assert set(got) == set(want)
+    for item in want:
+        assert math.isclose(got[item], want[item] * eff, rel_tol=1e-9), item
+    assert left == 0                                                     # the run-out leases were handed back
