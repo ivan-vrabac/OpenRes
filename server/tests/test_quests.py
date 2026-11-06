@@ -567,3 +567,19 @@ def test_international_waters_are_no_country_on_the_board():
     rankings._cache.clear()
     rows = call("/api/v1/rank/countries", sid)["rows"]
     assert all(r["country"] != "zz" or r["rank"] is None for r in rows)
+
+
+def test_countries_on_both_sides_of_tricky_borders():
+    """Owner 2026-11-06: points a few hundred metres either side of a border, enclaves and microstates."""
+    import countries
+    for (lat, lng), cc in {(42.9230, 17.6150): "ba", (42.9450, 17.5780): "hr",      # Neum corridor
+                           (45.1550, 18.0150): "hr", (45.1350, 18.0100): "ba",      # the Sava at Brod
+                           (54.7100, 20.5100): "ru", (54.3800, 19.8200): "pl",      # Kaliningrad
+                           (36.1300, -5.3450): "gi", (36.1650, -5.3480): "es",      # Gibraltar
+                           (35.8890, -5.3200): "es", (35.8480, -5.3580): "ma",      # Ceuta
+                           (42.4640, 1.9800): "es", (42.4330, 1.9450): "fr",        # Llivia
+                           (48.9850, -123.0600): "us", (49.0150, -123.0800): "ca",  # Point Roberts
+                           (37.9300, 126.6800): "kr", (37.9700, 126.5500): "kp",    # the DMZ
+                           (22.3200, 114.1700): "hk", (22.5450, 114.0600): "cn",
+                           (43.9356, 12.4473): "sm", (-29.3150, 27.4850): "ls"}.items():
+        assert countries.country_at(lat, lng) == cc, (lat, lng, cc)
