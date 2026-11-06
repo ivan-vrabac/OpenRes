@@ -50,8 +50,8 @@ class MapWorld extends ChangeNotifier {
 
   LatLngBounds? _box;        // what the last answer covered
   LatLngBounds? _acrossBox;  // and its part beyond the date line
-  double _boxZoom = 0;
   bool _boxDetail = false;
+  double _boxZoom = 0;
   bool _boxCut = false;      // the answer hit a server limit
   DateTime? _boxAt;
   // owner 2026-11-06: asking again for the same area sends what the server called it ("sig"); with
@@ -86,10 +86,11 @@ class MapWorld extends ChangeNotifier {
       inner.south >= outer.south && inner.north <= outer.north &&
       inner.west >= outer.west && inner.east <= outer.east;
 
-  /// The view plus one view on every side, less when the server would call it too big.
-  static LatLngBounds _withMargin(LatLngBounds view, bool detail) {
+  /// The view plus one view on every side, less when the server would call it too big, and half that when
+  /// the last answer was cut off ([crowded]: a built-up place, where a smaller area is filled sooner).
+  static LatLngBounds _withMargin(LatLngBounds view, bool detail, {bool crowded = false}) {
     final h = view.north - view.south, w = view.east - view.west;
-    var m = 1.0;
+    var m = crowded ? 0.5 : 1.0;
     if (detail) {
       final area = h * w;
       while (m > 0 && area * (1 + 2 * m) * (1 + 2 * m) > _maxDetailArea) m -= 0.25;
@@ -115,13 +116,25 @@ class MapWorld extends ChangeNotifier {
     final box = _box, view = _view, at = _boxAt;
     if (view == null) return false;
     if (_dirty || box == null || at == null) return true;
-    if (!_inside(view, box)) return true;
+    if (!_inside(view, box)) {
+      // owner 2026-11-06: a cut-off answer covers only the box the server filled (`cover`), so the view
+      // leaving it asks again. In a place so built up that even the view holds more than one answer can
+      // carry, it asks again only when the view's middle leaves the middle of what was filled (never in a loop).
+      final tooFull = _boxCut && _boxDetail &&
+          (box.north - box.south < view.north - view.south || box.east - box.west < view.east - view.west);
+      if (!tooFull) return true;
+      final lat = (view.north + view.south) / 2, lng = (view.east + view.west) / 2;
+      final qh = (box.north - box.south) / 4, qw = (box.east - box.west) / 4;
+      final mid = (box.north + box.south) / 2, mlng = (box.east + box.west) / 2;
+      if ((lat - mid).abs() > qh || (lng - mlng).abs() > qw) return true;
+    }
     final across = _across, abox = _acrossBox;
     if (across != null && (abox == null || !_inside(across, abox))) return true;
     if (DateTime.now().difference(at) >= _maxAge) return true;
     if (_zoom >= kHexZoom && !_boxDetail) return true;
     if (_zoom < kHexZoom && (_boxDetail || cloudLevel(_zoom) != _boxCloud)) return true;   // other cloud squares
-    return _boxCut && _zoom >= _boxZoom + 1;        // up close the cut-off parts may be in view
+    // far out a cut-off answer (more clouds than one answer carries) is asked again closer in
+    return _boxCut && !_boxDetail && _zoom >= _boxZoom + 1;
   }
 
   /// Keep [view] covered. Cheap: call it as often as you like (camera moves, a timer). With [centerLng]
@@ -163,8 +176,9 @@ class MapWorld extends ChangeNotifier {
         final sameArea = old != null && _boxDetail == detail && cloud == _boxCloud && _inside(view, old) &&
             (_across == null || (_acrossBox != null && _inside(_across!, _acrossBox!))) &&
             _fullAt != null && DateTime.now().difference(_fullAt!) < _fullEvery;
-        final box = sameArea ? old : _withMargin(view, detail);
-        final across = _across == null ? null : (sameArea ? _acrossBox : _withMargin(_across!, detail));
+        final crowded = _boxCut && _boxDetail && detail;
+        final box = sameArea ? old : _withMargin(view, detail, crowded: crowded);
+        final across = _across == null ? null : (sameArea ? _acrossBox : _withMargin(_across!, detail, crowded: crowded));
         final r = await _fetch('/api/v3/map', {'south': box.south, 'west': box.west,
             'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0, if (!detail) 'cloud': cloud,
             if (sameArea) 'sig': _sig});
@@ -187,11 +201,13 @@ class MapWorld extends ChangeNotifier {
           continue;
         }
         if (!sameArea) _fullAt = DateTime.now();
-        _merge(r, box, detail, also: ra == null ? null : (ra, across!));
-        _box = box;
-        _acrossBox = across;
-        _boxZoom = zoom;
+        // what is really loaded: the box the server filled when it had to cut the answer off
+        final filled = _cover(r) ?? box;
+        _merge(r, filled, detail, also: ra == null ? null : (ra, _cover(ra) ?? across!));
+        _box = filled;
+        _acrossBox = ra == null ? across : (_cover(ra) ?? across);
         _boxDetail = detail;
+        _boxZoom = zoom;
         _boxCloud = cloud;
         _boxCut = r.data['more'] == true;
         _boxAt = DateTime.now();
@@ -199,6 +215,13 @@ class MapWorld extends ChangeNotifier {
     } finally {
       _busy = false;
     }
+  }
+
+  static LatLngBounds? _cover(ApiResult r) {
+    final c = r.data['cover'];
+    if (c is! List || c.length != 4) return null;
+    final v = [for (final x in c) (x as num).toDouble()];
+    return LatLngBounds(LatLng(v[0], v[1]), LatLng(v[2], v[3]));
   }
 
   void _merge(ApiResult r, LatLngBounds box, bool detail, {(ApiResult, LatLngBounds)? also}) {

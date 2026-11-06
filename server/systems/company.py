@@ -1010,11 +1010,18 @@ def install(api) -> None:
             raise econ.GameError("too_big", "Zoom in to see hexes")
         now = utcnow()
         out = []
+        # nearest the middle first, measured in the box's own shape: when the limit cuts the answer off, what
+        # was sent fills a smaller box of the same shape completely (`cover`, owner 2026-11-06: up close in a
+        # built-up city hexes were missing at the edges and the app did not know it had to ask again)
+        clat, clng = (s + n) / 2, (w + e) / 2
+        hh, hw = max((n - s) / 2, 1e-9), max((e - w) / 2, 1e-9)
+        reach = 0.0
         for r in conn.execute("SELECT h.id, h.hid, h.lat, h.lng, h.op, h.item, h.quality, h.lease_until, h.built_at, s.edu "
                               "FROM co_hexes h LEFT JOIN co_supervisors s ON s.hex_id = h.id "
                               "WHERE h.lat BETWEEN ? AND ? AND h.lng BETWEEN ? AND ? "
-                              "ORDER BY ABS(h.lat-?) + ABS(h.lng-?) LIMIT ?",
-                              (s, n, w, e, (s + n) / 2, (w + e) / 2, MAP_HEXES)):
+                              "ORDER BY MAX(ABS(h.lat-?) / ?, ABS(h.lng-?) / ?) LIMIT ?",
+                              (s, n, w, e, clat, hh, clng, hw, MAP_HEXES)):
+            reach = max(reach, abs(r["lat"] - clat) / hh, abs(r["lng"] - clng) / hw)
             mine = r["hid"] == hid
             hx = {"id": r["id"], "lat": r["lat"], "lng": r["lng"], "op": r["op"], "item": r["item"], "own": mine}
             age = (now - parse(r["built_at"])).total_seconds()
@@ -1027,7 +1034,12 @@ def install(api) -> None:
                 if days < g.LEASE_CRITICAL_DAYS:              # only the critical ones (red countdown)
                     hx["leaseDays"] = round(days, 2)
             out.append(hx)
-        res["more"] = res["more"] or len(out) == MAP_HEXES
+        if len(out) == MAP_HEXES:
+            res["more"] = True
+            # every hex closer than the last one sent is in the answer: that box is complete (a hair less, as
+            # others at the same distance may be left out)
+            k = max(0.0, reach - 1e-9)
+            res["cover"] = [clat - k * hh, clng - k * hw, clat + k * hh, clng + k * hw]
         out += [{"id": None, "lat": c[0], "lng": c[1], "op": "campus", "item": None, "own": owner == hid}
                 for owner, c in site_cells]
         res["hexes"] = out

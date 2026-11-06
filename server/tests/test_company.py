@@ -643,3 +643,27 @@ def test_clouds_add_hexes_up_per_square():
         after = conn.execute("SELECT level, cy, cx, n FROM hex_grid ORDER BY 1, 2, 3").fetchall()
         conn.commit()
     assert [tuple(x) for x in before] == [tuple(x) for x in after]
+
+
+def test_a_cut_off_map_says_which_box_it_filled(monkeypatch):
+    """Owner 2026-11-06: more hexes than the limit: the answer fills a smaller box completely and says so."""
+    hid, sid = setup_hq("mcover", at=(-20.0, 30.0))
+    with main.get_db() as conn:
+        for i in range(30):
+            for j in range(30):
+                conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                             "VALUES(?,?,?,?,?,?,?,?)", (hid, -20.01 + i * 0.0007, 30.01 + j * 0.0007, "logging_camp",
+                                                         "wood", 50, "2026-01-01", "2027-01-01"))
+        conn.commit()
+    monkeypatch.setattr(co, "MAP_HEXES", 200)
+    box = dict(south=-20.012, west=30.008, north=-19.988, east=30.032)
+    r = call("/api/v3/map", sid, **box)
+    assert r["more"] is True and len(r["hexes"]) == 200
+    s, w, n, e = r["cover"]
+    assert box["south"] < s < n < box["north"] and box["west"] < w < e < box["east"]
+    got = {(round(h["lat"], 6), round(h["lng"], 6)) for h in r["hexes"]}
+    with main.get_db() as conn:
+        inside = {(round(a, 6), round(b, 6)) for a, b in conn.execute(
+            "SELECT lat, lng FROM co_hexes WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?", (s, n, w, e))}
+    assert inside and inside <= got                         # nothing inside the cover is missing
+    assert "cover" not in call("/api/v3/map", sid, south=-20.0002, west=29.9998, north=-19.9998, east=30.0002)

@@ -26,6 +26,7 @@ class Server {
   bool cut = false;
   Completer<void>? gate;
   int? version;                              // set: answers carry a sig and say "same" while it holds
+  double? coverShare;                        // set: up close the answer only fills this share of the box
 
   bool _in(Map<String, dynamic> m, Map<String, Object?> a) =>
       (m['lat'] as num) >= (a['south'] as num) && (m['lat'] as num) <= (a['north'] as num) &&
@@ -43,7 +44,12 @@ class Server {
     return ApiResult({
       'campuses': campuses.where((c) => _in(c, a)).toList(),
       'moves': moving.where((m) => _in(m, a)).toList(),
-      'more': cut,
+      'more': cut || coverShare != null,
+      if (coverShare != null && a['detail'] == 1) 'cover': () {
+        final s = a['south'] as num, n = a['north'] as num, w = a['west'] as num, e = a['east'] as num;
+        final k = coverShare!, ch = (n - s) / 2, cw = (e - w) / 2, cl = (n + s) / 2, cg = (e + w) / 2;
+        return [cl - k * ch, cg - k * cw, cl + k * ch, cg + k * cw];
+      }(),
       if (v != null) 'sig': '$v',
       if (a['detail'] == 1) 'hexes': inside
       else 'dots': [for (final h in inside) ...[h['lat'], h['lng']]],
@@ -223,6 +229,36 @@ void main() {
     w.want(at(45, 16, 0.25), 8.5);
     await settle();
     expect(srv.calls.length, greaterThan(n));
+  });
+
+  test('up close in a built-up place: leaving the filled box asks again at once (owner 2026-11-06)', () async {
+    srv.coverShare = 0.5;                    // the answer fills the middle half of what was asked
+    w.want(at(45, 16, 0.002), 17);
+    await settle();
+    final n = srv.calls.length;
+    w.want(at(45.001, 16, 0.002), 17);       // still inside what was filled
+    await settle();
+    expect(srv.calls.length, n);
+    w.want(at(45.004, 16, 0.002), 17);       // past its edge: ask again, around the new view
+    await settle();
+    expect(srv.calls.length, n + 1);
+    final a = srv.calls.last;
+    expect(((a['north'] as num) + (a['south'] as num)) / 2, closeTo(45.004, 0.0005));
+  });
+
+  test('so built up that not even the view fits: no endless asking, again once the view moves on', () async {
+    srv.coverShare = 0.05;                   // a tiny part of the view
+    w.want(at(45, 16, 0.002), 17);
+    await settle();
+    final n = srv.calls.length;
+    for (var i = 0; i < 5; i++) {
+      w.want(at(45, 16, 0.002), 17);         // the timer, the camera: same view
+      await settle();
+    }
+    expect(srv.calls.length, n);
+    w.want(at(45.003, 16, 0.002), 17);       // moved well away
+    await settle();
+    expect(srv.calls.length, n + 1);
   });
 
   test('the world view does not loop: bounds beyond the map still count as covered', () async {
