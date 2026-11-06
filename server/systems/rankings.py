@@ -102,10 +102,18 @@ def campus_rows(conn):
     return [r[:4] for r in rows]
 
 
+# The hex boards add up in the database per (company, operation, item) on idx_co_hexes_agg: a hex's output is
+# its quality times a rate of its operation and item, so a sum of qualities is enough (owner 2026-11-06: a
+# million hexes in Zagreb took 9 s here, now under 1 s).
+
 def hex_rows(conn):
     """(hexes, distinct items, hid), most hexes first."""
-    return sorted(((n, items, hid) for hid, n, items in conn.execute(
-        "SELECT hid, COUNT(*), COUNT(DISTINCT item) FROM co_hexes WHERE op!='campus' GROUP BY hid")), reverse=True)
+    acc = {}
+    for hid, _item, n in conn.execute("SELECT hid, item, COUNT(*) FROM co_hexes WHERE op!='campus' GROUP BY hid, item"):
+        v = acc.setdefault(hid, [0, 0])
+        v[0] += n
+        v[1] += 1
+    return sorted(((v[0], v[1], hid) for hid, v in acc.items()), reverse=True)
 
 
 def country_rows(conn):
@@ -126,11 +134,12 @@ PRODUCTS = sorted({recipe[1][0] for _n, _u, _m, recipes in g.FACTORIES.values() 
 def raw_rows(conn, item):
     """(per hour, hexes, hid) of everyone who makes `item` on hexes, best first."""
     acc = {}
-    for r in conn.execute("SELECT hid, op, quality FROM co_hexes WHERE item=?", (item,)):
-        v = acc.setdefault(r["hid"], [0.0, 0])
-        rate = co.rate_per_hour(r["op"], item, r["quality"])
+    for hid, op, quality, n in conn.execute("SELECT hid, op, SUM(quality), COUNT(*) FROM co_hexes WHERE item=? "
+                                            "GROUP BY hid, op", (item,)):
+        v = acc.setdefault(hid, [0.0, 0])
+        rate = co.rate_per_hour(op, item, quality)
         v[0] += rate / 1000 if item == g.ENERGY else rate
-        v[1] += 1
+        v[1] += n
     return sorted(((round(v[0], 1), v[1], hid) for hid, v in acc.items()), reverse=True)
 
 
@@ -150,10 +159,11 @@ def product_rows(conn, item):
 def all_rows(conn):
     """(credits per hour, hexes + plant levels, hid): everything made in an hour, valued at prices."""
     acc = {}
-    for r in conn.execute("SELECT hid, op, item, quality FROM co_hexes WHERE op!='campus'"):
-        v = acc.setdefault(r["hid"], [0.0, 0])
-        v[0] += co.rate_per_hour(r["op"], r["item"], r["quality"]) * _unit_price(r["item"])
-        v[1] += 1
+    for hid, op, item, quality, n in conn.execute("SELECT hid, op, item, SUM(quality), COUNT(*) FROM co_hexes "
+                                                  "WHERE op!='campus' GROUP BY hid, op, item"):
+        v = acc.setdefault(hid, [0.0, 0])
+        v[0] += co.rate_per_hour(op, item, quality) * _unit_price(item)
+        v[1] += n
     for r in conn.execute("SELECT hid, key, level, recipe FROM co_plants"):
         _inputs, (out, qty), hours, _kwh = production.batch(r["key"], r["recipe"])
         if out in g.UNTRADABLE:

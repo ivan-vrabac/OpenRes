@@ -171,6 +171,7 @@ def init_schema(conn) -> None:
         );                                                  --  column: always name the columns, never h.*)
         CREATE INDEX IF NOT EXISTS idx_co_hexes_pos ON co_hexes(lat, lng);
         CREATE INDEX IF NOT EXISTS idx_co_hexes_hid ON co_hexes(hid);
+        CREATE INDEX IF NOT EXISTS idx_co_hexes_agg ON co_hexes(hid, op, item, quality);   -- the hex boards
         CREATE TABLE IF NOT EXISTS co_supervisors (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             hid    TEXT NOT NULL,
