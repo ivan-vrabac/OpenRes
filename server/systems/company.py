@@ -215,6 +215,8 @@ def migrate(conn) -> None:
     if "streak_day" not in cols:
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_day INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE co_state ADD COLUMN streak_last TEXT")
+    if "streak_best" not in cols:                # the longest daily reward streak (the Streak achievement)
+        conn.execute("ALTER TABLE co_state ADD COLUMN streak_best INTEGER NOT NULL DEFAULT 0")
     # Campus compounds placed with the neighbours at the corners (overlapping): put them edge to edge
     for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state WHERE campus_level>0").fetchall():
         cells = conn.execute("SELECT lat, lng FROM co_hexes WHERE hid=? AND op='campus'", (r["hid"],)).fetchall()
@@ -630,6 +632,8 @@ def install(api) -> None:
                          "WHERE hid=?", (lat, lng, radius, iso(now), iso(nxt), hid))
             conn.execute("UPDATE co_state SET surveys=surveys+1 WHERE hid=?", (hid,))
             econ.emit(conn, "survey", hid, {"radius": radius}, public=False)
+            if row["campus_lat"] is not None and dist_m(lat, lng, row["campus_lat"], row["campus_lng"]) >= g.EXPLORE_M:
+                econ.emit(conn, "survey_far", hid, {"radius": radius}, public=False)
             log(conn, hid, "survey", lat=lat, lng=lng, radius=radius, cost=g.survey_tax(radius))
         return {"err": 0, "tax": g.survey_tax(radius), "next": iso(nxt)}
 
@@ -981,6 +985,8 @@ def install_campus(api) -> None:
             # the supervisor already there takes this one's old place (or goes back to the Campus)
             conn.execute("UPDATE co_supervisors SET hex_id=? WHERE hid=? AND hex_id=?", (sup["hex_id"], hid, hex_id))
             conn.execute("UPDATE co_supervisors SET hex_id=? WHERE id=?", (hex_id, sup_id))
+            if sup["hex_id"] is None:                       # one from the Campus (a quest counts it)
+                econ.emit(conn, "supervisor_appointed", hid, {"hex": hex_id}, public=False)
         return {"err": 0}
 
     @api.endpoint("/api/v3/supervisors/unassign")
@@ -1125,9 +1131,15 @@ def streak_status(row, now=None) -> dict:
     going = last in {(today - datetime.timedelta(days=d)).isoformat() for d in range(3)}
     current = row["streak_day"] if going else 0
     day = current if claimed else current + 1
-    return {"day": day, "current": current, "claimed": claimed,
+    # a missed day (one is forgiven): the app can say the streak is still alive
+    missed = going and not claimed and last != (today - datetime.timedelta(days=1)).isoformat()
+    nxt = g.next_streak_bonus(day)
+    return {"day": day, "current": current, "claimed": claimed, "missedOne": bool(missed and current),
             "credits": g.streak_reward(day, row["campus_level"]),
-            "materials": g.streak_materials(day)}
+            "bonus": g.streak_bonus(day, row["campus_level"]),
+            "materials": g.streak_materials(day),
+            "nextBonus": {"day": nxt, "credits": g.streak_bonus(nxt, row["campus_level"])},
+            "best": max(row["streak_best"] if "streak_best" in row.keys() else 0, current)}
 
 
 def install_streak(api) -> None:
@@ -1140,7 +1152,8 @@ def install_streak(api) -> None:
             row = collect(conn, hid)
         return {"err": 0, **streak_status(row),
                 "table": [{"from": d, "credits": g.streak_reward(d, row["campus_level"]), "materials": g.streak_materials(d)}
-                          for d, _ in g.STREAK_REWARD]}
+                          for d, _ in g.STREAK_REWARD],
+                "bonuses": [{"every": e, "credits": g.quest_credits(row["campus_level"]) * t} for e, t in g.STREAK_BONUS]}
 
     @api.endpoint("/api/v3/streak/claim")
     def streak_claim(conn, hid, form):
@@ -1150,11 +1163,11 @@ def install_streak(api) -> None:
             if s["claimed"]:
                 raise econ.GameError("claimed", "Today's reward is already yours. Come back tomorrow.")
             got = {item: add_stock(conn, hid, item, q, row["storage_level"]) for item, q in s["materials"].items()}
-            econ.credit(conn, hid, s["credits"], "login_streak", str(s["day"]))
-            conn.execute("UPDATE co_state SET streak_day=?, streak_last=? WHERE hid=?",
-                         (s["day"], utcnow().date().isoformat(), hid))
-            log(conn, hid, "daily_reward", day=s["day"], credits=s["credits"])
-        return {"err": 0, "day": s["day"], "credits": s["credits"], "materials": got}
+            econ.credit(conn, hid, s["credits"] + s["bonus"], "login_streak", str(s["day"]))
+            conn.execute("UPDATE co_state SET streak_day=?, streak_last=?, streak_best=MAX(streak_best, ?) WHERE hid=?",
+                         (s["day"], utcnow().date().isoformat(), s["day"], hid))
+            log(conn, hid, "daily_reward", day=s["day"], credits=s["credits"] + s["bonus"])
+        return {"err": 0, "day": s["day"], "credits": s["credits"], "bonus": s["bonus"], "materials": got}
 
 
 def install_views(api) -> None:

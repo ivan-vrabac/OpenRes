@@ -423,6 +423,7 @@ def install(api) -> None:
                          "status, created_at, expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                          (order_id, hid, item, price, qty, qty, escrow, 0.0, "open", now.isoformat(),
                           (now + datetime.timedelta(days=ORDER_DAYS)).isoformat()))
+            econ.emit(conn, "market_order", hid, {"item": item}, public=False)          # a quest counts it
             return {"err": 0, "orderID": order_id, "escrow": escrow, "tax": escrow - value}
         return idempotent(conn, hid, form, "market_order", run)
 

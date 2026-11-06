@@ -34,7 +34,7 @@ def test_huge_values_on_every_board():
         r = call(path, sid, **extra)
         assert r["err"] == 0, (path, r)
     top = call("/api/v1/rank/players", sid)["rows"][0]
-    assert top["value"] >= 5 * 10**18 and isinstance(top["value"], int)
+    assert top["score"] >= 10**18 and isinstance(top["score"], int)     # the value itself is not sent (owner 2026-11-06)
     hr = next(r for r in call("/api/v1/rank/countries", sid)["rows"] if r["country"] == "HR")
     assert hr["companies"] == 2 and hr["score"] > 5 * 10**18           # adding up past the 64-bit range is fine
     for _hid, s in hids:

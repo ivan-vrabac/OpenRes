@@ -413,82 +413,14 @@ def test_new_quests_end_at_midnight():
     assert all(q["expiresAt"] == tomorrow + "T00:00:00" for q in call(Q, sid)["quests"])
 
 
-def test_a_missed_day_adds_nothing_and_today_still_counts_once():
-    hid, sid, _ = new_player("qz")
-    today = econ.utcnow().date()
-    with main.get_db() as conn:
-        for back in (3, 2):                   # two good days, yesterday missed
-            d = (today - datetime.timedelta(days=back)).isoformat()
-            conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
-                         "VALUES(?,?,?,?,?,?)", (hid, d, "survey", d, d, d))
-        conn.commit()
-    assert call(Q, sid)["streak"] == 2                                   # alive, and yesterday isn't counted
-    today_s = today.isoformat()
-    _force_quests(hid, ["plant"], day=today_s)
-    _events(hid, "plant_upgraded", 2)
-    with main.get_db() as conn:
-        qid = conn.execute("SELECT id FROM daily_quests WHERE hid=? AND day=?", (hid, today_s)).fetchone()[0]
-    assert call(Q + "/claim", sid, id=qid)["streak"] == 3
-
-
-def test_seven_and_thirty_day_streak_milestones_paid_once():
-    hid, sid, _ = new_player("qf", level=1)
-    today = econ.utcnow().date()
-    with main.get_db() as conn:          # 29 previous fully-claimed days
-        for i in range(29, 0, -1):
-            d = (today - datetime.timedelta(days=i)).isoformat()
-            for c in ("survey", "renew", "plant"):
-                conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
-                             "VALUES(?,?,?,?,?,?)", (hid, d, c, d, d, d))
-        conn.commit()
-    _force_quests(hid, ["plant", "survey", "visit"])
-    _events(hid, "plant_upgraded", 2)
-    _events(hid, "survey", 5)
-    _events(hid, "campus_visit", 1)
-    paid = []
-    for q in call(Q, sid)["quests"]:
-        paid += call(Q + "/claim", sid, id=q["id"])["milestones"]
-    # day 30 completes: 7,14,21,28 (5 quest rewards each) + 30 (10 quest rewards)
-    u = quests.quest_credits(1)
-    assert sorted((m["days"], m["credits"]) for m in paid if "every" in m) == \
-        [(7, 5 * u), (14, 5 * u), (21, 5 * u), (28, 5 * u), (30, 10 * u)]
-    assert not [m for m in paid if m.get("daily")]                               # a streak day itself pays nothing
-    with main.get_db() as conn:
-        assert quests.pay_milestones(conn, hid, today.isoformat()) == []   # never twice
-        assert quests.current_streak(conn, hid) == 30
-        days = conn.execute("SELECT MAX(length) FROM streak_rewards WHERE hid=? AND every=1", (hid,)).fetchone()[0]
-        assert days == 30                                       # recorded for the streak achievement
-
-
-def test_broken_streak_restarts_milestones():
-    hid, sid, _ = new_player("qg")
-    today = econ.utcnow().date()
-    with main.get_db() as conn:
-        # 7-day streak long ago (already paid), a gap, then 6 days up to yesterday
-        days = [today - datetime.timedelta(days=i) for i in list(range(20, 13, -1)) + list(range(6, 0, -1))]
-        for d in days:
-            for c in ("survey",):
-                conn.execute("INSERT INTO daily_quests(hid, day, code, assigned_at, expires_at, claimed_at) "
-                             "VALUES(?,?,?,?,?,?)", (hid, d.isoformat(), c, d.isoformat(), d.isoformat(), d.isoformat()))
-        quests.pay_milestones(conn, hid, (today - datetime.timedelta(days=14)).isoformat())
-        conn.commit()
-    _force_quests(hid, ["survey"])
-    _events(hid, "survey", 5)
-    q = call(Q, sid)["quests"][0]
-    r = call(Q + "/claim", sid, id=q["id"])
-    u = quests.quest_credits(1)
-    assert [(m["days"], m["credits"]) for m in r["milestones"] if "every" in m] == [(7, 5 * u)]   # new streak
-
-
 def test_variable_targets_and_reward_plan():
     t = {quests.target_of("build_hexes", f"h{i}", "2026-01-01") for i in range(200)}
     assert min(t) >= 2 and max(t) <= 5 and len(t) > 2
     hid, sid, _ = new_player("qtu")
     codes = {q["code"] for q in call(Q, sid)["quests"]}
     assert codes <= set(quests.POOL)
-    plan = call(Q, sid)["rewardPlan"]
-    u = quests.quest_credits(1)
-    assert "daily" not in plan and plan["milestones"][0] == {"every": 7, "credits": 5 * u}
+    r = call(Q, sid)
+    assert r["reward"]["credits"] == quests.quest_credits(1) and "endsAt" in r and "rewardPlan" not in r
 
 
 def test_one_missed_day_keeps_the_streak_two_end_it():
@@ -581,15 +513,21 @@ def test_every_day_has_one_quick_quest():
         assert len(qs) == quests.DAILY_COUNT and quick, qs
 
 
-def test_visit_is_not_dealt_while_it_is_closed():
-    hid = new_player("qvisit")[0]
-    import gamedata as g
-    now = datetime.datetime.combine(econ.utcnow().date(), datetime.time(22, 0))      # 2 h before midnight
-    with main.get_db() as conn:                      # visited just now: closed for 8 h, past midnight
-        conn.execute("INSERT INTO co_state(hid, campus_level, visit_at) VALUES(?,?,?) ON CONFLICT(hid) DO UPDATE SET "
-                     "campus_level=1, visit_at=excluded.visit_at", (hid, 1, now.isoformat()))
-        assert g.VISIT_EVERY_HOURS > 2
-        assert not quests.doable(conn, hid, "visit", now)
-        conn.execute("UPDATE co_state SET visit_at=NULL WHERE hid=?", (hid,))
-        assert quests.doable(conn, hid, "visit", now)
-        conn.rollback()
+def test_quests_pay_on_their_own_and_have_no_streak():
+    """Owner 2026-11-06: quests are a side hustle; the only streak is the daily reward's."""
+    hid, sid, _ = new_player("qside")
+    _force_quests(hid, ["survey", "trade", "visit"])
+    _events(hid, "survey", 3)
+    q = next(x for x in call(Q, sid)["quests"] if x["code"] == "survey")
+    before = credits(hid)
+    r = call(Q + "/claim", sid, id=q["id"])
+    assert r["err"] == 0 and r["milestones"] == [] and credits(hid) == before + r["credits"]
+    assert call(Q, sid)["streak"] == 0                       # claiming quests doesn't start a streak
+
+
+def test_new_quest_kinds_count_their_actions():
+    hid, sid, _ = new_player("qnew")
+    _force_quests(hid, ["appoint", "buy_order", "explore"])
+    for t in ("supervisor_appointed", "market_order", "survey_far"):
+        _events(hid, t, 3)
+    assert all(q["claimable"] for q in call(Q, sid)["quests"])

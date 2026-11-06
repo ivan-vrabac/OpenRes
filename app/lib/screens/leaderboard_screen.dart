@@ -8,8 +8,9 @@ import '../widgets/async_view.dart';
 import 'profile_screen.dart';
 
 import '../app_colors.dart';
-/// Leaderboards (server: systems/rankings.py): overall (company value x activity), Campus level
-/// (x activity), countries, Tantalum-180m, and output per hour (one item, or everything at prices).
+/// Leaderboards (server: systems/rankings.py): overall (company value, weighed by how often the company plays),
+/// Campus level, countries, Tantalum-180m, and output per hour (one item, or everything at prices). The
+/// activity share itself is not shown (owner 2026-11-06).
 /// Compact one-line rows; tap a row for the company sheet. Big numbers are always short (1.25T).
 class LeaderboardScreen extends StatelessWidget {
   final bool embedded;                     // a tab of the bottom bar: no back arrow
@@ -190,13 +191,11 @@ class _OverallBoardState extends _BoardState<_OverallBoard> {
     super.build(context);
     return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
       final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
-      return list(rows, (r) => _row(context, r, value: _short(r['score'] as num),
-          middle: Text('${r['activity']} %', style: TextStyle(color: AppColors.t70, fontSize: 12))),
+      return list(rows, (r) => _row(context, r, value: _short(r['score'] as num)),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
             controls(),
-            _note('Score: company value (credits, storage and everything built) times the share of days played '
-                'in the last 100 days.'),
-            _infoRow('Active', 'Score'),
+            _note('Score: your company value (credits, storage and everything built).'),
+            _infoRow('', 'Score'),
           ]));
     });
   }
@@ -217,12 +216,11 @@ class _CampusBoardState extends _BoardState<_CampusBoard> {
     super.build(context);
     return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
       final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
-      return list(rows, (r) => _row(context, r, value: 'Campus ${r['level']}',
-          middle: Text('${r['activity']} %', style: TextStyle(color: AppColors.t70, fontSize: 12))),
+      return list(rows, (r) => _row(context, r, value: 'Campus ${r['level']}'),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
             controls(),
-            _note('Ranked by Campus level times the share of days played in the last 100 days.'),
-            _infoRow('Active', 'Campus'),
+            _note('Ranked by Campus level.'),
+            _infoRow('', 'Campus'),
           ]));
     });
   }

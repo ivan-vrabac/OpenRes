@@ -51,7 +51,7 @@ def campus_level(conn, hid) -> int:
     return max(1, r[0] if r else 1)
 STREAK_MILESTONES = ((7, 5), (30, 10))     # (every N days, quest rewards)
 # owner 2026-11-06: one quest a day is always quick, so the day is easy to keep going: renew one lease (only when
-# a lease can be renewed today), one market trade, or the Campus visit (only when it is allowed today)
+# a lease can be renewed today), one market trade, or the Campus visit (owner: its 8 h wait always ends within the day)
 EASY = ("renew", "trade", "visit")
 
 
@@ -64,6 +64,11 @@ POOL = {
     "trade":        (("Make {} market trade", "Make {} market trades"), "market_trade", (2, 5)),
     "renew":        (("Renew {} hex lease", "Renew {} hex leases"), "hex_renewed", (1, 3)),
     "visit":        (("Visit your Campus", "Visit your Campus"), "campus_visit", 1),
+    # owner 2026-11-06: more kinds
+    "appoint":      (("Appoint {} supervisor to a hex", "Appoint {} supervisors to hexes"), "supervisor_appointed", (1, 3)),
+    "buy_order":    (("Place a buy order on the Market", "Place {} buy orders on the Market"), "market_order", 1),
+    "explore":      (("Survey at least 1 km away from your Campus", "Survey at least 1 km away from your Campus"),
+                     "survey_far", 1),
     "place_campus": (("Place your Campus", "Place your Campus"), "campus_placed", 1),
 }
 
@@ -145,13 +150,10 @@ def doable(conn, hid, code, now) -> bool:
         return False
     if code == "renew":
         return renewable(conn, hid, now) > 0
-    if code == "visit":                         # the weekly visit: only when it opens before midnight
-        from .company import next_visit, parse
-        row = conn.execute("SELECT visit_at FROM co_state WHERE hid=?", (hid,)).fetchone()
-        nxt = next_visit(row, now) if row else None
-        return nxt is None or parse(nxt) < _midnight_after(now)
     if code == "educate":
         return conn.execute("SELECT 1 FROM co_supervisors WHERE hid=? AND edu<4", (hid,)).fetchone() is not None
+    if code == "appoint":                       # a hex to put a supervisor on
+        return conn.execute("SELECT 1 FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)).fetchone() is not None
     if code == "build_hexes":
         return conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)).fetchone()[0] < g.MAX_HEXES
     return True
@@ -163,6 +165,9 @@ def fit_target(conn, hid, code, target, now) -> int:
         return min(target, max(1, renewable(conn, hid, now)))
     if code == "educate":
         return min(target, g.queue_slots(campus_level(conn, hid)))
+    if code == "appoint":
+        hexes = conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus'", (hid,)).fetchone()[0]
+        return min(target, max(1, hexes))
     return target
 
 
@@ -344,15 +349,13 @@ def install(api) -> None:
         with econ.tx(conn):
             assign_today(conn, hid, now)
         level = campus_level(conn, hid)
-        streak = current_streak(conn, hid, now)
-        nxt = min(((streak // e) + 1) * e for e, _ in STREAK_MILESTONES)
-        return {"err": 0, "quests": view(conn, hid, now), "streak": streak, "nextMilestone": nxt,
-                "reward": {"credits": quest_credits(level)},
-                "milestones": [{"every": e, "credits": quest_credits(level) * t} for e, t in STREAK_MILESTONES],
-                # everything the Rewards button lists
-                "rewardPlan": {
-                    "perQuest": [{"itemID": 1, "qty": quest_credits(level)}],
-                    "milestones": [{"every": e, "credits": quest_credits(level) * t} for e, t in STREAK_MILESTONES]}}
+        # the Rewards tab in one answer: today's quests and the daily reward (its streak is the only streak)
+        from .company import streak_status
+        row = conn.execute("SELECT * FROM co_state WHERE hid=?", (hid,)).fetchone()
+        daily = streak_status(row, now) if row else None
+        return {"err": 0, "quests": view(conn, hid, now), "reward": {"credits": quest_credits(level)},
+                "endsAt": _midnight_after(now).isoformat(), "daily": daily,
+                "streak": daily["current"] if daily else 0}
 
     @api.endpoint("/api/v1/quests/claim", feature="QUESTS")
     def claim(conn, hid, form):
@@ -377,6 +380,5 @@ def install(api) -> None:
             econ.emit(conn, "quest_completed", hid, {"code": q["code"]}, public=False)
             conn.execute("INSERT OR IGNORE INTO achievements(hid, code, title, ts) VALUES(?,?,?,?)",
                          (hid, "first_quest", "Completed a daily quest", now.isoformat()))
-            milestones = pay_milestones(conn, hid, q["day"])
-        return {"err": 0, "credits": credits, "milestones": milestones,
-                "streak": current_streak(conn, hid, now)}
+        # owner 2026-11-06: quests are a side hustle, each pays on its own; the streak is the daily reward's
+        return {"err": 0, "credits": credits, "milestones": []}

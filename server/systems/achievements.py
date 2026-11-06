@@ -22,7 +22,7 @@ DEFS = {
     "surveys":      ("Surveyor", "Government surveys", (10, 100, 1000), "surveys"),
     "trader":       ("Trader", "Market trades", (10, 100, 1000), "trades"),
     "storage":      ("Storekeeper", "Central Storage level", (10, 20, 30), ""),
-    "streak":       ("Quest solver", "Daily quest streak", (7, 30, 90), "days"),
+    "streak":       ("Loyal", "Daily reward streak", (7, 30, 90), "days"),
 }
 TIER_NAMES = ("First star", "Second star", "Third star")
 # short score label shown as "<label>: value / target"
@@ -64,7 +64,9 @@ def metrics(conn, h, hid) -> dict:
         "surveys": _one(conn, "SELECT surveys FROM co_state WHERE hid=?", (hid,)),
         "trader": _one(conn, "SELECT COUNT(*) FROM market_trades WHERE buyer_hid=? OR seller_hid=?", (hid, hid)),
         "storage": st["storage_level"] if st else 1,
-        "streak": max(_one(conn, "SELECT MAX(length) FROM streak_rewards WHERE hid=? AND every=1", (hid,)), 0),
+        # the daily reward streak (owner 2026-11-06); the old quest streak still counts for who had one
+        "streak": max(_one(conn, "SELECT MAX(length) FROM streak_rewards WHERE hid=? AND every=1", (hid,)),
+                      _one(conn, "SELECT MAX(streak_best, streak_day) FROM co_state WHERE hid=?", (hid,)), 0),
     }
 
 

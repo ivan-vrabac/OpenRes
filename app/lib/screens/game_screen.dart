@@ -73,7 +73,7 @@ final Map<GameTabId, _TabMeta> tabMeta = {
   GameTabId.luxury: _TabMeta(label: 'Tantalum', icon: Icons.science_outlined,
       draw: (c, s) => TaIcon(color: c, size: s),
       build: () => const LuxuryScreen()),
-  GameTabId.quests: _TabMeta(label: 'Quests', icon: Icons.emoji_events_outlined,
+  GameTabId.quests: _TabMeta(label: 'Rewards', icon: Icons.redeem,
       build: () => const QuestsScreen(), needsScaffold: true),
   GameTabId.stats: _TabMeta(label: 'Company', icon: Icons.bar_chart_outlined,       // owner 2026-11-03: one name
       build: () => const ProfileScreen(embedded: true), needsScaffold: true),

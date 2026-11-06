@@ -73,9 +73,10 @@ extension _MapTutorial on _MapTabState {
         const TutorialStep('Production',
             'Plants sit inside your Campus and turn raw materials into goods worth more, like wood into lumber into furniture. '
             'They need their inputs and electricity in Storage, so make power with solar farms, wind farms or a power plant.', tab: GameTabId.factories),
-        const TutorialStep('Quests',
-            'You get 3 quests a day. Finish all of them every day for a streak, with bonuses every 7 and 30 days. One missed day is forgiven, two end it. '
-            'The daily reward works the same way.', tab: GameTabId.quests),
+        const TutorialStep('Rewards',
+            'Claim the daily reward every day for a streak: it grows, with a bonus every 7th and 30th day. One missed day '
+            'is forgiven, two start it again. Below it are 3 quests a day, each paid when done; one is always quick.',
+            tab: GameTabId.quests),
         const TutorialStep('Leaderboards',
             'Compete on company value, Campus, hexes, output, countries and Tantalum. Value and Campus count how active you are, so a company that stops playing slides down.', tab: GameTabId.leaderboard),
         const TutorialStep('Tantalum-180m',

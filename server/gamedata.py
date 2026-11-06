@@ -405,6 +405,10 @@ QUEST_CAMPUS_SHARE = 0.002                           # a quest reward: this shar
 QUEST_MIN_CREDITS = 5000
 # ... and materials (plan: "credits + materials"): books, which supervisor education needs
 STREAK_MATERIALS = [(1, {"books": 10}), (7, {"books": 50}), (14, {"books": 150}), (30, {"books": 500})]
+# owner 2026-11-06: ONE streak, the daily reward's. The bonuses the quest streak used to pay come on these days:
+# every 7th day of the streak 5 quest rewards more, every 30th day 10 more (both on day 210, 420, ...)
+STREAK_BONUS = [(7, 5), (30, 10)]
+EXPLORE_M = 1000           # the "explore" quest: a survey at least this far from your Campus
 
 
 QUEST_SMOOTH_TO = 10       # up to this Campus level the reward grows a little every level (owner 2026-11-03)
@@ -432,6 +436,17 @@ def streak_reward(day: int, campus_level: int) -> int:
 
 def streak_materials(day: int) -> dict:
     return [m for d, m in STREAK_MATERIALS if day >= d][-1]
+
+
+def streak_bonus(day: int, campus_level: int) -> int:
+    """The extra credits of a streak day that is a multiple of 7 and/or 30 (0 on other days)."""
+    times = sum(t for every, t in STREAK_BONUS if day > 0 and day % every == 0)
+    return quest_credits(campus_level) * times
+
+
+def next_streak_bonus(day: int) -> int:
+    """The next streak day (after `day`) that pays a bonus."""
+    return min(((day // every) + 1) * every for every, _ in STREAK_BONUS)
 
 
 # ── XP: the value of what is permanently consumed ──────────────────────────────────────────────

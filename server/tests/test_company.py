@@ -305,6 +305,16 @@ def test_login_streak_grows_and_resets():
         conn.commit()
     s = call("/api/v3/streak", sid)
     assert s["day"] == 7 and s["credits"] == g.streak_reward(7, 1) and s["materials"] == {"books": 50}
+    # owner 2026-11-06: day 7 also pays the weekly bonus (5 quest rewards), once
+    lv = call("/api/v3/state", sid)["campus"]["level"]
+    assert s["bonus"] == 5 * g.quest_credits(lv) and s["nextBonus"]["day"] == 14
+    before = call("/api/v3/state", sid)["credits"]
+    r = call("/api/v3/streak/claim", sid)
+    assert r["bonus"] == 5 * g.quest_credits(lv)
+    assert call("/api/v3/state", sid)["credits"] == before + g.streak_reward(7, lv) + r["bonus"]
+    s = call("/api/v3/streak", sid)
+    assert s["claimed"] and s["best"] == 7 and s["nextBonus"]["day"] == 14
+    assert g.streak_bonus(30, 1) == 10 * g.quest_credits(1) and g.streak_bonus(210, 1) == 15 * g.quest_credits(1)
     one = (co.utcnow() - datetime.timedelta(days=2)).date().isoformat()
     with main.get_db() as conn:                      # one missed day is forgiven
         conn.execute("UPDATE co_state SET streak_day=20, streak_last=? WHERE hid=?", (one, hid))

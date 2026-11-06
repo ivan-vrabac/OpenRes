@@ -7,9 +7,11 @@ import '../widgets/async_view.dart';
 import '../widgets/top_banner.dart';
 
 import '../app_colors.dart';
-/// Daily quests (they end at midnight) and the streak (0.2.3 redo, owner 2026-10-31): the streak card with this
-/// week's days and the bonuses every 7 and 30 days (a streak day itself pays nothing), then the
-/// quests as cards with their icon in a progress ring and a Claim button with the reward.
+import '../v3/company.dart';
+import '../v3/streak.dart';
+/// The Rewards tab (owner 2026-11-06): the daily reward with the game's only streak on top, then today's
+/// quests, a side hustle: each one pays when it is done, and they end at midnight (UTC). One of them is
+/// always quick.
 class QuestsScreen extends StatefulWidget {
   const QuestsScreen({super.key});
   @override
@@ -54,6 +56,7 @@ class _QuestsScreenState extends State<QuestsScreen> {
           : ' · Streak: ${fmtCredits(ms.fold<num>(0, (a, m) => a + (m['credits'] as num? ?? 0)))}';
       AppNotify.show(context, 'Reward: ${fmtCredits(r.data['credits'] as num)}$extra');
       context.read<PlayerProvider>().refresh();
+      context.read<Company>().refresh();
     }
     _load();
   }
@@ -74,6 +77,9 @@ class _QuestsScreenState extends State<QuestsScreen> {
         'renew' => (Icons.autorenew, Colors.orangeAccent),
         'visit' => (Icons.location_city, Colors.pinkAccent),
         'place_campus' => (Icons.add_location_alt_outlined, Colors.pinkAccent),
+        'appoint' => (Icons.person_pin_circle_outlined, Colors.cyanAccent),
+        'buy_order' => (Icons.add_shopping_cart, Colors.tealAccent),
+        'explore' => (Icons.travel_explore, Colors.lightBlueAccent),
         _ => (Icons.flag_outlined, AppColors.accent),
       };
 
@@ -86,16 +92,19 @@ class _QuestsScreenState extends State<QuestsScreen> {
       builder: () {
         final d = _d!;
         final qs = (d['quests'] as List).cast<Map<String, dynamic>>();
-        final streak = d['streak'] as int? ?? 0;
+        final daily = (d['daily'] as Map?)?.cast<String, dynamic>();
         final reward = (d['reward'] as Map<String, dynamic>? ?? const {})['credits'] as num? ?? 0;
-        final ms = ((d['rewardPlan'] as Map?)?['milestones'] as List? ?? const []).cast<Map<String, dynamic>>();
+        final co = context.read<Company>();
         final today = qs.isEmpty ? '' : qs.map((q) => q['day'] as String).reduce((a, b) => a.compareTo(b) > 0 ? a : b);
         final done = qs.where((q) => q['day'] == today && q['claimed'] == true).length;
         final ofToday = qs.where((q) => q['day'] == today).length;
         return RefreshIndicator(
           onRefresh: _load,
           child: ListView(padding: tabPadding(context, 12), children: [
-            _streakCard(streak, ms),
+            if (daily != null)
+              DailyRewardCard(status: daily, co: co, onClaim: () async {
+                if (await claimDailyReward(context, co)) _load();
+              }),
             const SizedBox(height: 16),
             Row(children: [
               Text("TODAY'S QUESTS", style: TextStyle(fontSize: 11, color: AppColors.t38, letterSpacing: 1.2)),
@@ -108,74 +117,12 @@ class _QuestsScreenState extends State<QuestsScreen> {
                   child: Center(child: Text('No quests right now', style: TextStyle(color: AppColors.t54)))),
             for (final q in qs) _questCard(q, reward),
             const SizedBox(height: 10),
-            Text('Finish all of today\'s quests before midnight (UTC) for a streak day. Missing one day won\'t '
-                'end your streak, missing two in a row will. Your streak days count for the Quest solver achievement.',
+            Text('Quests are extra: each one pays when you finish it, and one is always quick. They end at '
+                'midnight (UTC) and new ones come every day. They don\'t affect your streak.',
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.t38)),
           ]),
         );
       },
-    );
-  }
-
-  /// The streak: the days in the current week of it, the bonus every 7 and every 30 days.
-  Widget _streakCard(int streak, List<Map<String, dynamic>> ms) {
-    num bonus(int every) => ms.firstWhere((m) => m['every'] == every, orElse: () => const {'credits': 0})['credits'] as num;
-    final inWeek = streak == 0 ? 0 : (streak - 1) % 7 + 1;       // day 7 shows a full week
-    final to30 = 30 - streak % 30;
-    final hot = streak > 0;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(colors: [
-          (hot ? Colors.deepOrange : Colors.blueGrey).withValues(alpha: 0.30),
-          Colors.white.withValues(alpha: 0.04),
-        ], begin: Alignment.topLeft, end: Alignment.bottomRight),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Icon(Icons.local_fire_department, size: 44, color: hot ? Colors.orangeAccent : Colors.white24),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('$streak', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1)),
-            Text(streak == 1 ? 'day in a row' : 'days in a row', style: TextStyle(fontSize: 12, color: AppColors.t54)),
-          ])),
-        ]),
-        const SizedBox(height: 14),
-        // this week of the streak: a dot per day, the 7th is the bonus
-        Row(children: [
-          for (var i = 1; i <= 7; i++) ...[
-            Expanded(child: Container(
-              height: 26,
-              decoration: BoxDecoration(
-                color: i <= inWeek ? Colors.orangeAccent.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(child: i == 7
-                  ? Icon(Icons.card_giftcard, size: 15, color: i <= inWeek ? Colors.black : AppColors.t54)
-                  : Text('$i', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                      color: i <= inWeek ? Colors.black : AppColors.t38))),
-            )),
-            if (i < 7) const SizedBox(width: 4),
-          ],
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: Text('Every 7 days', style: TextStyle(fontSize: 12, color: AppColors.t70))),
-          Text(fmtCredits(bonus(7)), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-        ]),
-        const SizedBox(height: 4),
-        Row(children: [
-          Expanded(child: Text('Every 30 days ($to30 to go)', style: TextStyle(fontSize: 12, color: AppColors.t70))),
-          Text(fmtCredits(bonus(30)), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-        ]),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(value: (streak % 30) / 30, minHeight: 4,
-              backgroundColor: Colors.white12, color: Colors.amber),
-        ),
-      ]),
     );
   }
 

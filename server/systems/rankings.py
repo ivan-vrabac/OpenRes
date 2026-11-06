@@ -1,6 +1,7 @@
 """Leaderboards (owner 2026-10-31: no XP points any more):
 
-  overall    company value x activity. Value = credits + Central Storage at prices + what was invested
+  overall    company value x activity. Value = credits + Central Storage at prices + what was invested, less the
+             start credits (a new company starts at 0),
              for good (Campus, plants, storage, hexes, education: the players.xp column counts exactly
              those credits). Activity = share of days played (the last 100 days), so a company that
              stops playing slides down instead of staying on top for ever.
@@ -63,13 +64,15 @@ def _unit_price(item) -> float:
 
 
 def company_values(conn, only: str | None = None) -> dict:
-    """hid: credits + Central Storage at prices + credits invested for good (`only`: one company)."""
+    """hid: credits + Central Storage at prices + credits invested for good, less the start credits (`only`: one
+    company)."""
     where, args = (" AND hid=?", (only,)) if only else ("", ())
     stock = {}
     for hid, item, qty in conn.execute("SELECT hid, item, qty FROM co_stock WHERE qty > 0" + where, args):
         if item not in g.UNTRADABLE:
             stock[hid] = stock.get(hid, 0.0) + qty * _unit_price(item)
-    return {hid: max(0.0, credits or 0) + stock.get(hid, 0.0) + (invested or 0)
+    # owner 2026-11-06: the start credits don't count, so a new company starts at 0 (at the bottom), not mid-table
+    return {hid: max(0.0, max(0.0, credits or 0) + stock.get(hid, 0.0) + (invested or 0) - co.START_CREDITS)
             for hid, credits, invested in conn.execute(
                 "SELECT hID, credits, xp FROM players" + (" WHERE hID=?" if only else ""), args)}
 
@@ -188,7 +191,8 @@ def install(api) -> None:
         rows = overall_rows(conn)
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
-        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0], "activity": r[1], "value": r[3],
+        # owner 2026-11-06: activity stays hidden from players (and the value, which would give it away)
+        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0],
                                             "country": r[4] or "", "isMe": r[2] == hid} for n, r in part]}
 
     @api.endpoint("/api/v1/rank/campus")
@@ -197,7 +201,7 @@ def install(api) -> None:
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
         cc = countries(conn)
-        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0], "activity": r[1], "level": r[3],
+        return {"err": 0, **meta, "rows": [{"rank": n, **rf[r[2]], "score": r[0], "level": r[3],
                                             "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part]}
 
     @api.endpoint("/api/v1/rank/hexes")

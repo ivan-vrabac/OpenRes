@@ -101,8 +101,10 @@ def test_overall_is_value_times_activity():
     rankings._cache.clear()
     rows = {x["name"][:4]: x for x in call("/api/v1/rank/players", a_sid)["rows"] if x["name"].startswith("rkv")}
     import gamedata as g
-    assert rows["rkv1"]["value"] == round(1_000_000 + 1000 * g.PRICES["wood"]) and rows["rkv1"]["activity"] == 100
-    assert rows["rkv2"]["value"] == 5_000_000 and rows["rkv2"]["activity"] == 10
+    from systems import company as co
+    v1, v2 = round(1_000_000 + 1000 * g.PRICES["wood"]) - co.START_CREDITS, 5_000_000 - co.START_CREDITS
+    assert rows["rkv1"]["score"] == v1 and rows["rkv2"]["score"] == round(v2 * 0.1)
+    assert "activity" not in rows["rkv1"] and "value" not in rows["rkv1"]    # hidden from players (owner 2026-11-06)
     assert rows["rkv1"]["rank"] < rows["rkv2"]["rank"]
 
 
@@ -114,7 +116,7 @@ def test_campus_and_country_boards():
         for hid, lvl, cc in ((a, 12, "qq"), (b, 30, "qq")):
             conn.execute("INSERT INTO co_state(hid, campus_level) VALUES(?,?) ON CONFLICT(hid) DO UPDATE SET "
                          "campus_level=excluded.campus_level", (hid, lvl))
-            conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
+            conn.execute("UPDATE players SET country_code=?, credits=1000000 WHERE hID=?", (cc, hid))   # above the start
         conn.commit()
     _active(a, 10)
     _active(b, 2)                                       # owner 2026-11-06: the level decides, not activity
@@ -163,3 +165,11 @@ def test_biggest_campus_per_country_for_the_far_map():
     top = {x["country"]: x for x in call("/api/v3/campuses/top", a_sid)["campuses"]}
     assert top["xa"]["level"] == 9 and top["xa"]["name"].startswith("tc2") and not top["xa"]["own"]
     assert top["xb"]["level"] == 3
+
+
+def test_a_new_company_starts_at_zero():
+    """Owner 2026-11-06: the 300 000 start credits don't count, a new company starts at the bottom."""
+    from systems import company as co
+    hid, sid, _ = new_player("rknew", credits=co.START_CREDITS)
+    with main.get_db() as conn:
+        assert rankings.company_values(conn, only=hid)[hid] == 0
