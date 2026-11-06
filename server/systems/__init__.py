@@ -8,10 +8,12 @@ the result like the legacy endpoints (zlib JSON).
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import sqlite3
 import threading
 import types
+import weakref
 
 import anyio
 from fastapi import Request
@@ -69,14 +71,17 @@ def too_often(hid: str, path: str, now: float | None = None) -> bool:
 # thread at a time, and many threads reading rows slow each other down badly; the CPUs are used by running
 # many processes instead (serve.py).
 DB_THREADS = int(os.environ.get("DB_THREADS", "4"))
-_limiter = None
+# one limit per event loop: a limiter belongs to the loop that made it, and a request on another loop (tests
+# call from several threads, each with its own loop) would wait on it for ever (CI hung on Linux, 2026-11-07)
+_limiters: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 def _db_limiter():
-    global _limiter
-    if _limiter is None:
-        _limiter = anyio.CapacityLimiter(DB_THREADS)
-    return _limiter
+    loop = asyncio.get_running_loop()
+    lim = _limiters.get(loop)
+    if lim is None:
+        lim = _limiters[loop] = anyio.CapacityLimiter(DB_THREADS)
+    return lim
 
 
 class Api:

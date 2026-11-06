@@ -538,7 +538,11 @@ def test_countries_of_places_around_the_world():
     import countries
     for (lat, lng), cc in {(45.81, 15.98): "hr", (43.40, 16.20): "hr", (39.03, 125.75): "kp", (90, 0): "zz",
                            (-90, 0): "aq", (-77.85, 166.67): "aq", (0, -150): "zz", (-48.88, -123.39): "zz",
-                           (78.2, 15.6): "no", (42.66, 21.16): "xk", (21.3, -157.85): "us"}.items():
+                           (78.2, 15.6): "sj", (42.66, 21.16): "xk", (21.3, -157.85): "us",
+                           # territories with their own flag win over the country governing them, on every machine
+                           (4.93, -52.33): "gf", (18.45, -66.1): "pr", (25.03, 121.56): "tw", (60.1, 19.94): "ax",
+                           (-22.27, 166.44): "nc", (13.47, 144.75): "gu", (27.15, -13.2): "eh",
+                           (48.86, 2.35): "fr", (59.91, 10.75): "no", (39.9, 116.4): "cn"}.items():
         assert countries.country_at(lat, lng) == cc, (lat, lng)
 
 
