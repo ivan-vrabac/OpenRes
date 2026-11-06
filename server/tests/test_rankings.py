@@ -61,7 +61,7 @@ def test_country_filter_recounts_ranks_and_pages():
     r = call("/api/v1/rank/players", ids[2][1], country=1)
     assert r["countryFilter"] and [x["rank"] for x in r["rows"]] == list(range(1, len(r["rows"]) + 1))
     assert all(x["country"] == "zz" for x in r["rows"]) and r["myRank"] == 2      # #3 overall, #2 in country
-    assert len(call("/api/v1/rank/players", ids[2][1])["rows"]) <= rankings.PAGE
+    assert len(call("/api/v1/rank/players", ids[2][1])["rows"]) <= rankings.TOP + 1
 
 
 def test_tantalum_board_ranks_everything_made():
@@ -173,3 +173,23 @@ def test_a_new_company_starts_at_zero():
     hid, sid, _ = new_player("rknew", credits=co.START_CREDITS)
     with main.get_db() as conn:
         assert rankings.company_values(conn, only=hid)[hid] == 0
+
+
+def test_boards_show_the_top_100_and_your_own_row():
+    """Owner 2026-11-06: no pages; the top 100 and, further down, your own row with the gap to the one above."""
+    from systems import company as co
+    me, sid, _ = new_player("rktop", credits=co.START_CREDITS + 1)
+    with main.get_db() as conn:
+        for i in range(105):
+            h = f"rktop-fill-{i}"
+            conn.execute("INSERT OR IGNORE INTO players(hID, company_name, credits, created_at) VALUES(?,?,?,?)",
+                         (h, f"rktop fill {i}", co.START_CREDITS + 1_000_000 + i, "2026-01-01"))
+            conn.execute("INSERT OR IGNORE INTO player_activity(hid, day) VALUES(?, date('now'))", (h,))
+        conn.commit()
+    _active(me, 5)
+    rankings._cache.clear()
+    r = call("/api/v1/rank/players", sid)
+    assert "pages" not in r and r["top"] == 100 and r["myRank"] > 100
+    ranks = [x["rank"] for x in r["rows"]]
+    assert ranks[:100] == list(range(1, 101)) and ranks[-1] == r["myRank"] and r["rows"][-1]["isMe"]
+    assert len(r["rows"]) == 101 and r["gap"] is not None and r["gap"] >= 0

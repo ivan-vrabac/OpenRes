@@ -27,7 +27,7 @@ from . import production
 
 CACHE_S = 300
 MAX_ROWS = 100_000      # computed boards are cached in full and paged
-PAGE = 100
+TOP = 100               # owner 2026-11-06: every board shows its top 100, no pages, and your own row
 ACTIVITY_DAYS = 100
 _cache: dict = {}
 
@@ -164,6 +164,13 @@ def all_rows(conn):
     return sorted(((round(v[0]), v[1], hid) for hid, v in acc.items()), reverse=True)
 
 
+def _gap(rows, me):
+    """How much the row at index `me` is behind the one just above it (None at the top or when absent)."""
+    if not me:
+        return None
+    return rows[me - 1][0] - rows[me][0]
+
+
 def install(api) -> None:
     def refs(conn, hids, viewer):
         return {x: social.public_ref(conn, x) for x in hids}
@@ -173,18 +180,19 @@ def install(api) -> None:
                                              conn.execute("SELECT hID, country_code FROM players")})
 
     def page_of(conn, hid, form, rows, hid_at):
-        """Filter to the viewer's country (country=1), rank 1..n AFTER filtering, cut one page."""
+        """Filter to the viewer's country (country=1; ranks count from 1 within it), keep the top TOP, and add the
+        viewer's own row when it is further down. `gap`: how far behind the one just above (the board's number)."""
         cc = countries(conn)
         mine_cc = cc.get(hid, "")
         if form.get("country") == "1" and mine_cc:
             rows = [r for r in rows if cc.get(hid_at(r), "") == mine_cc]
-        page = int_arg(form, "page", 0, 0, 10**6)
         me = next((i for i, r in enumerate(rows) if hid_at(r) == hid), None)
-        part = rows[page * PAGE:(page + 1) * PAGE]
-        meta = {"page": page, "pages": max(1, -(-len(rows) // PAGE)), "total": len(rows),
-                "myRank": None if me is None else me + 1, "myCountry": mine_cc,
-                "countryFilter": form.get("country") == "1" and bool(mine_cc)}
-        return [(page * PAGE + i + 1, r) for i, r in enumerate(part)], meta
+        part = [(i + 1, r) for i, r in enumerate(rows[:TOP])]
+        if me is not None and me >= TOP:
+            part.append((me + 1, rows[me]))
+        meta = {"total": len(rows), "top": TOP, "myRank": None if me is None else me + 1, "myCountry": mine_cc,
+                "gap": _gap(rows, me), "countryFilter": form.get("country") == "1" and bool(mine_cc)}
+        return part, meta
 
     @api.endpoint("/api/v1/rank/players")
     def players(conn, hid, form):
@@ -218,9 +226,13 @@ def install(api) -> None:
         rows = _cached("countries_board", lambda: country_rows(conn))
         mine = countries(conn).get(hid, "")
         me = next((i for i, r in enumerate(rows) if r[2] == mine), None)
-        return {"err": 0, "myCountry": mine, "myRank": None if me is None else me + 1, "total": len(rows),
+        part = list(enumerate(rows[:TOP]))
+        if me is not None and me >= TOP:
+            part.append((me, rows[me]))
+        return {"err": 0, "myCountry": mine, "myRank": None if me is None else me + 1, "total": len(rows), "top": TOP,
+                "gap": _gap(rows, me),
                 "rows": [{"rank": i + 1, "country": r[2], "score": r[0], "companies": r[1], "isMe": r[2] == mine}
-                         for i, r in enumerate(rows[:300])]}
+                         for i, r in part]}
 
     @api.endpoint("/api/v1/rank/tantalum")
     def tantalum(conn, hid, form):

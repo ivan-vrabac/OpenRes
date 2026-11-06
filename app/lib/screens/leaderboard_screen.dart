@@ -79,9 +79,12 @@ Widget _row(BuildContext context, Map<String, dynamic> r, {Widget? middle, requi
         const SizedBox(width: 8),
         Expanded(
           flex: 5,
-          child: Text(r['name'] as String? ?? '?', overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: isMe ? AppColors.accent : AppColors.fg,
-                  fontWeight: isMe ? FontWeight.bold : FontWeight.normal)),
+          child: Row(children: [
+            _flag(r['country'] as String?),
+            Flexible(child: Text(r['name'] as String? ?? '?', overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: isMe ? AppColors.accent : AppColors.fg,
+                    fontWeight: isMe ? FontWeight.bold : FontWeight.normal))),
+          ]),
         ),
         if (middle != null) Expanded(flex: 4, child: middle),
         SizedBox(
@@ -93,6 +96,16 @@ Widget _row(BuildContext context, Map<String, dynamic> r, {Widget? middle, requi
     ),
   );
 }
+
+/// A small country flag before a name (nothing when the country is unknown).
+Widget _flag(String? cc) => cc == null || cc.isEmpty
+    ? const SizedBox.shrink()
+    : Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ClipRRect(borderRadius: BorderRadius.circular(2), child: Image.asset(
+            'assets/images_countryflags/${cc.toLowerCase()}.png', width: 18, height: 12, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+      );
 
 /// Column titles above a board (owner 2026-10-24): Rank · Player · middle column · value.
 Widget _infoRow(String middle, String value, {String who = 'Company'}) => Container(
@@ -111,8 +124,7 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
   Map<String, dynamic>? data;
   bool loading = true;
   String? error;
-  bool country = false;   // only my country (ranks recounted by the server)
-  int page = 0;           // 100 players per page
+  bool country = false;   // only my country (ranks recounted by the server, from 1)
   String get path;
   Map<String, dynamic> get params => const {};
 
@@ -128,15 +140,14 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
   Future<void> load() async {
     setState(() => loading = true);
     final r = await GameApi.call(path, context.read<PlayerProvider>().sid,
-        {...params, 'page': page, if (country) 'country': 1});
+        {...params, if (country) 'country': 1});
     if (!mounted) return;
     setState(() { loading = false; error = r.ok ? null : r.message; if (r.ok) data = r.data; });
   }
 
-  /// "My country" filter and page arrows, shown on every board.
+  /// "My country" filter, shown on every board (owner 2026-11-06: the top 100, no pages).
   Widget controls({String? note}) {
     final d = data!;
-    final pages = (d['pages'] as num? ?? 1).toInt();
     final hasCountry = (d['myCountry'] as String? ?? '').isNotEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
@@ -145,33 +156,59 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
           FilterChip(
             label: const Text('My country', style: TextStyle(fontSize: 11)),
             selected: country, visualDensity: VisualDensity.compact,
-            onSelected: (v) { setState(() { country = v; page = 0; }); load(); },
+            onSelected: (v) { setState(() => country = v); load(); },
           ),
         const SizedBox(width: 8),
-        Expanded(child: Text(note ?? (d['myRank'] != null ? 'Your rank: #${d['myRank']}' : ''),
-            style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-        IconButton(
-          visualDensity: VisualDensity.compact, icon: const Icon(Icons.chevron_left),
-          onPressed: page > 0 ? () { setState(() => page--); load(); } : null,
-        ),
-        Text('${page + 1}/$pages', style: const TextStyle(fontSize: 12)),
-        IconButton(
-          visualDensity: VisualDensity.compact, icon: const Icon(Icons.chevron_right),
-          onPressed: page + 1 < pages ? () { setState(() => page++); load(); } : null,
-        ),
+        Expanded(child: Text(note ?? 'Top ${d['top'] ?? 100}', style: TextStyle(color: AppColors.t54, fontSize: 12),
+            overflow: TextOverflow.ellipsis)),
       ]),
     );
   }
 
-  Widget list(List<Map<String, dynamic>> rows, Widget Function(Map<String, dynamic>) tile, {Widget? header}) {
+  /// The board: your own row pinned on top (rank, flag, score and how far behind the one above you), then the
+  /// top 100 with your row highlighted when you are in it. [gapText] writes the gap in the board's unit.
+  Widget list(List<Map<String, dynamic>> rows, Widget Function(Map<String, dynamic>) tile,
+      {Widget? header, String Function(num gap)? gapText}) {
+    final top = (data?['top'] as num? ?? 100).toInt();
+    final me = rows.where((r) => r['isMe'] == true).firstOrNull;
+    final shown = rows.where((r) => (r['rank'] as num) <= top).toList();
     final h = header != null ? 1 : 0;
-    return RefreshIndicator(
-      onRefresh: load,
-      child: ListView.separated(
-        itemCount: rows.length + h,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white10),
-        itemBuilder: (_, i) => h == 1 && i == 0 ? header! : tile(rows[i - h]),
+    return Column(children: [
+      if (me != null) _meCard(me, tile, gapText ?? (g) => _short(g)),
+      Expanded(child: RefreshIndicator(
+        onRefresh: load,
+        child: ListView.separated(
+          itemCount: shown.length + h,
+          separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white10),
+          itemBuilder: (_, i) => h == 1 && i == 0 ? header! : tile(shown[i - h]),
+        ),
+      )),
+    ]);
+  }
+
+  Widget _meCard(Map<String, dynamic> me, Widget Function(Map<String, dynamic>) tile, String Function(num) gapText) {
+    final rank = (me['rank'] as num).toInt();
+    final gap = data?['gap'] as num?;
+    final total = data?['total'] as num?;
+    final line = rank == 1
+        ? 'You are first${total != null && total > 1 ? ' of ${fmtNum(total)}' : ''}'
+        : gap == null ? '' : gap <= 0 ? 'Level with #${rank - 1}' : '${gapText(gap)} behind #${rank - 1}';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6)),
       ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        tile(me),
+        if (line.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(56, 0, 10, 6),
+            child: Text(line, style: TextStyle(fontSize: 11, color: AppColors.accent)),
+          ),
+      ]),
     );
   }
 }
@@ -217,6 +254,7 @@ class _CampusBoardState extends _BoardState<_CampusBoard> {
     return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
       final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
       return list(rows, (r) => _row(context, r, value: 'Campus ${r['level']}'),
+          gapText: (g) => g == 1 ? '1 level' : '${g.round()} levels',
           header: Column(mainAxisSize: MainAxisSize.min, children: [
             controls(),
             _note('Ranked by Campus level.'),
@@ -290,8 +328,7 @@ class _CountryBoardState extends _BoardState<_CountryBoard> {
       }, header: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Text(data!['myRank'] != null ? 'Your country: #${data!['myRank']} of ${data!['total']}' : '',
-              style: TextStyle(color: AppColors.t54, fontSize: 12)),
+          child: Text('Top ${data!['top'] ?? 100}', style: TextStyle(color: AppColors.t54, fontSize: 12)),
         ),
         _note('The overall scores of every company of a country added up.'),
         _infoRow('Companies', 'Score', who: 'Country'),
@@ -315,11 +352,10 @@ class _LuxuryBoardState extends _BoardState<_LuxuryBoard> {
     super.build(context);
     return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
       final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
-      return list(rows, (r) => _row(context, r, value: fmtMass(r['mg'] as num),
+      return list(rows, gapText: (g) => fmtMass(g), (r) => _row(context, r, value: fmtMass(r['mg'] as num),
           middle: Text(fmtMass(r['investedMg'] as num? ?? 0), style: TextStyle(fontSize: 12, color: AppColors.t70))),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
-        controls(note: 'You have made ${fmtMass(data!['myMg'] as num? ?? 0)}'
-            '${data!['myRank'] != null ? ' · #${data!['myRank']}' : ''}'),
+        controls(note: 'Top 100 · you have made ${fmtMass(data!['myMg'] as num? ?? 0)}'),
         _infoRow('In research', 'Made in total'),
       ]));
     });
@@ -349,7 +385,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
       final options = all ? const <String>[] : ((data!['options'] as Map)[_kind] as List).cast<String>();
       final names = (data!['names'] as Map? ?? const {}).cast<String, dynamic>();
       final item = data!['item'] as String? ?? '';
-      return list(rows, (r) => _row(context, r,
+      return list(rows, gapText: (g) => all ? 'ꞓ${_short(g)} an hour' : '${_short(g.round())} an hour', (r) => _row(context, r,
           value: all ? 'ꞓ${_short(r['perHour'] as num)}' : _short((r['perHour'] as num).round()),
           middle: Text('${r['count']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -361,7 +397,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
                   ButtonSegment(value: 'raw', label: Text('Hexes')), ButtonSegment(value: 'product', label: Text('Plants'))],
                 selected: {_kind},
                 style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                onSelectionChanged: (v) { setState(() { _kind = v.first; _item = null; page = 0; }); load(); },
+                onSelectionChanged: (v) { setState(() { _kind = v.first; _item = null; }); load(); },
               ),
               const SizedBox(width: 8),
               if (!all) Expanded(
@@ -375,7 +411,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
                         Flexible(child: Text(names[o] as String? ?? o, overflow: TextOverflow.ellipsis)),
                       ])),
                   ],
-                  onChanged: (v) { setState(() { _item = v; page = 0; }); load(); },
+                  onChanged: (v) { setState(() => _item = v); load(); },
                 ),
               ),
             ]),
