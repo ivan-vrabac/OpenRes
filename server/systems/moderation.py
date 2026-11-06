@@ -5,6 +5,11 @@ private messages were removed in 0.2.3, so what is left is about players (compan
 - Bans: a full ban (no sign-in at all), for some hours or forever.
 - Moderators: /api/v1/mod/* with the moderator password (MOD_PASSWORD, environment) -- the page
   https://resources.vrabac.eu/mod.html and `python admin.py` use them.
+- Cheat signals (owner 2026-11-06): impossible position jumps (the travel check), failed Play Integrity checks
+  and fake GPS the app saw are kept in cheat_signals; the page lists suspects, a company's full picture, and
+  can ban and wipe a company's game. Reviewed signals go to the archive.
+- Retention (mod_settings): how long moderation data is kept, 30 days up to what the privacy policy promises
+  (RETENTION_LIMITS); nothing is deleted by hand, the daily janitor does it.
 """
 from __future__ import annotations
 
@@ -18,6 +23,20 @@ import econ
 import names
 
 REASONS = ("insult", "hate", "sexual", "spam", "cheating", "other")
+SIGNAL_KINDS = ("teleport", "integrity", "mock_gps")
+SIGNAL_GAP_S = 600              # the same kind for the same company counts once per 10 minutes
+# key: (what it is, default days, the most the privacy policy allows). Longer needs a new privacy policy.
+RETENTION_LIMITS = {
+    "reports":      ("Reports (with the reported text)", 365, 365),
+    "ended_bans":   ("Ended bans", 365, 365),
+    "mod_log":      ("Moderation log", 365, 365),
+    "contact":      ("Contact messages", 365, 365),
+    "cheat_signals": ("Cheat signals (jumps, device checks, fake GPS)", 365, 365),
+}
+RETENTION_MIN = 30
+# a company's game, wiped by a moderator (the account, its ban, reports and cheat signals stay)
+GAME_TABLES = ("co_state", "co_moves", "co_hexes", "co_supervisors", "co_education", "co_stock", "co_plants",
+               "co_luxury", "daily_quests", "streak_rewards", "achievements")
 
 def init_schema(conn) -> None:
     conn.executescript("""
@@ -52,6 +71,20 @@ def init_schema(conn) -> None:
             PRIMARY KEY (hid, device)
         );
         CREATE INDEX IF NOT EXISTS idx_player_devices ON player_devices(device);
+        CREATE TABLE IF NOT EXISTS cheat_signals (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts       TEXT NOT NULL,
+            hid      TEXT NOT NULL,
+            kind     TEXT NOT NULL,                 -- teleport | integrity | mock_gps
+            detail   TEXT,
+            lat      REAL, lng REAL,
+            reviewed INTEGER NOT NULL DEFAULT 0     -- 1: looked at (the archive)
+        );
+        CREATE INDEX IF NOT EXISTS idx_cheat_hid ON cheat_signals(hid, ts);
+        CREATE TABLE IF NOT EXISTS mod_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS mod_log (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             ts     TEXT NOT NULL,
@@ -100,6 +133,54 @@ def is_banned(get_db, hid) -> dict | None:
     return b
 
 
+def signal(conn, hid, kind, detail="", lat=None, lng=None) -> None:
+    """Record a cheat signal (inside the caller's transaction or on its own); once per SIGNAL_GAP_S per kind."""
+    if not hid or kind not in SIGNAL_KINDS:
+        return
+    since = (econ.utcnow() - datetime.timedelta(seconds=SIGNAL_GAP_S)).isoformat()
+    if conn.execute("SELECT 1 FROM cheat_signals WHERE hid=? AND kind=? AND ts>?", (hid, kind, since)).fetchone():
+        return
+    conn.execute("INSERT INTO cheat_signals(ts, hid, kind, detail, lat, lng) VALUES(?,?,?,?,?,?)",
+                 (econ.utcnow_iso(), hid, kind, (detail or "")[:300], lat, lng))
+
+
+def retention_days(conn, key) -> int:
+    _, default, most = RETENTION_LIMITS[key]
+    r = conn.execute("SELECT value FROM mod_settings WHERE key=?", (f"retention.{key}",)).fetchone()
+    try:
+        v = int(r[0]) if r else default
+    except ValueError:
+        v = default
+    return max(RETENTION_MIN, min(most, v))
+
+
+def prune(conn, now=None) -> None:
+    """The janitor's part for moderation data (inside a tx): everything older than its retention."""
+    now = now or econ.utcnow()
+    cut = lambda key: (now - datetime.timedelta(days=retention_days(conn, key))).isoformat()
+    conn.execute("DELETE FROM reports WHERE ts < ?", (cut("reports"),))
+    conn.execute("DELETE FROM player_bans WHERE until IS NOT NULL AND until < ?", (cut("ended_bans"),))
+    conn.execute("DELETE FROM mod_log WHERE ts < ?", (cut("mod_log"),))
+    conn.execute("DELETE FROM cheat_signals WHERE ts < ?", (cut("cheat_signals"),))
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contact_messages'").fetchone():
+        conn.execute("DELETE FROM contact_messages WHERE ts < ?", (cut("contact"),))
+
+
+def wipe_game(conn, hid) -> int:
+    """A company's whole game goes (inside a tx): Campus, hexes, storage, plants, quests, open buy orders,
+    credits. The account stays (so a ban holds), and so do reports, cheat signals and the ledger."""
+    n = 0
+    have = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    for t in GAME_TABLES:
+        if t in have:
+            n += conn.execute(f"DELETE FROM {t} WHERE hid=?", (hid,)).rowcount
+    if "market_orders" in have:
+        n += conn.execute("UPDATE market_orders SET status='cancelled', qty_open=0, escrow=0 "
+                          "WHERE hid=? AND status='open'", (hid,)).rowcount
+    conn.execute("UPDATE players SET credits=0, xp=0 WHERE hID=?", (hid,))
+    return n
+
+
 def _mod_ok(form) -> bool:
     want = os.environ.get("MOD_PASSWORD", "")
     return bool(want) and hmac.compare_digest(want.encode(), (form.get("mod_password") or "").encode())
@@ -129,6 +210,20 @@ def install(api) -> None:
         with econ.tx(conn):
             conn.execute("INSERT INTO player_devices(hid, device, first_seen, last_seen) VALUES(?,?,?,?) "
                          "ON CONFLICT(hid, device) DO UPDATE SET last_seen=excluded.last_seen", (hid, d, now, now))
+        return {"err": 0}
+
+    @api.endpoint("/api/v1/signal")
+    def app_signal(conn, hid, form):
+        """The app saw a fake (mock) GPS position (owner 2026-11-06). Kept for moderators, nothing else happens."""
+        kind = form.get("kind") or ""
+        if kind != "mock_gps":
+            raise econ.GameError("bad_input", "Invalid signal")
+        try:
+            lat, lng = float(form.get("lat")), float(form.get("lng"))
+        except (TypeError, ValueError):
+            lat = lng = None
+        with econ.tx(conn):
+            signal(conn, hid, kind, (form.get("detail") or "")[:100], lat, lng)
         return {"err": 0}
 
     @api.endpoint("/api/v1/report", feature="SOCIAL")
@@ -199,9 +294,71 @@ def install(api) -> None:
             shared.append({"device": dev[:10], "companies": [
                 {"name": name_of(conn, r[0]), "pid": social.pid_of(conn, r[0]), "lastSeen": r[1]}
                 for r in conn.execute("SELECT hid, last_seen FROM player_devices WHERE device=? ORDER BY last_seen DESC", (dev,))]})
+        now_iso = econ.utcnow_iso()
+        ended = [{"target": name_of(conn, b[0]), "pid": social.pid_of(conn, b[0]), "until": b[1], "reason": b[2]}
+                 for b in conn.execute("SELECT hid, until, reason FROM player_bans WHERE until IS NOT NULL AND until <= ? "
+                                       "ORDER BY until DESC LIMIT 100", (now_iso,))]
+        # suspects: companies with cheat signals nobody has looked at yet, the most first
+        suspects = []
+        for hid_, n_, last in conn.execute("SELECT hid, COUNT(*), MAX(ts) FROM cheat_signals WHERE reviewed=0 "
+                                           "GROUP BY hid ORDER BY COUNT(*) DESC, MAX(ts) DESC LIMIT 200").fetchall():
+            kinds = dict(conn.execute("SELECT kind, COUNT(*) FROM cheat_signals WHERE hid=? AND reviewed=0 GROUP BY kind",
+                                      (hid_,)).fetchall())
+            suspects.append({"name": name_of(conn, hid_), "pid": social.pid_of(conn, hid_), "signals": n_, "last": last,
+                             "kinds": kinds, **_profile_short(conn, hid_)})
+        archived = [{"name": name_of(conn, r[0]), "pid": social.pid_of(conn, r[0]), "signals": r[1], "last": r[2]}
+                    for r in conn.execute("SELECT hid, COUNT(*), MAX(ts) FROM cheat_signals WHERE reviewed=1 GROUP BY hid "
+                                          "ORDER BY MAX(ts) DESC LIMIT 100")]
+        retention = [{"key": k, "label": lab, "days": retention_days(conn, k), "min": RETENTION_MIN, "max": most,
+                      "default": d} for k, (lab, d, most) in RETENTION_LIMITS.items()]
         conn.commit()
         return {"err": 0, "reports": out, "contact": contact, "bans": bans, "sharedDevices": shared,
-                "companies": companies, "doneContact": done_contact, "doneReports": done_reports, "log": log}
+                "companies": companies, "doneContact": done_contact, "doneReports": done_reports, "log": log,
+                "endedBans": ended, "suspects": suspects, "archivedSignals": archived, "retention": retention}
+
+    def _profile_short(conn, hid_):
+        st = conn.execute("SELECT campus_level FROM co_state WHERE hid=?", (hid_,)).fetchone()
+        ig = conn.execute("SELECT ok FROM co_integrity WHERE hid=?", (hid_,)).fetchone()
+        devs = conn.execute("SELECT COUNT(DISTINCT d2.hid) FROM player_devices d1 JOIN player_devices d2 "
+                            "ON d1.device=d2.device AND d2.hid<>d1.hid WHERE d1.hid=?", (hid_,)).fetchone()[0]
+        return {"campus": st[0] if st else 0, "integrityOk": None if not ig else bool(ig[0]),
+                "sameDevice": devs, "banned": active_ban(conn, hid_) is not None}
+
+    @api.endpoint("/api/v1/mod/company", auth=False)
+    @mod
+    def mod_company(conn, form):
+        """Everything about one company (pid) for an investigation."""
+        hid_ = social.hid_of(conn, form.get("pid"))
+        if not hid_:
+            raise econ.GameError("not_found", "Company not found")
+        p = conn.execute("SELECT * FROM players WHERE hID=?", (hid_,)).fetchone()
+        keys = p.keys()
+        st = conn.execute("SELECT * FROM co_state WHERE hid=?", (hid_,)).fetchone()
+        ig = conn.execute("SELECT ok, problems, verdict, checked_at FROM co_integrity WHERE hid=?", (hid_,)).fetchone()
+        devices = []
+        for dev, first, last in conn.execute("SELECT device, first_seen, last_seen FROM player_devices WHERE hid=? "
+                                             "ORDER BY last_seen DESC", (hid_,)).fetchall():
+            others = [{"name": name_of(conn, o[0]), "pid": social.pid_of(conn, o[0])} for o in conn.execute(
+                "SELECT hid FROM player_devices WHERE device=? AND hid<>?", (dev, hid_))]
+            devices.append({"device": dev[:10], "first": first, "last": last, "others": others})
+        signals = [dict(r) for r in conn.execute("SELECT id, ts, kind, detail, lat, lng, reviewed FROM cheat_signals "
+                                                 "WHERE hid=? ORDER BY id DESC LIMIT 300", (hid_,))]
+        log = [{"ts": r[0], "type": r[1], "data": r[2]} for r in conn.execute(
+            "SELECT created_at, log_type, data_json FROM proto_log WHERE hid=? ORDER BY created_at DESC LIMIT 100", (hid_,))]
+        hexes = conn.execute("SELECT COUNT(*) FROM co_hexes WHERE hid=? AND op!='campus'", (hid_,)).fetchone()[0]
+        reports = [{"ts": r[0], "reason": r[1], "note": r[2], "status": r[3], "by": name_of(conn, r[4])}
+                   for r in conn.execute("SELECT ts, reason, note, status, reporter_hid FROM reports WHERE target_hid=? "
+                                         "ORDER BY id DESC LIMIT 50", (hid_,))]
+        days = conn.execute("SELECT COUNT(*) FROM player_activity WHERE hid=?", (hid_,)).fetchone()[0]
+        col = lambda k: p[k] if k in keys else None
+        return {"err": 0, "name": p["company_name"], "pid": form.get("pid"), "created": p["created_at"],
+                "credits": p["credits"], "invested": p["xp"], "country": col("country_code") or "",
+                "position": {"lat": col("pos_lat"), "lng": col("pos_lng"), "at": col("pos_at")},
+                "campus": None if not st else {"level": st["campus_level"], "lat": st["campus_lat"], "lng": st["campus_lng"]},
+                "hexes": hexes, "daysPlayed": days, "ban": active_ban(conn, hid_), "reports": reports,
+                "integrity": None if not ig else {"ok": bool(ig["ok"]), "problems": ig["problems"],
+                                                  "verdict": ig["verdict"], "at": ig["checked_at"]},
+                "devices": devices, "signals": signals, "log": log}
 
     @api.endpoint("/api/v1/mod/act", auth=False)
     @mod
@@ -239,6 +396,31 @@ def install(api) -> None:
                 conn.execute("UPDATE contact_messages SET handled=0 WHERE id=?", (int(form.get("contact") or 0),))
             elif action == "report_reopen" and r:
                 conn.execute("UPDATE reports SET status='open', action=NULL, handled_at=NULL WHERE id=?", (rid,))
+            elif action in ("signals_done", "signals_reopen") and target:
+                conn.execute("UPDATE cheat_signals SET reviewed=? WHERE hid=?", (1 if action == "signals_done" else 0, target))
+            elif action == "wipe" and target:
+                # banned for good and the whole game removed; the company name typed again confirms it
+                if (form.get("confirm") or "") != name_of(conn, target):
+                    raise econ.GameError("bad_input", "Type the company name to confirm")
+                set_ban(conn, target, "full", None, reason or "cheating")
+                n = wipe_game(conn, target)
+                conn.execute("UPDATE cheat_signals SET reviewed=1 WHERE hid=?", (target,))
+                reason = f"{reason or 'cheating'}, banned for good, {n} rows of game data removed"
+            elif action == "retention":
+                key = form.get("key") or ""
+                if key not in RETENTION_LIMITS:
+                    raise econ.GameError("bad_input", "Unknown setting")
+                try:
+                    days = int(form.get("days") or 0)
+                except ValueError:
+                    days = 0
+                most = RETENTION_LIMITS[key][2]
+                if not RETENTION_MIN <= days <= most:
+                    raise econ.GameError("bad_input", f"Between {RETENTION_MIN} and {most} days "
+                                                      "(longer needs a new privacy policy)")
+                conn.execute("INSERT INTO mod_settings(key, value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET "
+                             "value=excluded.value", (f"retention.{key}", str(days)))
+                reason = f"{RETENTION_LIMITS[key][0]}: {days} days"
             elif action != "dismiss":
                 raise econ.GameError("bad_input", "Unknown action")
             if r and action != "report_reopen":
@@ -250,6 +432,4 @@ def install(api) -> None:
                                           "forever" if action == "ban" and not hours else "", reason) if x)
             conn.execute("INSERT INTO mod_log(ts, action, target, detail) VALUES(?,?,?,?)",
                          (econ.utcnow_iso(), action, what, detail))
-            year = (econ.utcnow() - datetime.timedelta(days=365)).isoformat()
-            conn.execute("DELETE FROM mod_log WHERE ts < ?", (year,))
         return {"err": 0}

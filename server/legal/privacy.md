@@ -21,6 +21,7 @@ Where no other legal basis is named below, we process the data to perform our ag
 - **Notifications:** the notifications the game sends you, kept on the server (at most the last 200) so your phone can fetch them, and a push token for your phone. Google's Firebase Cloud Messaging uses that token to wake the app; the text of a notification doesn't pass through Google.
 - **Contact form:** what you write to us and the reply address you give, to answer you (GDPR Art. 6(1)(f)), kept until your request is handled and at most 1 year.
 - **App and device check:** the app asks Google Play to confirm that it is the real app from Google Play on a genuine device, and our server keeps the result (for example whether the device passed and whether Play Protect found a problem), to keep the game fair (GDPR Art. 6(1)(f), legitimate interest). If the check fails, some game actions (for example surveys and market trades) are blocked until it passes. You can ask us to look at this through the contact form.
+- **Cheating checks:** when the game sees a position jump nobody could travel, a failed app and device check, or a fake (simulated) GPS position, the server keeps a short record of it (when, what and where) so moderators can look into cheating (GDPR Art. 6(1)(f), legitimate interest). It is kept for up to 1 year.
 - **Device ID:** a one-way scrambled (hashed) form of Android's ID for this app on your phone, to recognise several companies played from the same phone (one person, one company; GDPR Art. 6(1)(f), preventing cheating). It is not used for ads and never shared. Kept as long as your account exists.
 - **Technical data:** IP address, device and app version and server logs, needed to run and protect the service (GDPR Art. 6(1)(f), legitimate interest).
 
@@ -49,7 +50,7 @@ We don't sell or rent personal data and we don't share it for marketing ("we do 
 ## How long we keep data
 
 - Account and game data: as long as your account exists.
-- Activity log: 7 days. Reports, moderation records, ended bans and contact messages: up to 1 year.
+- Activity log: 7 days. Reports, moderation records, cheating check records, ended bans and contact messages: up to 1 year.
 - Server logs and backups: at most 30 days.
 - When you delete your account (in the app: Settings › Account › Delete account, or on https://resources.vrabac.eu/delete.html), your company and all its game data are deleted. Accounts younger than 30 days are deleted at once; older accounts are deleted after a 30-day waiting period, during which signing in cancels the deletion (this protects against mistakes and stolen passwords). After deletion, copies in logs and backups disappear within 30 days. Moderation records and contact messages can still name your company until their 1 year limit; market trades stay for the other company, without your company. We keep nothing else about deleted accounts.
 

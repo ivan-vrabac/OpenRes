@@ -163,4 +163,7 @@ def install(api) -> None:
         with econ.tx(conn):
             conn.execute("UPDATE co_integrity SET ok=?, problems=?, verdict=?, checked_at=? WHERE hid=?",
                          (0 if problems else 1, json.dumps(problems), json.dumps(verdict), econ.utcnow_iso(), hid))
+            if problems:                                     # kept for the moderators (owner 2026-11-06)
+                from . import moderation
+                moderation.signal(conn, hid, "integrity", ", ".join(map(str, problems)))
         return {"err": 0, "status": "checked"}

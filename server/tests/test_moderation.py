@@ -98,3 +98,53 @@ def test_a_moderator_renames_a_company_without_asking(modpw):
         assert conn.execute("SELECT detail FROM mod_log ORDER BY id DESC LIMIT 1").fetchone()[0].endswith(f"was {name}")
     assert act(name=other)["code"] == "name_taken"
     assert act(name="x")["code"] == "invalid_name"
+
+
+def test_cheat_signals_suspects_archive_and_wipe(modpw):
+    """Owner 2026-11-06: jumps, failed device checks and fake GPS are kept; a moderator sees the suspects,
+    archives them, or bans and wipes the whole game."""
+    hid, sid, name = new_player("chs1")
+    from test_company import BASE
+    at = (BASE[0] - 2.47, BASE[1] + 1.9)
+    assert call("/api/v3/campus/place", sid, lat=at[0], lng=at[1], plat=at[0], plng=at[1])["err"] == 0
+    far = (at[0] + 9, at[1])                                        # 1 000 km at once
+    assert call("/api/v3/campus/place", sid, lat=far[0], lng=far[1], plat=far[0], plng=far[1])["code"] == "teleport"
+    assert call("/api/v1/signal", sid, kind="mock_gps", lat=1, lng=2)["err"] == 0
+    assert call("/api/v1/signal", sid, kind="mock_gps")["err"] == 0          # once per 10 minutes
+    assert call("/api/v1/signal", sid, kind="speed")["code"] == "bad_input"
+    d = call("/api/v1/mod/reports", "", mod_password=modpw)
+    me = next(x for x in d["suspects"] if x["name"] == name)
+    assert me["kinds"] == {"teleport": 1, "mock_gps": 1} and me["campus"] == 1
+    pid = me["pid"]
+    c = call("/api/v1/mod/company", "", mod_password=modpw, pid=pid)
+    assert c["name"] == name and len(c["signals"]) == 2 and "km/h" in next(s for s in c["signals"]
+                                                                         if s["kind"] == "teleport")["detail"]
+    assert call("/api/v1/mod/act", "", mod_password=modpw, action="signals_done", pid=pid)["err"] == 0
+    d = call("/api/v1/mod/reports", "", mod_password=modpw)
+    assert not [x for x in d["suspects"] if x["name"] == name] and [x for x in d["archivedSignals"] if x["name"] == name]
+    assert call("/api/v1/mod/act", "", mod_password=modpw, action="wipe", pid=pid, confirm="nope")["code"] == "bad_input"
+    assert call("/api/v1/mod/act", "", mod_password=modpw, action="wipe", pid=pid, confirm=name)["err"] == 0
+    with main.get_db() as conn:
+        assert not conn.execute("SELECT 1 FROM co_hexes WHERE hid=?", (hid,)).fetchone()
+        assert conn.execute("SELECT credits FROM players WHERE hID=?", (hid,)).fetchone()[0] == 0
+        assert M.active_ban(conn, hid) is not None
+
+
+def test_retention_is_30_days_up_to_the_privacy_policy(modpw):
+    act = lambda **kw: call("/api/v1/mod/act", "", mod_password=modpw, action="retention", **kw)
+    assert act(key="reports", days=29)["code"] == "bad_input"
+    assert act(key="reports", days=366)["code"] == "bad_input"
+    assert act(key="nothing", days=60)["code"] == "bad_input"
+    assert act(key="cheat_signals", days=90)["err"] == 0
+    r = {x["key"]: x for x in call("/api/v1/mod/reports", "", mod_password=modpw)["retention"]}
+    assert r["cheat_signals"]["days"] == 90 and r["reports"]["max"] == 365
+    import datetime
+    import econ
+    with main.get_db() as conn:
+        old = (econ.utcnow() - datetime.timedelta(days=100)).isoformat()
+        conn.execute("INSERT INTO cheat_signals(ts, hid, kind) VALUES(?,?,?)", (old, "x" * 32, "teleport"))
+        with econ.tx(conn):
+            M.prune(conn)
+        assert not conn.execute("SELECT 1 FROM cheat_signals WHERE ts=?", (old,)).fetchone()
+        conn.execute("DELETE FROM mod_settings")
+        conn.commit()

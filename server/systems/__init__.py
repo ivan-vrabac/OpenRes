@@ -106,6 +106,14 @@ class Api:
                         except econ.GameError as e:
                             if conn.in_transaction:
                                 conn.rollback()
+                            sig = getattr(e, "signal", None)          # a refusal that is also a cheat signal
+                            if sig and hid:
+                                try:
+                                    from . import moderation
+                                    with econ.tx(conn):
+                                        moderation.signal(conn, hid, *sig)
+                                except Exception:
+                                    pass
                             return e.resp()
                 return h.zlib_resp(await run_in_threadpool(work))
             handler.__name__ = fn.__name__

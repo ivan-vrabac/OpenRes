@@ -15,7 +15,7 @@ RETENTION_DAYS = 30                 # logs and backups (privacy policy)
 _contact_bucket = econ.TokenBucket(10, 1800.0)   # site-wide: 10 messages, then one more every 30 minutes
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-LEGAL_VERSION = "2026-11-02.4"      # Croatia first; no refunds where the law allows it, otherwise Google Play's rules
+LEGAL_VERSION = "2026-11-06.1"      # cheating check records (owner 2026-11-06)
 LEDGER_DAYS = 90
 EVENT_DAYS = 7
 ACTIVITY_KEEP_DAYS = 110       # the leaderboards look at the last 100 days
@@ -117,11 +117,10 @@ def install(api) -> None:
                 with h.get_db() as conn:
                     prune_history(conn)
                     with econ.tx(conn):
-                        year = (econ.utcnow() - __import__("datetime").timedelta(days=365)).isoformat()
-                        conn.execute("DELETE FROM contact_messages WHERE ts < ?", (year,))
-                        # reports (with the reported text) and ended bans: at most a year
-                        conn.execute("DELETE FROM reports WHERE ts < ?", (year,))
-                        conn.execute("DELETE FROM player_bans WHERE until IS NOT NULL AND until < ?", (year,))
+                        # reports, ended bans, the moderation log, contact messages and cheat signals: as long as
+                        # the moderators set (30 days up to the privacy policy's 1 year)
+                        from . import moderation
+                        moderation.prune(conn)
             except Exception:
                 pass
             time.sleep(86400)

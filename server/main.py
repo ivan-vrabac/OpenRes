@@ -378,7 +378,11 @@ def check_travel(conn, hid: str, lat: float, lng: float) -> None:
             dt_h = 1e9
         d = haversine_m(r["pos_lat"], r["pos_lng"], lat, lng)
         if d > TRAVEL_FREE_M and d / 1000 / dt_h > TRAVEL_MAX_KMH:
-            raise econ.GameError("teleport", "Your position jumped too far too fast. Wait a moment and try again.")
+            e = econ.GameError("teleport", "Your position jumped too far too fast. Wait a moment and try again.")
+            # kept for the moderators (owner 2026-11-06): how far, how fast, from where
+            e.signal = ("teleport", f"{d / 1000:.1f} km in {dt_h * 60:.1f} min ({d / 1000 / dt_h:.0f} km/h) from "
+                                    f"{r['pos_lat']:.4f},{r['pos_lng']:.4f}", lat, lng)
+            raise e
     conn.execute("UPDATE players SET pos_lat=?, pos_lng=?, pos_at=? WHERE hID=?", (lat, lng, now.isoformat(), hid))
 
 # Owner 2026-10-23: start with enough for about six clay pits; scans are free below level 5

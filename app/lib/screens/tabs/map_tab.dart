@@ -20,6 +20,7 @@ import '../../screens/settings_screen.dart' show kCloudOpacity,
     kMapPanelOpacity,
     heatmapSchemeNotifier,
     mapPanelOpacityNotifier;
+import '../../services/game_api.dart';
 import '../../services/location_service.dart';
 import '../../widgets/live_location_layer.dart';
 import '../../widgets/glass.dart';
@@ -330,6 +331,11 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
     if (!mounted || f == null || _gate != LocationGate.ok) return;
     // Google Play's reviewers test on emulators with simulated GPS: their account is exempt
     if (f.mock && context.read<PlayerProvider>().player?.name != 'PlayReview') {
+      // the moderators get to know, once per app start (the server keeps one a 10 minutes anyway)
+      if (!_mockDetected) {
+        GameApi.call('/api/v1/signal', context.read<PlayerProvider>().sid,
+            {'kind': 'mock_gps', 'lat': f.pos.latitude, 'lng': f.pos.longitude});
+      }
       setState(() => _mockDetected = true);
       return;
     }
