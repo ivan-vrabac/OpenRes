@@ -160,7 +160,7 @@ def test_biggest_campus_per_country_for_the_far_map():
             conn.execute("INSERT INTO co_state(hid, campus_level, campus_lat, campus_lng) VALUES(?,?,?,?) "
                          "ON CONFLICT(hid) DO UPDATE SET campus_level=excluded.campus_level, "
                          "campus_lat=excluded.campus_lat, campus_lng=excluded.campus_lng", (hid, lvl, 40.0, 20.0))
-            conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
+            conn.execute("UPDATE co_state SET campus_cc=? WHERE hid=?", (cc, hid))     # the Campus's country
             conn.commit()
     top = {x["country"]: x for x in call("/api/v3/campuses/top", a_sid)["campuses"]}
     assert top["xa"]["level"] == 9 and top["xa"]["name"].startswith("tc2") and not top["xa"]["own"]

@@ -587,3 +587,24 @@ def test_countries_on_both_sides_of_tricky_borders():
                            (51.4400, 4.9300): "be", (45.8470, 15.6800): "si",       # Baarle-Hertog; Obrezje
                            (44.95, 34.1): "ua", (45.04, 38.98): "ru"}.items():      # Crimea is Ukraine (UN)
         assert countries.country_at(lat, lng) == cc, (lat, lng, cc)
+
+
+def test_one_map_pin_per_country_and_one_for_international_waters():
+    """Owner 2026-11-06: far out, at most one pin per country, enclave state or international waters."""
+    sid = new_player("qone")[1]
+    spots = [(0.5, -150.0, 3), (30.0, -40.0, 7), (-30.0, 80.0, 2),          # international waters, three oceans
+             (41.9022, 12.4568, 4), (41.9029, 12.47, 9), (45.0, 10.0, 2)]   # the Vatican, Rome, northern Italy
+    hids = []
+    for i, (lat, lng, lvl) in enumerate(spots):
+        h = new_player(f"qone{i}")[0]
+        hids.append(h)
+        with main.get_db() as conn:
+            conn.execute("INSERT INTO co_state(hid, campus_level, campus_lat, campus_lng) VALUES(?,?,?,?) "
+                         "ON CONFLICT(hid) DO UPDATE SET campus_level=excluded.campus_level, "
+                         "campus_lat=excluded.campus_lat, campus_lng=excluded.campus_lng, campus_cc=NULL", (h, lvl, lat, lng))
+            conn.commit()
+    pins = call("/api/v3/campuses/top", sid)["campuses"]
+    ccs = [p["country"] for p in pins]
+    assert len(ccs) == len(set(ccs))                                     # never two pins for one country
+    by = {p["country"]: p for p in pins}
+    assert by["zz"]["level"] >= 7 and by["va"]["level"] == 4 and by["it"]["level"] >= 9

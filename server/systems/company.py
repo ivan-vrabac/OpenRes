@@ -1218,16 +1218,15 @@ def install_views(api) -> None:
 
     @api.endpoint("/api/v3/campuses/top")
     def campuses_top(conn, hid, form):
-        """The biggest Campus of every country, for the map zoomed far out (owner 2026-10-30). The country is
-        the company's and can be unknown: those get the biggest per 10 degree square, so they still show."""
+        """The biggest Campus of every country, for the map zoomed far out (owner 2026-10-30). At most one pin
+        per country and one for all of international waters (owner 2026-11-06): the country is where the Campus
+        stands (campus_cc; looked up from its place if not saved yet)."""
         best = {}
-        for r in conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name, p.country_code "
+        for r in conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, c.campus_cc, p.company_name "
                               "FROM co_state c JOIN players p ON p.hID=c.hid WHERE c.campus_level>0 "
                               "AND c.campus_lat IS NOT NULL ORDER BY c.campus_level DESC, p.xp DESC, p.created_at, c.hid"):
-            cc = (r["country_code"] or "").lower()
-            # no country, or international waters: the biggest per 10 degree square
-            key = cc if cc and cc != countries.INTERNATIONAL else f"{cc}{r['campus_lat'] // 10}:{r['campus_lng'] // 10}"
-            if key not in best:
-                best[key] = {"country": cc, "own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
+            cc = r["campus_cc"] or countries.country_at(r["campus_lat"], r["campus_lng"])
+            if cc not in best:
+                best[cc] = {"country": cc, "own": r["hid"] == hid, "level": r["campus_level"], "lat": r["campus_lat"],
                             "lng": r["campus_lng"], "name": r["company_name"]}
         return {"err": 0, "campuses": sorted(best.values(), key=lambda c: -c["level"])}
