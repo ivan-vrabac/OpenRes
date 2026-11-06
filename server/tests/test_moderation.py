@@ -119,7 +119,10 @@ def test_cheat_signals_suspects_archive_and_wipe(modpw):
     assert M.risk_of({"mock_gps": 3}, 0, None) == (15, "high") and M.risk_of({}, 0, True) == (0, "low")
     pid = me["pid"]
     c = call("/api/v1/mod/company", "", mod_password=modpw, pid=pid)
-    assert c["name"] == name and len(c["signals"]) == 2 and "km/h" in next(s for s in c["signals"]
+    assert c["name"] == name and len(c["signals"]) == 2
+    assert call("/api/v1/mod/reports", "", mod_password=modpw, company=pid)["name"] == name     # the website's path
+    bad = modpw[::-1]                                             # any other value is refused
+    assert call("/api/v1/mod/reports", "", mod_password=bad, company=pid)["code"] == "auth" and "km/h" in next(s for s in c["signals"]
                                                                          if s["kind"] == "teleport")["detail"]
     assert call("/api/v1/mod/act", "", mod_password=modpw, action="signals_done", pid=pid)["err"] == 0
     d = call("/api/v1/mod/reports", "", mod_password=modpw)

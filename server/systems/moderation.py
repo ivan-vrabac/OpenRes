@@ -279,6 +279,10 @@ def install(api) -> None:
     @api.endpoint("/api/v1/mod/reports", auth=False)
     @mod
     def mod_reports(conn, form):
+        # one company's full picture through this path too: the website forwards only reports and act (owner
+        # 2026-11-06: the details never opened on resources.vrabac.eu)
+        if form.get("company"):
+            return mod_company(conn, "", {**form, "pid": form.get("company")})
         status = form.get("status", "open")
         rows = conn.execute("SELECT * FROM reports WHERE status=? ORDER BY id DESC LIMIT 200", (status,)).fetchall()
         out = []
