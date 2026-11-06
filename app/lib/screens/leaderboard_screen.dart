@@ -25,7 +25,7 @@ class LeaderboardScreen extends StatelessWidget {
         child: Column(children: [
           TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
             Tab(text: 'Overall'), Tab(text: 'Campus'), Tab(text: 'Hexes'), Tab(text: 'Countries'), Tab(text: 'Tantalum'),
-            Tab(text: 'Output'),
+            Tab(text: 'Production'),
           ]),
           Expanded(child: TabBarView(children: [
             _OverallBoard(), _CampusBoard(), _HexBoard(), _CountryBoard(), _LuxuryBoard(), _ResourceBoard(),
@@ -369,7 +369,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
           middle: Text('${r['count']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
           // owner 2026-11-06: the buttons never move: no check mark, fixed width, and the item list's place is kept
-          SizedBox(height: 48, child: Padding(
+          SizedBox(height: 52, child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
             child: Row(children: [
               SizedBox(width: 210, child: SegmentedButton<String>(
@@ -384,6 +384,8 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
               if (all) const Expanded(child: SizedBox.shrink()) else Expanded(
                 child: DropdownButton<String>(
                   isExpanded: true,
+                  isDense: true,                       // fits the fixed row (owner 2026-11-06: it was cut off)
+                  hint: const Text('Choose an item'),
                   value: options.contains(item) ? item : null,
                   items: [
                     for (final o in options)

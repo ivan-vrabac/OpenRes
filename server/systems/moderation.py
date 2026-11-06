@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import datetime
 import hmac
+import math
 import os
 import re
 import time
@@ -233,6 +234,8 @@ def install(api) -> None:
             raise econ.GameError("bad_input", "Invalid signal")
         try:
             lat, lng = float(form.get("lat")), float(form.get("lng"))
+            if not (math.isfinite(lat) and math.isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180):
+                lat = lng = None                       # NaN or nonsense would break the moderators' JSON
         except (TypeError, ValueError):
             lat = lng = None
         with econ.tx(conn):

@@ -208,3 +208,12 @@ def test_signing_in_on_a_friends_phone_far_away(modpw):
     # a day later (a long trip, or the friend logged out): the far place is accepted again
     _was_at(hid, *ZAGREB, hours_ago=30)
     assert _act_at(sid, *SYDNEY).get("code") != "teleport"
+
+
+def test_a_fake_gps_signal_with_nonsense_numbers_is_stored_without_them(modpw):
+    hid, sid, _ = new_player("sgnan")
+    assert call("/api/v1/signal", sid, kind="mock_gps", lat="nan", lng="inf")["err"] == 0
+    import main as m
+    with m.get_db() as conn:
+        assert tuple(conn.execute("SELECT lat, lng FROM cheat_signals WHERE hid=?", (hid,)).fetchone()) == (None, None)
+    assert call("/api/v1/mod/reports", "", mod_password=modpw)["err"] == 0
