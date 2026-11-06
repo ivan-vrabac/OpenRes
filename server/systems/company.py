@@ -33,6 +33,7 @@ from __future__ import annotations
 import base64
 import datetime
 import math
+import threading
 
 
 import countries
@@ -236,9 +237,10 @@ def migrate(conn) -> None:
                          (r["hid"], a, b, "campus", built or iso(utcnow())))
 
 
-def set_campus_country(conn, hid, lat, lng) -> str:
-    """The company's country is where its Campus stands (owner 2026-11-06); "zz" is international waters."""
-    cc = countries.country_at(lat, lng)
+def set_campus_country(conn, hid, lat, lng, cc: str | None = None) -> str:
+    """The company's country is where its Campus stands (owner 2026-11-06); "zz" is international waters.
+    Pass `cc` when it was looked up before the write transaction (the lookup then holds no lock)."""
+    cc = cc or countries.country_at(lat, lng)
     conn.execute("UPDATE co_state SET campus_cc=? WHERE hid=?", (cc, hid))
     conn.execute("UPDATE players SET country_code=? WHERE hID=?", (cc, hid))
     return cc
@@ -554,6 +556,7 @@ def install(api) -> None:
     @api.endpoint("/api/v3/campus/place")
     def campus_place(conn, hid, form):
         lat, lng, plat, plng = build_spot(form)
+        cc = countries.country_at(lat, lng)          # before the write lock: other writers never wait on it
         with econ.tx(conn):
             travel_check(conn, hid, plat, plng)
             row = collect(conn, hid)
@@ -570,7 +573,7 @@ def install(api) -> None:
             conn.execute("UPDATE co_state SET campus_level=1, campus_lat=?, campus_lng=?, last_visit=? WHERE hid=?",
                          (lat, lng, now, hid))
             ensure_supervisors(conn, hid, 1)
-            set_campus_country(conn, hid, lat, lng)
+            set_campus_country(conn, hid, lat, lng, cc)
             econ.emit(conn, "campus_placed", hid, {}, public=False)
             log(conn, hid, "campus_placed", lat=lat, lng=lng)
         return {"err": 0, "level": 1}
@@ -908,6 +911,8 @@ def install(api) -> None:
 
 def install_campus(api) -> None:
     """Campus and storage levels, supervisors and their education."""
+    # the borders load in the background at start (0.7 s), so no player's request waits for them
+    threading.Thread(target=countries.country_at, args=(0.0, 0.0), daemon=True, name="countries").start()
 
     @api.endpoint("/api/v3/campus/upgrade")
     def campus_upgrade(conn, hid, form):
