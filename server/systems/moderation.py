@@ -134,9 +134,9 @@ _ban_cache: dict = {}
 
 
 def is_banned(get_db, hid) -> dict | None:
-    """Full ban (cached for 60 s): used when signing in and for every request."""
+    """Full ban (cached for 15 s per process: a ban reaches every process of the server within 15 s)."""
     hit = _ban_cache.get(hid)
-    if hit and time.time() - hit[0] < 60:
+    if hit and time.time() - hit[0] < 15:
         return hit[1]
     with get_db() as conn:
         try:

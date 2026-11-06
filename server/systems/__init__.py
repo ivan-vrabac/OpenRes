@@ -8,14 +8,15 @@ the result like the legacy endpoints (zlib JSON).
 """
 from __future__ import annotations
 
-import collections
+import os
 import sqlite3
 import threading
-import time
 import types
 
+import anyio
 from fastapi import Request
-from starlette.concurrency import run_in_threadpool
+
+import procs
 
 import econ
 
@@ -36,8 +37,6 @@ LIMITS = {
     "/api/v1/quests/claim": (20, 60), "/api/v1/account/rename": (5, 3600),
     "/api/v3/integrity/report": (6, 3600),
 }
-_recent: dict = collections.defaultdict(collections.deque)      # (hid, path): times of recent calls
-_recent_lock = threading.Lock()
 _countries: dict = {}                     # hid: the country last saved, so a request only reads it
 
 
@@ -58,20 +57,26 @@ def see_country(conn, hid: str, header: str | None) -> None:
 
 
 def too_often(hid: str, path: str, now: float | None = None) -> bool:
-    """True when `hid` already used `path` its LIMITS[path] times in the window (then not counted)."""
+    """True when `hid` already used `path` its LIMITS[path] times in the window (then not counted). Counted
+    across all the server's processes (procs.too_often)."""
     lim = LIMITS.get(path)
     if not lim or not hid:
         return False
-    n, window = lim
-    now = time.monotonic() if now is None else now
-    with _recent_lock:
-        q = _recent[(hid, path)]
-        while q and q[0] <= now - window:
-            q.popleft()
-        if len(q) >= n:
-            return True
-        q.append(now)
-        return False
+    return procs.too_often(hid, path, lim[0], lim[1], now)
+
+
+# Database work runs in threads, at most DB_THREADS at once per process (owner 2026-11-06): Python runs one
+# thread at a time, and many threads reading rows slow each other down badly; the CPUs are used by running
+# many processes instead (serve.py).
+DB_THREADS = int(os.environ.get("DB_THREADS", "4"))
+_limiter = None
+
+
+def _db_limiter():
+    global _limiter
+    if _limiter is None:
+        _limiter = anyio.CapacityLimiter(DB_THREADS)
+    return _limiter
 
 
 class Api:
@@ -117,7 +122,7 @@ class Api:
                                 except Exception:
                                     pass
                             return e.resp()
-                return h.zlib_resp(await run_in_threadpool(work))
+                return h.zlib_resp(await anyio.to_thread.run_sync(work, limiter=_db_limiter()))
             handler.__name__ = fn.__name__
             self.app.add_api_route(path, handler, methods=["POST"])
             return fn

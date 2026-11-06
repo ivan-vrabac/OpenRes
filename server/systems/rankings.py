@@ -15,7 +15,10 @@ Results are cached for CACHE_S seconds per board so large worlds stay cheap.
 """
 from __future__ import annotations
 
+import contextlib
 import datetime
+import json
+import sqlite3
 import time
 
 import econ
@@ -29,15 +32,66 @@ CACHE_S = 300
 MAX_ROWS = 100_000      # computed boards are cached in full and paged
 TOP = 100               # owner 2026-11-06: every board shows its top 100, no pages, and your own row
 ACTIVITY_DAYS = 100
-_cache: dict = {}
+
+
+class _Cache:
+    """The computed boards: this process's copy, and the shared one every process reads (owner 2026-11-06:
+    with many processes, one computes a board every CACHE_S seconds and the others read it)."""
+
+    def __init__(self):
+        self.local: dict = {}
+
+    def get(self, key):
+        return self.local.get(key)
+
+    def clear(self):
+        self.local.clear()
+        if _get_db is not None:
+            with contextlib.suppress(sqlite3.Error), _get_db() as c:
+                c.execute("DELETE FROM rank_cache")
+                c.commit()
+
+
+_cache = _Cache()
+_get_db = None           # set by install(): a new connection (the cache is written outside the request's)
 
 
 def _cached(key, fn):
-    hit = _cache.get(key)
-    if hit and time.time() - hit[0] < CACHE_S:
+    """The board `key`: fresh from this process, else from the shared cache, else computed here. While one
+    process computes a stale board (it claims it for a minute), the others keep serving the old one."""
+    now = time.time()
+    hit = _cache.local.get(key)
+    if hit and now - hit[0] < CACHE_S:
         return hit[1]
+    if _get_db is None:
+        val = fn()
+        _cache.local[key] = (now, val)
+        return val
+    row, claimed = None, True
+    try:
+        with _get_db() as c:
+            row = c.execute("SELECT at, data FROM rank_cache WHERE key=?", (key,)).fetchone()
+            if row and row[1] != "null" and now - row[0] < CACHE_S:
+                val = json.loads(row[1])
+                _cache.local[key] = (row[0], val)
+                return val
+            claimed = c.execute(
+                "INSERT INTO rank_cache(key, at, data, claim) VALUES(?, 0, 'null', ?) ON CONFLICT(key) DO UPDATE "
+                "SET claim=excluded.claim WHERE rank_cache.claim IS NULL OR rank_cache.claim < ?",
+                (key, now, now - 60)).rowcount == 1
+            c.commit()
+    except sqlite3.Error:                     # the database is busy: compute it here, share it next time
+        pass
+    if not claimed and row and row[1] != "null":
+        val = json.loads(row[1])              # another process is on it: the last one meanwhile
+        _cache.local[key] = (now - CACHE_S + 5, val)
+        return val
     val = fn()
-    _cache[key] = (time.time(), val)
+    done = time.time()
+    _cache.local[key] = (done, val)
+    with contextlib.suppress(sqlite3.Error), _get_db() as c:
+        c.execute("UPDATE rank_cache SET at=?, data=?, claim=NULL WHERE key=?", (done, json.dumps(val), key))
+        c.commit()
     return val
 
 
@@ -182,6 +236,12 @@ def _gap(rows, me):
 
 
 def install(api) -> None:
+    global _get_db
+    _get_db = api.h.get_db
+    with _get_db() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS rank_cache (key TEXT PRIMARY KEY, at REAL NOT NULL, data TEXT NOT NULL, "
+                  "claim REAL)")
+        c.commit()
     def refs(conn, hids, viewer):
         return {x: social.public_ref(conn, x) for x in hids}
 

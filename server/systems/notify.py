@@ -249,7 +249,8 @@ def install(api) -> None:
                 pass
 
     if os.environ.get("WORLD_EVENTS_THREAD", "1") == "1":
-        threading.Thread(target=sweeper, daemon=True, name="notify-sweep").start()
+        import procs
+        procs.as_leader(sweeper, "notify-sweep")       # one process sends them, or players get each twice
     h.notify_enabled_for = lambda conn, kind: [r[0] for r in conn.execute(
         "SELECT hid FROM notif_kinds WHERE kind=? AND enabled=1", (kind,))]
 

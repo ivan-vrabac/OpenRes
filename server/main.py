@@ -356,9 +356,15 @@ class _Connection(sqlite3.Connection):
 
 
 def get_db() -> sqlite3.Connection:
-    # Requests run concurrently in threads; wait for a busy writer instead of failing fast.
+    # Requests run concurrently in threads and processes; wait for a busy writer instead of failing fast.
     conn = sqlite3.connect(DB_PATH, timeout=30, factory=_Connection)
     conn.row_factory = sqlite3.Row
+    # owner 2026-11-06 (many processes): NORMAL is safe in WAL mode (a crash of the server loses nothing; a
+    # power cut at most the last moment, never the file) and much faster than FULL; reads go through memory
+    # the operating system shares between the processes; sorting in memory
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA mmap_size=1073741824")
+    conn.execute("PRAGMA temp_store=MEMORY")
     return conn
 
 # ── Travel check (GPS spoofing) ─────────────────────────────────────────────────
@@ -472,6 +478,10 @@ def init_db():
             conn.execute("CREATE INDEX IF NOT EXISTS idx_players_name_ci2 ON players(lower(company_name))")
         conn.commit()
 
+import procs  # noqa: E402
+
+_init = procs.init_lock()          # the processes start together: one at a time makes tables and migrates
+_init.__enter__()
 init_db()
 with get_db() as _conn:
     auth.init(_conn, db_connect=get_db)
@@ -923,6 +933,7 @@ SYSTEM_HELPERS = _types.SimpleNamespace(
     push=_push_to_player, new_id=new_id, record_daily_activity=record_daily_activity,
 )
 INSTALLED_SYSTEMS = systems.install_all(app, SYSTEM_HELPERS)
+_init.__exit__(None, None, None)
 
 # ── Unknown paths ─────────────────────────────────────────────────────────────────
 # (owner 2026-10-25: nothing is forwarded to any other server any more)

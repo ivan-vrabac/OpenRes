@@ -126,8 +126,8 @@ def install(api) -> None:
             time.sleep(86400)
 
     if os.environ.get("WORLD_EVENTS_THREAD", "1") == "1":
-        import threading
-        threading.Thread(target=janitor, daemon=True, name="retention").start()
+        import procs
+        procs.as_leader(janitor, "retention")          # one process does it (owner 2026-11-06: many processes)
 
     @api.endpoint("/api/v1/legal", auth=False)
     def legal(conn, hid, form):
