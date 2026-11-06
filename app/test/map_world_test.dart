@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:openres/map_kit/map_world.dart';
+import 'package:openres/map_kit/smoke.dart';
 import 'package:openres/services/game_api.dart';
 
 LatLngBounds at(double lat, double lng, [double size = 0.01]) =>
@@ -122,6 +124,38 @@ void main() {
     w.refresh();
     await settle();
     expect(w.hexes.map((h) => h['id']), unorderedEquals([1, 2]));
+  });
+
+  test('far out: clouds of squares that fit the zoom, asked again when the zoom needs other squares', () async {
+    // zooming out never makes the squares smaller, and the far ends use the smallest and biggest
+    var last = -1;
+    for (var z = 14.4; z >= 1; z -= 0.5) {
+      final l = cloudLevel(z);
+      expect(l, greaterThanOrEqualTo(last));
+      last = l;
+    }
+    expect(cloudLevel(14.4), 0);
+    expect(cloudLevel(1), kCloudSizes.length - 1);
+    w.want(at(45, 16, 0.05), 13);
+    await settle();
+    expect(srv.calls.last['detail'], 0);
+    expect(srv.calls.last['cloud'], cloudLevel(13));
+    final n = srv.calls.length;
+    w.want(at(45, 16, 0.05), 13.1);          // the same squares: nothing to ask
+    await settle();
+    expect(srv.calls.length, n);
+    w.want(at(45, 16, 0.05), 6);             // much further out: bigger squares
+    await settle();
+    expect(srv.calls.last['cloud'], cloudLevel(6));
+    expect(cloudLevel(6), greaterThan(cloudLevel(13)));
+  });
+
+  test('a cloud of many hexes is a bigger puff, never a huge one', () {
+    final d = SmokeData.fromClouds(Float64List.fromList([45, 16, 1, 45.1, 16, 10, 45.2, 16, 1e6]));
+    expect(d.length, 3);
+    expect(d.size![0], 1.0);
+    expect(d.size![1], greaterThan(1.5));
+    expect(d.size![2], 2.5);
   });
 
   test('moving inside the margin needs no request', () async {

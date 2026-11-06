@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,20 @@ import 'smoke.dart';
 
 /// Below this zoom the hexes are clouds.
 const double kHexZoom = 14.5;
+
+/// The server's cloud square sizes in degrees (company.CLOUD_SIZES), smallest first.
+const kCloudSizes = [0.002, 0.01, 0.05, 0.25, 1.0, 5.0];
+
+/// Which cloud squares fit [zoom]: the biggest that is not wider than one puff, so puffs still overlap
+/// into one soft cloud and there are never more than a few thousand on the screen.
+int cloudLevel(double zoom) {
+  final puffDeg = SmokePainter.radiusFor(zoom) * 360 / (256 * math.pow(2, zoom));
+  var level = 0;
+  for (var i = 0; i < kCloudSizes.length; i++) {
+    if (kCloudSizes[i] <= puffDeg) level = i;
+  }
+  return level;
+}
 
 /// What is drawn on the map, known in one place (owner 2026-10-31: Campuses and hexes kept vanishing
 /// until a refresh). Hexes, Campuses and clouds come from one request for the view plus a margin, so
@@ -43,6 +58,7 @@ class MapWorld extends ChangeNotifier {
   // nothing changed there the answer is {"same": 1} and nothing is read or rebuilt. A full answer at
   // least every [_fullEvery] anyway (names, the lease days).
   String? _sig, _acrossSig;
+  int _boxCloud = -1;        // the cloud squares of the last far answer
   DateTime? _fullAt;
   static const _fullEvery = Duration(minutes: 5);
 
@@ -104,6 +120,7 @@ class MapWorld extends ChangeNotifier {
     if (across != null && (abox == null || !_inside(across, abox))) return true;
     if (DateTime.now().difference(at) >= _maxAge) return true;
     if (_zoom >= kHexZoom && !_boxDetail) return true;
+    if (_zoom < kHexZoom && (_boxDetail || cloudLevel(_zoom) != _boxCloud)) return true;   // other cloud squares
     return _boxCut && _zoom >= _boxZoom + 1;        // up close the cut-off parts may be in view
   }
 
@@ -142,17 +159,20 @@ class MapWorld extends ChangeNotifier {
         final detail = zoom >= kHexZoom;
         // the same area as last time, only older: ask with its sig (the view stays inside it, so keep it)
         final old = _box;
-        final sameArea = old != null && _boxDetail == detail && _inside(view, old) &&
+        final cloud = detail ? -1 : cloudLevel(zoom);
+        final sameArea = old != null && _boxDetail == detail && cloud == _boxCloud && _inside(view, old) &&
             (_across == null || (_acrossBox != null && _inside(_across!, _acrossBox!))) &&
             _fullAt != null && DateTime.now().difference(_fullAt!) < _fullEvery;
         final box = sameArea ? old : _withMargin(view, detail);
         final across = _across == null ? null : (sameArea ? _acrossBox : _withMargin(_across!, detail));
         final r = await _fetch('/api/v3/map', {'south': box.south, 'west': box.west,
-            'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0, if (sameArea) 'sig': _sig});
+            'north': box.north, 'east': box.east, 'detail': detail ? 1 : 0, if (!detail) 'cloud': cloud,
+            if (sameArea) 'sig': _sig});
         if (_gone) return;
         if (!r.ok) { _dirty = true; break; }        // what is known stays; the next want tries again
         final ra = across == null ? null : await _fetch('/api/v3/map', {'south': across.south, 'west': across.west,
-            'north': across.north, 'east': across.east, 'detail': detail ? 1 : 0, if (sameArea) 'sig': _acrossSig});
+            'north': across.north, 'east': across.east, 'detail': detail ? 1 : 0, if (!detail) 'cloud': cloud,
+            if (sameArea) 'sig': _acrossSig});
         if (_gone) return;
         if (ra != null && !ra.ok) { _dirty = true; break; }
         _sig = r.data['sig'] as String?;
@@ -172,6 +192,7 @@ class MapWorld extends ChangeNotifier {
         _acrossBox = across;
         _boxZoom = zoom;
         _boxDetail = detail;
+        _boxCloud = cloud;
         _boxCut = r.data['more'] == true;
         _boxAt = DateTime.now();
       }
@@ -188,7 +209,12 @@ class MapWorld extends ChangeNotifier {
         for (final h in hexes)
           ...[(h['lat'] as num).toDouble(), (h['lng'] as num).toDouble()],     // Campus cells too
       ]));
-    } else {
+    } else if (r.data['clouds'] != null) {
+      smoke = SmokeData.fromClouds(Float64List.fromList([
+        for (final a in [r, if (also != null) also.$1])
+          for (final v in a.data['clouds'] as List? ?? const []) (v as num).toDouble(),
+      ]));
+    } else {                                     // an older server: one dot per hex
       smoke = SmokeData.fromLatLng(Float64List.fromList([
         for (final a in [r, if (also != null) also.$1])
           for (final v in a.data['dots'] as List? ?? const []) (v as num).toDouble(),

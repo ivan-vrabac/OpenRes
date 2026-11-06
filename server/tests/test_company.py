@@ -604,3 +604,42 @@ def test_map_answers_same_while_nothing_changed():
             got = conn.execute("SELECT " + comp._cell_sql(repr(lat), repr(lng))).fetchone()[0]
             want = (math.floor(lat * 10) + 900) * 4000 + math.floor(lng * 10) + 1800
             assert got == want, (lat, lng, got, want)
+
+
+def test_clouds_add_hexes_up_per_square():
+    """Owner 2026-11-06: far out, one puff per square with how many hexes it holds, kept by triggers."""
+    hid, sid = setup_hq("cloud", at=(-12.3, 27.3))
+    box = dict(south=-12.5, west=27.1, north=-12.1, east=27.5, detail=0)
+    def total(level):
+        r = call("/api/v3/map", sid, cloud=level, **box)
+        c = r["clouds"]
+        return sum(c[2::3]), len(c) // 3, r
+    n0, puffs0, r0 = total(0)
+    assert n0 == 7 and "dots" not in r0                     # the Campus's 7 cells
+    spots = [(-12.3 + 0.004 * i, 27.3 + 0.003 * i) for i in range(1, 11)]
+    with main.get_db() as conn:
+        for lat, lng in spots:
+            conn.execute("INSERT INTO co_hexes(hid, lat, lng, op, item, quality, built_at, lease_until) "
+                         "VALUES(?,?,?,?,?,?,?,?)", (hid, lat, lng, "logging_camp", "wood", 50, "2026-01-01", "2027-01-01"))
+        conn.commit()
+    for level in range(len(co.CLOUD_SIZES)):
+        n, puffs, _ = total(level)
+        assert n == 17, level                                 # every hex counted once at every size
+    assert total(0)[1] > total(3)[1] == 1                     # small squares: many puffs; big: one
+    with main.get_db() as conn:
+        conn.execute("DELETE FROM co_hexes WHERE hid=? AND op='logging_camp'", (hid,))
+        conn.commit()
+    assert total(0)[0] == 7 and total(5)[0] == 7
+    # the puff sits at the middle of its hexes
+    _, _, r = total(5)
+    assert abs(r["clouds"][0] + 12.3) < 0.01 and abs(r["clouds"][1] - 27.3) < 0.01
+    # the old way still answers old apps
+    old = call("/api/v3/map", sid, **box)
+    assert len(old["dots"]) // 2 == 7 and "clouds" not in old
+    # a rebuild from scratch gives the same counts
+    with main.get_db() as conn:
+        before = conn.execute("SELECT level, cy, cx, n FROM hex_grid ORDER BY 1, 2, 3").fetchall()
+        co.rebuild_clouds(conn)
+        after = conn.execute("SELECT level, cy, cx, n FROM hex_grid ORDER BY 1, 2, 3").fetchall()
+        conn.commit()
+    assert [tuple(x) for x in before] == [tuple(x) for x in after]

@@ -45,7 +45,25 @@ class SmokeData {
   final Float32List world; // x, y pairs
   final Float32List rects; // sprite source rects (all the same)
   final Float32List xf;    // per-frame RSTransforms, rewritten in paint()
-  SmokeData._(this.world, this.rects, this.xf);
+  final Float32List? size; // per puff: how much bigger than one hex's puff (clouds of many hexes)
+  SmokeData._(this.world, this.rects, this.xf, [this.size]);
+
+  /// How much bigger a puff of [hexes] hexes is drawn: one hex 1x, ten about 1.8x, a thousand 2.5x at most.
+  static double puffSize(num hexes) => hexes <= 1 ? 1.0 : math.min(2.5, 1.0 + 0.25 * math.log(hexes) / math.ln2);
+
+  /// The server's clouds (owner 2026-11-06): lat, lng, hexes per square, one puff each.
+  factory SmokeData.fromClouds(Float64List latLngN) {
+    final n = latLngN.length ~/ 3;
+    final world = Float32List(n * 2), rects = Float32List(n * 4), size = Float32List(n);
+    for (int i = 0; i < n; i++) {
+      world[2 * i] = mercX(latLngN[3 * i + 1]);
+      world[2 * i + 1] = mercY(latLngN[3 * i]);
+      size[i] = puffSize(latLngN[3 * i + 2]);
+      rects[4 * i + 2] = kPuffTex;
+      rects[4 * i + 3] = kPuffTex;
+    }
+    return SmokeData._(world, rects, Float32List(n * 4), size);
+  }
 
   factory SmokeData.fromLatLng(Float64List latLng) {
     final n = latLng.length ~/ 2;
@@ -85,16 +103,18 @@ class SmokePainter extends CustomPainter {
     final r = radiusFor(zoom);
     final s = 2 * r / kPuffTex;
     final halfW = size.width / 2, halfH = size.height / 2;
-    final w = d.world, xf = d.xf;
+    final w = d.world, xf = d.xf, sizes = d.size;
     int k = 0;
     for (int i = 0; i < d.length; i++) {
+      final f = sizes == null ? 1.0 : sizes[i];
+      final ri = r * f;
       final sx = halfW + nearestWorld(w[2 * i] - cx) * scale;
       final sy = halfH + (w[2 * i + 1] - cy) * scale;
-      if (sx < -r || sx > size.width + r || sy < -r || sy > size.height + r) continue;
-      xf[4 * k]     = s;
+      if (sx < -ri || sx > size.width + ri || sy < -ri || sy > size.height + ri) continue;
+      xf[4 * k]     = s * f;
       xf[4 * k + 1] = 0;
-      xf[4 * k + 2] = sx - r;
-      xf[4 * k + 3] = sy - r;
+      xf[4 * k + 2] = sx - ri;
+      xf[4 * k + 3] = sy - ri;
       k++;
     }
     if (k == 0) return;

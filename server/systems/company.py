@@ -226,6 +226,7 @@ def migrate(conn) -> None:
                           "WHERE campus_lat IS NOT NULL AND campus_cc IS NULL").fetchall():
         set_campus_country(conn, r["hid"], r["campus_lat"], r["campus_lng"])
     map_triggers(conn)
+    cloud_triggers(conn)
     # Campus compounds placed with the neighbours at the corners (overlapping): put them edge to edge
     for r in conn.execute("SELECT hid, campus_lat, campus_lng FROM co_state WHERE campus_level>0").fetchall():
         cells = conn.execute("SELECT lat, lng FROM co_hexes WHERE hid=? AND op='campus'", (r["hid"],)).fetchall()
@@ -297,6 +298,54 @@ def map_triggers(conn) -> None:
     ]
     for st in stmts:
         conn.execute(st)
+
+
+# ── clouds: hexes added up per map square (owner 2026-11-06) ────────────────────────────────────────
+# Far out the map shows clouds, not hexes. One puff per hex meant 50,000 puffs a frame for a built-up
+# city; now the server keeps how many hexes (and their middle) lie in every square of each size below,
+# by triggers, and the app gets one puff per square of the size that fits its zoom.
+CLOUD_SIZES = (0.002, 0.01, 0.05, 0.25, 1.0, 5.0)     # degrees: about 200 m to 500 km
+MAP_CLOUDS = 20000
+
+
+def _floor_div(v, size):
+    x = f"(({v}) / {size!r})"
+    return f"(CAST({x} AS INTEGER) - ({x} < CAST({x} AS INTEGER)))"
+
+
+def cloud_triggers(conn) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS hex_grid (level INTEGER NOT NULL, cy INTEGER NOT NULL, cx INTEGER NOT NULL, "
+                 "n INTEGER NOT NULL, slat REAL NOT NULL, slng REAL NOT NULL, PRIMARY KEY(level, cy, cx)) WITHOUT ROWID")
+    add = "".join(
+        f"INSERT INTO hex_grid(level, cy, cx, n, slat, slng) VALUES({i}, {_floor_div('NEW.lat', z)}, "
+        f"{_floor_div('NEW.lng', z)}, 1, NEW.lat, NEW.lng) ON CONFLICT(level, cy, cx) DO UPDATE SET "
+        f"n=n+1, slat=slat+excluded.slat, slng=slng+excluded.slng;" for i, z in enumerate(CLOUD_SIZES))
+    sub = "".join(
+        f"UPDATE hex_grid SET n=n-1, slat=slat-OLD.lat, slng=slng-OLD.lng WHERE level={i} AND "
+        f"cy={_floor_div('OLD.lat', z)} AND cx={_floor_div('OLD.lng', z)};" for i, z in enumerate(CLOUD_SIZES))
+    sub += "DELETE FROM hex_grid WHERE n<=0;"
+    conn.execute(f"CREATE TRIGGER IF NOT EXISTS cg_hex_ins AFTER INSERT ON co_hexes BEGIN {add} END")
+    conn.execute(f"CREATE TRIGGER IF NOT EXISTS cg_hex_del AFTER DELETE ON co_hexes BEGIN {sub} END")
+    conn.execute(f"CREATE TRIGGER IF NOT EXISTS cg_hex_mov AFTER UPDATE OF lat, lng ON co_hexes BEGIN {sub}{add} END")
+    if conn.execute("SELECT 1 FROM hex_grid LIMIT 1").fetchone() is None:
+        rebuild_clouds(conn)
+
+
+def rebuild_clouds(conn) -> None:
+    """Count every hex again (first start, or after hexes were changed with the triggers off)."""
+    conn.execute("DELETE FROM hex_grid")
+    for i, z in enumerate(CLOUD_SIZES):
+        conn.execute(f"INSERT INTO hex_grid(level, cy, cx, n, slat, slng) SELECT {i}, {_floor_div('lat', z)} AS y, "
+                     f"{_floor_div('lng', z)} AS x, COUNT(*), SUM(lat), SUM(lng) FROM co_hexes GROUP BY y, x")
+
+
+def clouds(conn, level: int, s, w, n, e) -> list:
+    """[lat, lng, hexes, ...]: one puff per square of CLOUD_SIZES[level] in the area, at its hexes' middle."""
+    z = CLOUD_SIZES[level]
+    rows = conn.execute("SELECT n, slat, slng FROM hex_grid WHERE level=? AND cy BETWEEN ? AND ? AND cx BETWEEN ? AND ? "
+                        "LIMIT ?", (level, math.floor(s / z), math.floor(n / z), math.floor(w / z), math.floor(e / z),
+                                    MAP_CLOUDS)).fetchall()
+    return [v for c, a, b in rows for v in (round(a / c, 6), round(b / c, 6), c)]
 
 
 def map_sig(conn, s, w, n, e) -> str:
@@ -928,7 +977,7 @@ def install(api) -> None:
         s, w = float_arg(form, "south", lo=-90, hi=90), float_arg(form, "west", lo=-180, hi=180)
         n, e = float_arg(form, "north", lo=-90, hi=90), float_arg(form, "east", lo=-180, hi=180)
         # owner 2026-11-06: the app asks again every 30 s; when nothing changed in the area it gets no data
-        sig = map_sig(conn, s, w, n, e)
+        sig = f"{map_sig(conn, s, w, n, e)}.{form.get('detail', '1')}.{form.get('cloud', '')}"   # what was asked too
         if form.get("sig") == sig:
             return {"err": 0, "same": 1, "sig": sig}
         campuses = conn.execute("SELECT c.hid, c.campus_level, c.campus_lat, c.campus_lng, p.company_name FROM co_state c "
@@ -943,6 +992,13 @@ def install(api) -> None:
                              "WHERE m.lat BETWEEN ? AND ? AND m.lng BETWEEN ? AND ?", (s, n, w, e)).fetchall()
         res["moves"] = [{"own": m["hid"] == hid, "lat": m["lat"], "lng": m["lng"], "name": m["company_name"]} for m in moves]
         site_cells = [(m["hid"], c) for m in moves for c in compound_cells(m["lat"], m["lng"])]
+        if form.get("detail", "1") == "0" and form.get("cloud") is not None:
+            # new apps: one puff per square that fits the zoom (old apps get the dots below)
+            level = int_arg(form, "cloud", lo=0, hi=len(CLOUD_SIZES) - 1)
+            res["clouds"] = clouds(conn, level, s, w, n, e)
+            res["more"] = res["more"] or len(res["clouds"]) // 3 == MAP_CLOUDS
+            res["clouds"] += [v for _, c in site_cells for v in (round(c[0], 6), round(c[1], 6), 1)]
+            return res
         if form.get("detail", "1") == "0":
             rows = conn.execute("SELECT lat, lng FROM co_hexes WHERE lat BETWEEN ? AND ? "       # Campus cells too
                                 "AND lng BETWEEN ? AND ? LIMIT ?", (s, n, w, e, MAP_DOTS)).fetchall()
