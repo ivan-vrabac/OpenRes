@@ -217,6 +217,16 @@ class MapWorld extends ChangeNotifier {
     }
   }
 
+  /// Up close, but [view] holds more hexes than one answer carries (a built-up city at the first hex zooms):
+  /// show clouds there instead of the strip of hexes that came (owner 2026-11-06). Zooming in until the view
+  /// fits shows hexes again.
+  bool crowdedFor(LatLngBounds view) {
+    final box = _box;
+    if (box == null || !_boxCut || !_boxDetail) return false;
+    return box.north - box.south < (view.north - view.south) * 0.98 ||
+        box.east - box.west < (view.east - view.west) * 0.98;
+  }
+
   static LatLngBounds? _cover(ApiResult r) {
     final c = r.data['cover'];
     if (c is! List || c.length != 4) return null;
@@ -227,7 +237,12 @@ class MapWorld extends ChangeNotifier {
   void _merge(ApiResult r, LatLngBounds box, bool detail, {(ApiResult, LatLngBounds)? also}) {
     _mergeOne(r, box, detail);
     if (also != null) _mergeOne(also.$1, also.$2, detail);
-    if (detail) {
+    if (detail && r.data['clouds'] != null) {           // cut off up close: the area's clouds came too
+      smoke = SmokeData.fromClouds(Float64List.fromList([
+        for (final a in [r, if (also != null) also.$1])
+          for (final v in a.data['clouds'] as List? ?? const []) (v as num).toDouble(),
+      ]));
+    } else if (detail) {
       smoke = SmokeData.fromLatLng(Float64List.fromList([
         for (final h in hexes)
           ...[(h['lat'] as num).toDouble(), (h['lng'] as num).toDouble()],     // Campus cells too

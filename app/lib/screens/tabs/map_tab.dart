@@ -673,13 +673,15 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
           if (_showMines)
             ListenableBuilder(listenable: _world, builder: (ctx, _) {
               final cam = MapCamera.of(ctx);
+              // more hexes in view than one answer carries: clouds, not a strip of hexes (owner 2026-11-06)
+              final crowded = cam.zoom >= kHexZoom && _world.crowdedFor(cam.visibleBounds);
               return Stack(children: [
-                if (cam.zoom < kHexZoom)
+                if (cam.zoom < kHexZoom || crowded)
                   CustomPaint(
                     painter: SmokePainter(data: _world.smoke, puff: _puff, center: cam.center, zoom: cam.zoom),
                     size: Size.infinite,
                   ),
-                MapObjectsLayer(world: _world, frame: _kFrame, accent: AppColors.accent),
+                MapObjectsLayer(world: _world, frame: _kFrame, accent: AppColors.accent, showHexes: !crowded),
               ]);
             }),
 

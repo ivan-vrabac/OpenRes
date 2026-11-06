@@ -1040,6 +1040,9 @@ def install(api) -> None:
             # others at the same distance may be left out)
             k = max(0.0, reach - 1e-9)
             res["cover"] = [clat - k * hh, clng - k * hw, clat + k * hh, clng + k * hw]
+            # and the smallest clouds of the whole area: where even the view holds more hexes than one answer
+            # carries, the app shows clouds there instead of a strip of hexes (owner 2026-11-06)
+            res["clouds"] = clouds(conn, 0, s, w, n, e)
         out += [{"id": None, "lat": c[0], "lng": c[1], "op": "campus", "item": None, "own": owner == hid}
                 for owner, c in site_cells]
         res["hexes"] = out

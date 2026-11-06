@@ -261,6 +261,19 @@ void main() {
     expect(srv.calls.length, n + 1);
   });
 
+  test('crowded: clouds when the view holds more than one answer, hexes when it fits (owner 2026-11-06)', () async {
+    srv.coverShare = 0.05;
+    final view = at(45, 16, 0.002);
+    w.want(view, 15);
+    await settle();
+    expect(w.crowdedFor(view), isTrue);
+    expect(w.crowdedFor(at(45, 16, 0.00005)), isFalse);       // zoomed in far enough: it fits
+    srv.coverShare = null;                                   // a normal place: everything fits
+    w.refresh();
+    await settle();
+    expect(w.crowdedFor(view), isFalse);
+  });
+
   test('the world view does not loop: bounds beyond the map still count as covered', () async {
     final view = LatLngBounds(const LatLng(-89, -179.9), const LatLng(89, 179.9));
     w.want(view, 3);

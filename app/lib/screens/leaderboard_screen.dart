@@ -108,6 +108,7 @@ Widget _flag(String? cc) => cc == null || cc.isEmpty
         padding: const EdgeInsets.only(right: 6),
         child: ClipRRect(borderRadius: BorderRadius.circular(2), child: Image.asset(
             'assets/images_countryflags/${cc.toLowerCase()}.png', width: 18, height: 12, fit: BoxFit.cover,
+            cacheWidth: 54, gaplessPlayback: true,              // decoded small: shows at once, stays cached
             errorBuilder: (_, __, ___) => const SizedBox.shrink())),
       );
 
@@ -125,6 +126,11 @@ Widget _infoRow(String middle, String value, {String who = 'Company'}) => Contai
     );
 
 abstract class _BoardState<T extends StatefulWidget> extends State<T> with AutomaticKeepAliveClientMixin {
+  // owner 2026-11-06: coming back to the leaderboards showed a spinner and the flags loading again; every
+  // board's last answer is kept while the app runs, shown at once, and quietly refreshed
+  static final _kept = <String, Map<String, dynamic>>{};
+  String get _key => '$path|${params.entries.map((e) => '${e.key}=${e.value}').join('&')}|$country';
+
   Map<String, dynamic>? data;
   bool loading = true;
   String? error;
@@ -138,15 +144,24 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
   @override
   void initState() {
     super.initState();
+    data = _kept[_key];
+    loading = data == null;
     load();
   }
 
   Future<void> load() async {
-    setState(() => loading = true);
+    final key = _key;
+    final kept = _kept[key];
+    // a board seen before shows at once (no spinner) while the fresh one comes
+    setState(() { if (kept != null) data = kept; loading = kept == null; });
     final r = await GameApi.call(path, context.read<PlayerProvider>().sid,
         {...params, if (country) 'country': 1});
     if (!mounted) return;
-    setState(() { loading = false; error = r.ok ? null : r.message; if (r.ok) data = r.data; });
+    if (r.ok) _kept[key] = r.data;
+    setState(() {
+      loading = false;
+      if (r.ok) { data = r.data; error = null; } else if (data == null) { error = r.message; }
+    });
   }
 
   /// "My country" filter, shown on every board (owner 2026-11-06: the top 100, no pages).
@@ -295,6 +310,7 @@ class _CountryBoardState extends _BoardState<_CountryBoard> {
             const SizedBox(width: 8),
             ClipRRect(borderRadius: BorderRadius.circular(2), child: Image.asset(
                 'assets/images_countryflags/$cc.png', width: 24, height: 16, fit: BoxFit.cover,
+                cacheWidth: 72, gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => const SizedBox(width: 24))),
             const SizedBox(width: 8),
             Expanded(flex: 4, child: Text(cc == 'zz' ? 'Intl. waters' : cc.toUpperCase(), style: TextStyle(fontSize: 13,

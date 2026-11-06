@@ -19,7 +19,9 @@ const double kCampusWidthM = 75, kCampusHeightM = 77.94;      // the Campus pict
 class MapObjectsLayer extends StatefulWidget {
   final MapWorld world;
   final Color frame, accent;
-  const MapObjectsLayer({super.key, required this.world, required this.frame, required this.accent});
+  final bool showHexes;              // false: the view is too crowded, clouds are drawn instead
+  const MapObjectsLayer({super.key, required this.world, required this.frame, required this.accent,
+      this.showHexes = true});
   @override
   State<MapObjectsLayer> createState() => _MapObjectsLayerState();
 }
@@ -65,6 +67,7 @@ class _MapObjectsLayerState extends State<MapObjectsLayer> {
       size: Size.infinite,
       painter: _MapObjectsPainter(
         world: w, center: cam.center, zoom: cam.zoom, frame: widget.frame, accent: widget.accent,
+        showHexes: widget.showHexes,
         dpr: MediaQuery.of(context).devicePixelRatio,
         repaint: Listenable.merge([w, HexTiles.ready, _tick]),
       ),
@@ -77,8 +80,10 @@ class _MapObjectsPainter extends CustomPainter {
   final LatLng center;
   final double zoom, dpr;
   final Color frame, accent;
+  final bool showHexes;
   _MapObjectsPainter({required this.world, required this.center, required this.zoom, required this.dpr,
-      required this.frame, required this.accent, required Listenable repaint}) : super(repaint: repaint);
+      required this.frame, required this.accent, required this.showHexes, required Listenable repaint})
+      : super(repaint: repaint);
 
   static final _atlasPaint = Paint()..filterQuality = FilterQuality.medium;
   // the sprite buffers per hex picture, kept between frames (a new pair every frame churned memory)
@@ -119,7 +124,7 @@ class _MapObjectsPainter extends CustomPainter {
     final cx = mercX(center.longitude), cy = mercY(center.latitude);
     final halfW = size.width / 2, halfH = size.height / 2;
     if (zoom < kHexZoom) return;              // further out both are clouds
-    _hexes(canvas, size, scene, scale, cx, cy, halfW, halfH);
+    if (showHexes) _hexes(canvas, size, scene, scale, cx, cy, halfW, halfH);
     _campuses(canvas, size, scene, scale, cx, cy, halfW, halfH);
     _sites(canvas, size, scene, scale, cx, cy, halfW, halfH);
   }
@@ -231,7 +236,8 @@ class _MapObjectsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MapObjectsPainter old) =>
-      old.center != center || old.zoom != zoom || old.frame != frame || old.accent != accent || old.world != world;
+      old.center != center || old.zoom != zoom || old.frame != frame || old.accent != accent || old.world != world ||
+      old.showHexes != showHexes;
 }
 
 /// The 7-hex outline of a Campus about to be placed, as the marker's child at [ppm] pixels per metre.

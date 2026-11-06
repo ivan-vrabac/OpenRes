@@ -666,4 +666,5 @@ def test_a_cut_off_map_says_which_box_it_filled(monkeypatch):
         inside = {(round(a, 6), round(b, 6)) for a, b in conn.execute(
             "SELECT lat, lng FROM co_hexes WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?", (s, n, w, e))}
     assert inside and inside <= got                         # nothing inside the cover is missing
+    assert sum(r["clouds"][2::3]) >= 900                    # and clouds of the whole area come with it
     assert "cover" not in call("/api/v3/map", sid, south=-20.0002, west=29.9998, north=-19.9998, east=30.0002)
