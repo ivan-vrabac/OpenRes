@@ -877,7 +877,8 @@ Future<void> showCampusLevels(BuildContext context) async {
     builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
       final cs = Theme.of(ctx).colorScheme;
       final shown = levels.skip(page * per).take(per).toList();
-      return SafeArea(
+      // owner 2026-11-06: a sheet, never taller than 80 % of the screen; the levels scroll inside it
+      return ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8), child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -897,7 +898,7 @@ Future<void> showCampusLevels(BuildContext context) async {
             Flexible(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (!open(page))
               Container(
-                height: 320,
+                height: 240,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -912,7 +913,7 @@ Future<void> showCampusLevels(BuildContext context) async {
             ]))),
           ]),
         ),
-      );
+      ));
     }),
   );
 }
@@ -937,9 +938,11 @@ Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
         ]),
       );
   final unlocks = _CampusScreenState._unlocks(co, lvl);
+  // owner 2026-11-06: every card the same height, its description scrolls inside it (as before)
   return Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.all(10),
+    height: 100,
+    margin: const EdgeInsets.only(bottom: 6),
+    padding: const EdgeInsets.all(8),
     decoration: BoxDecoration(
       color: here ? cs.primary.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(12),
@@ -948,10 +951,11 @@ Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.asset(campusPicture(lvl), width: 64, height: 66, fit: BoxFit.contain, cacheWidth: 128, gaplessPlayback: true),
+        child: Image.asset(campusPicture(lvl), width: 52, height: 54, fit: BoxFit.contain, cacheWidth: 104, gaplessPlayback: true),
       ),
       const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: SingleChildScrollView(physics: const ClampingScrollPhysics(),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Text('Level $lvl', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(width: 6),
@@ -960,8 +964,8 @@ Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
           if (here) Text('You', style: TextStyle(fontSize: 11, color: cs.primary, fontWeight: FontWeight.bold))
           else if (done) Icon(Icons.check, size: 16, color: Colors.greenAccent.withValues(alpha: 0.8)),
         ]),
-        const SizedBox(height: 6),
-        Wrap(spacing: 6, runSpacing: 6, children: [
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, runSpacing: 4, children: [
           chip(Icons.groups_outlined, '${l['supervisors']} supervisors'),
           chip(Icons.school_outlined, '$slots education slot${slots == 1 ? '' : 's'}'),
           chip(Icons.radar, 'Surveys ${_dist(l['surveyRadius'] as num)}'),
@@ -982,7 +986,7 @@ Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
               ', Central Storage level ${cost['storage']}',
               style: TextStyle(fontSize: 11, color: AppColors.t54)),
         ],
-      ])),
+      ]))),
     ]),
   );
 }
