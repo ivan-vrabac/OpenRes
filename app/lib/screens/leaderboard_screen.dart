@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'luxury_screen.dart' show fmtMass;
 import 'package:provider/provider.dart';
 import '../constants.dart' show fmtNum;
@@ -127,8 +130,26 @@ Widget _infoRow(String middle, String value, {String who = 'Company'}) => Contai
 
 abstract class _BoardState<T extends StatefulWidget> extends State<T> with AutomaticKeepAliveClientMixin {
   // owner 2026-11-06: coming back to the leaderboards showed a spinner and the flags loading again; every
-  // board's last answer is kept while the app runs, shown at once, and quietly refreshed
+  // board's last answer is kept, in memory and on the phone (so also after the app was closed), shown at
+  // once and quietly refreshed. Saved per company, so another account on the phone never sees yours.
   static final _kept = <String, Map<String, dynamic>>{};
+  String get _diskKey => 'lb|${context.read<PlayerProvider>().player?.hid ?? ''}|$_key';
+
+  Future<void> _fromDisk() async {
+    final key = _key, disk = _diskKey;
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(disk);
+      if (raw == null || !mounted || data != null || _key != key) return;
+      final saved = jsonDecode(raw) as Map<String, dynamic>;
+      _kept[key] = saved;
+      setState(() { data = saved; loading = false; });
+    } catch (_) {}                             // nothing saved, or unreadable: the fresh answer comes anyway
+  }
+
+  void _toDisk(Map<String, dynamic> d) {
+    final disk = _diskKey;
+    SharedPreferences.getInstance().then((p) => p.setString(disk, jsonEncode(d))).catchError((_) => false);
+  }
   String get _key => '$path|${params.entries.map((e) => '${e.key}=${e.value}').join('&')}|$country';
 
   Map<String, dynamic>? data;
@@ -146,6 +167,7 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
     super.initState();
     data = _kept[_key];
     loading = data == null;
+    if (data == null) _fromDisk();
     load();
   }
 
@@ -157,7 +179,10 @@ abstract class _BoardState<T extends StatefulWidget> extends State<T> with Autom
     final r = await GameApi.call(path, context.read<PlayerProvider>().sid,
         {...params, if (country) 'country': 1});
     if (!mounted) return;
-    if (r.ok) _kept[key] = r.data;
+    if (r.ok) {
+      _kept[key] = r.data;
+      _toDisk(r.data);
+    }
     setState(() {
       loading = false;
       if (r.ok) { data = r.data; error = null; } else if (data == null) { error = r.message; }
