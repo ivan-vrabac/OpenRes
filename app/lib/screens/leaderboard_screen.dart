@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'luxury_screen.dart' show fmtMass;
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import '../constants.dart' show fmtNum;
 import '../models/player_provider.dart';
 import '../services/game_api.dart';
 import '../widgets/async_view.dart';
+import '../widgets/picture_cache.dart';
 import 'profile_screen.dart';
 
 import '../app_colors.dart';
@@ -109,18 +109,16 @@ Widget _row(BuildContext context, Map<String, dynamic> r, {Widget? middle, requi
 const _rowFlagW = 54, _countryFlagW = 72;
 var _flagsWarm = false;
 
-/// Decode every flag once, at the sizes the leaderboards use, so they never pop in (owner 2026-11-06: even
-/// after the app was closed). Called a moment after the game opens; about 2 MB.
+/// Decode every flag once, at the sizes the leaderboards use, and keep them (widgets/picture_cache.dart), so
+/// they never pop in (owner 2026-11-06: even after the app was closed). About 2 MB.
 Future<void> warmFlags(BuildContext context) async {
   if (_flagsWarm) return;
   _flagsWarm = true;
   try {
-    final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-    final flags = manifest.listAssets().where((a) => a.startsWith('assets/images_countryflags/'));
-    for (final path in flags) {
+    for (final path in await assetsIn(const ['assets/images_countryflags/'])) {
       if (!context.mounted) return;
       for (final w in const [_rowFlagW, _countryFlagW]) {
-        await precacheImage(ResizeImage.resizeIfNeeded(w, null, AssetImage(path)), context);
+        await pinPicture(ResizeImage.resizeIfNeeded(w, null, AssetImage(path)), context);
       }
     }
   } catch (_) {

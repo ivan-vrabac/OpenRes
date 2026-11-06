@@ -8,7 +8,7 @@ import '../app_colors.dart';
 import '../constants.dart';
 import '../services/location_service.dart';
 import '../v3/company.dart';
-import '../widgets/async_view.dart' show fmtCredits, fmtQty;
+import '../widgets/async_view.dart' show GamePicture, fmtCredits, fmtQty;
 import '../widgets/cards.dart';
 import '../widgets/popups.dart';
 import '../widgets/slide_confirm.dart';
@@ -381,7 +381,7 @@ class _CampusScreenState extends State<CampusScreen> {
       ring(Icon(Icons.toll, size: 28, color: AppColors.t70), 'Credits', co.credits.toDouble(), credits,
           '${fmtCredits(co.credits)} / ${fmtCredits(credits)}'),
       for (final e in mats.entries)
-        ring(Image.asset(itemPicture(e.key), width: 40, height: 40, fit: BoxFit.cover,
+        ring(GamePicture(itemPicture(e.key), width: 40, height: 40, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 20, color: AppColors.t38)),
             co.itemName(e.key), have(e.key), (e.value as num).toDouble(),
             '${fmtQty(have(e.key).floor())} / ${fmtQty(e.value as num)}'),

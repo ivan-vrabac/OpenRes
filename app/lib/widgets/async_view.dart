@@ -13,6 +13,31 @@ class HexClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> _) => false;
 }
 
+/// Small pictures are decoded this wide (owner 2026-11-06: an icon is about 115 px on a phone; the
+/// pictures are 256 px): a quarter of the memory, and the size widgets/picture_cache.dart keeps ready.
+const kSmallPicturePx = 128;
+
+/// [px] screen pixels wide: decode at [kSmallPicturePx] when that is enough, else at full size (null).
+int? pictureCacheWidth(double px) => px <= kSmallPicturePx ? kSmallPicturePx : null;
+
+/// One of the game's pictures (items, plants, operations, land), like `Image.asset`, but drawn small it uses
+/// the small decoded copy (kSmallPicturePx) that widgets/picture_cache.dart keeps ready: it shows at once
+/// and takes a quarter of the memory (owner 2026-11-06). Without a size it is decoded in full.
+class GamePicture extends StatelessWidget {
+  final String path;
+  final double? width, height;
+  final BoxFit? fit;
+  final ImageErrorWidgetBuilder? errorBuilder;
+  const GamePicture(this.path, {super.key, this.width, this.height, this.fit, this.errorBuilder});
+
+  @override
+  Widget build(BuildContext context) {
+    final side = width == null && height == null ? null : [width ?? 0, height ?? 0].reduce((a, b) => a > b ? a : b);
+    return Image.asset(path, width: width, height: height, fit: fit, gaplessPlayback: true, errorBuilder: errorBuilder,
+        cacheWidth: side == null ? null : pictureCacheWidth(side * MediaQuery.devicePixelRatioOf(context)));
+  }
+}
+
 /// A picture cut to the hex shape, like the hexes on the map (owner 2026-10-31: hex pictures
 /// everywhere a hex is meant: picker, leaderboard, company sheet).
 class HexPicture extends StatelessWidget {
@@ -28,6 +53,7 @@ class HexPicture extends StatelessWidget {
         child: ClipPath(
           clipper: const HexClipper(),
           child: Transform.scale(scale: 1.1, child: Image.asset(asset, fit: BoxFit.cover, gaplessPlayback: true,
+              cacheWidth: pictureCacheWidth(size * 1.1 * MediaQuery.devicePixelRatioOf(context)),
               errorBuilder: (_, __, ___) => Icon(Icons.hexagon_outlined, size: size * 0.8, color: AppColors.t38))),
         ),
       ),
@@ -141,6 +167,7 @@ class GameItemIcon extends StatelessWidget {
       : hex ? HexPicture('assets/game/items/$item.png', size: size) : Image.asset(
         'assets/game/items/$item.png',
         width: size, height: size, fit: BoxFit.contain, gaplessPlayback: true,
+        cacheWidth: pictureCacheWidth(size * MediaQuery.devicePixelRatioOf(context)),
         errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: size * 0.8, color: AppColors.t38),
       );
 }

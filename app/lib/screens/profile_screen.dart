@@ -174,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _countTag('×${it['count']}'),
             ])),
             _gridSection('Plants', p['plants'], (it) => Stack(alignment: Alignment.bottomCenter, children: [
-              ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(plantPicture(it['key'] as String),
+              ClipRRect(borderRadius: BorderRadius.circular(12), child: GamePicture(plantPicture(it['key'] as String),
                   width: 60, height: 52, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Icon(Icons.factory_outlined, size: 40, color: AppColors.t38))),
               _countTag('Lv ${it['level']}'),

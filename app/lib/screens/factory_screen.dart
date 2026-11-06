@@ -129,7 +129,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
               margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
                 dense: true,
-                leading: SizedBox(width: 32, height: 32, child: Image.asset(plantPicture(p['key'] as String),
+                leading: SizedBox(width: 32, height: 32, child: GamePicture(plantPicture(p['key'] as String), width: 32, height: 32,
                     errorBuilder: (_, __, ___) => const Icon(Icons.factory_outlined))),
                 title: Text(p['name'] as String),
                 subtitle: Text('Makes ${_co.itemName(rec['output'] as String).toLowerCase()}'),
@@ -243,7 +243,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
                 ClipRRect(borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(plantPicture(p['key'] as String), width: 72, height: 72, fit: BoxFit.cover,
+                    child: GamePicture(plantPicture(p['key'] as String), width: 72, height: 72, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Icon(Icons.factory, size: 56, color: AppColors.accent))),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -315,7 +315,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
                 ClipRRect(borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(plantPicture(p['key'] as String), width: 72, height: 72, fit: BoxFit.cover,
+                    child: GamePicture(plantPicture(p['key'] as String), width: 72, height: 72, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Icon(Icons.factory, size: 56, color: AppColors.accent))),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -405,7 +405,7 @@ Widget _itemIcon(String item, {double size = 16}) => item == 'electricity'
     : SizedBox(
         width: size, height: size,
         child: ClipRRect(borderRadius: BorderRadius.circular(size / 5),
-            child: Image.asset(itemPicture(item), fit: BoxFit.cover,
+            child: GamePicture(itemPicture(item), width: size, height: size, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: size - 2, color: AppColors.t38))),
       );
 
@@ -534,7 +534,7 @@ class _PlantCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: AspectRatio(aspectRatio: 1.6, child: Opacity(
                   opacity: status == _Status.idle ? 0.45 : 1,
-                  child: Image.asset(plantPicture(p['key'] as String), fit: BoxFit.cover,
+                  child: GamePicture(plantPicture(p['key'] as String), fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Icon(Icons.factory, size: 40, color: AppColors.accent)),
                 )),
               ),
@@ -587,7 +587,7 @@ class _NewPlantCard extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: AspectRatio(aspectRatio: 1.6, child: Image.asset(plantPicture(p['key'] as String), fit: BoxFit.cover,
+                child: AspectRatio(aspectRatio: 1.6, child: GamePicture(plantPicture(p['key'] as String), fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Icon(Icons.factory, size: 40, color: AppColors.accent))),
               ),
               const SizedBox(height: 8),

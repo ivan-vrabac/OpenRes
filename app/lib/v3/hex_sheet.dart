@@ -5,6 +5,7 @@ import '../app_colors.dart';
 import '../widgets/popups.dart';
 import '../widgets/top_banner.dart';
 import 'company.dart';
+import '../widgets/async_view.dart' show GamePicture;
 import '../constants.dart' show fmtNum;
 
 /// One of your hexes: product, quality, supervisor, lease (renew, cancel), switching product.
@@ -90,7 +91,7 @@ class _HexSheetState extends State<_HexSheet> {
           if (e.key != h['item'])
             ListTile(
               enabled: e.value['unlocked'] == true,
-              leading: Image.asset(itemPictureOrEnergy(h['op'] as String, e.key), width: 36, height: 36),
+              leading: GamePicture(itemPictureOrEnergy(h['op'] as String, e.key), width: 36, height: 36),
               title: Text(co.itemName(e.key)),
               subtitle: Text('Quality ${e.value['quality']} % · ${fmtNum(e.value['lease'] as num)}'),
               onTap: () => popIfCurrent(ctx, e.key),
@@ -114,7 +115,7 @@ class _HexSheetState extends State<_HexSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             ClipRRect(borderRadius: BorderRadius.circular(8),
-                child: Image.asset(itemPictureOrEnergy(h['op'] as String, h['item'] as String), width: 56, height: 56)),
+                child: GamePicture(itemPictureOrEnergy(h['op'] as String, h['item'] as String), width: 56, height: 56)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(co.itemName(h['item'] as String), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

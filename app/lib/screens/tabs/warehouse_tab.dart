@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../constants.dart';
 import '../../v3/company.dart';
 import '../../v3/sell_sheet.dart';
-import '../../widgets/async_view.dart' show fmtCredits;
+import '../../widgets/async_view.dart' show GamePicture, fmtCredits;
 import '../../widgets/cards.dart';
 import '../../widgets/slide_confirm.dart';
 import '../../widgets/top_banner.dart';
@@ -253,7 +253,7 @@ class _ItemIcon extends StatelessWidget {
             ? const Icon(Icons.bolt, size: 34, color: Colors.amberAccent)
             : ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.asset(itemPicture(item), fit: BoxFit.cover, gaplessPlayback: true,
+                child: GamePicture(itemPicture(item), width: 40, height: 40, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => CircleAvatar(
                       radius: 20,
                       backgroundColor: AppColors.accent.withValues(alpha: 0.3),
