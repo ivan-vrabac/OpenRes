@@ -364,7 +364,7 @@ def get_db() -> sqlite3.Connection:
 # ── Travel check (GPS spoofing) ─────────────────────────────────────────────────
 # Positions come from the phone. Teleporting is refused: between two positioned actions the player
 # can't have travelled faster than TRAVEL_MAX_KMH (allowing GPS jitter). Long gaps are always fine.
-TRAVEL_MAX_KMH = 300
+TRAVEL_MAX_KMH = 1000        # owner 2026-11-06: a flight (Croatia to the USA in 13 h is about 750 km/h) is no cheating
 TRAVEL_FREE_M = 5000          # jumps up to this distance are always accepted (GPS fixes switching)
 
 def check_travel(conn, hid: str, lat: float, lng: float) -> None:

@@ -150,3 +150,61 @@ def test_retention_is_30_days_up_to_the_privacy_policy(modpw):
         assert not conn.execute("SELECT 1 FROM cheat_signals WHERE ts=?", (old,)).fetchone()
         conn.execute("DELETE FROM mod_settings")
         conn.commit()
+
+
+def _was_at(hid, lat, lng, hours_ago):
+    import datetime
+    with main.get_db() as conn:
+        at = (datetime.datetime.utcnow() - datetime.timedelta(hours=hours_ago)).isoformat()
+        conn.execute("UPDATE players SET pos_lat=?, pos_lng=?, pos_at=? WHERE hID=?", (lat, lng, at, hid))
+        conn.commit()
+
+
+ZAGREB, NEW_YORK, SYDNEY = (45.815, 15.982), (40.713, -74.006), (-33.869, 151.209)
+
+
+def _act_at(sid, lat, lng):
+    """An action that checks where the player stands (placing the Campus)."""
+    return call("/api/v3/campus/place", sid, lat=lat, lng=lng, plat=lat, plng=lng)
+
+
+def _signals(hid):
+    with main.get_db() as conn:
+        return [r[0] for r in conn.execute("SELECT kind FROM cheat_signals WHERE hid=?", (hid,))]
+
+
+def test_a_flight_is_not_cheating(modpw):
+    """Phone off in Croatia, on again in New York 13 hours later: a real trip (owner 2026-11-06)."""
+    hid, sid, _ = new_player("fly1", credits=10_000_000)
+    _was_at(hid, *ZAGREB, hours_ago=13)
+    r = _act_at(sid, *NEW_YORK)
+    assert r.get("code") != "teleport", r
+    assert _signals(hid) == []
+
+
+def test_jumping_across_the_ocean_at_once_is_caught(modpw):
+    hid, sid, _ = new_player("fly2", credits=10_000_000)
+    _was_at(hid, *ZAGREB, hours_ago=0.2)
+    assert _act_at(sid, *NEW_YORK)["code"] == "teleport"
+    assert _signals(hid) == ["teleport"]
+    # the real position (still in Zagreb) keeps working
+    assert _act_at(sid, *ZAGREB).get("code") != "teleport"
+
+
+def test_signing_in_on_a_friends_phone_far_away(modpw):
+    """The account used on another phone 16 000 km away an hour later: refused, kept, and the moderator sees
+    both phones and the risk."""
+    hid, sid, name = new_player("fly3", credits=10_000_000)
+    assert call("/api/v1/device", sid, device="a" * 64)["err"] == 0
+    _was_at(hid, *ZAGREB, hours_ago=1)
+    assert call("/api/v1/device", sid, device="b" * 64)["err"] == 0               # the friend's phone
+    assert _act_at(sid, *SYDNEY)["code"] == "teleport"
+    pid = _pid(sid)
+    c = call("/api/v1/mod/company", "", mod_password=modpw, pid=pid)
+    assert len(c["devices"]) == 2 and [s["kind"] for s in c["signals"]] == ["teleport"]
+    assert "km/h" in c["signals"][0]["detail"]
+    me = next(x for x in call("/api/v1/mod/reports", "", mod_password=modpw)["suspects"] if x["name"] == name)
+    assert me["riskLevel"] == "low" and me["risk"] == 3             # one jump alone is not a cheater yet
+    # a day later (a long trip, or the friend logged out): the far place is accepted again
+    _was_at(hid, *ZAGREB, hours_ago=30)
+    assert _act_at(sid, *SYDNEY).get("code") != "teleport"
