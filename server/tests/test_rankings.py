@@ -64,17 +64,19 @@ def test_country_filter_recounts_ranks_and_pages():
     assert len(call("/api/v1/rank/players", ids[2][1])["rows"]) <= rankings.TOP + 1
 
 
-def test_tantalum_board_ranks_everything_made():
+def test_tantalum_board_ranks_what_is_in_research():
     a, a_sid, _ = new_player("rkt1")
     b, _, _ = new_player("rkt2")
     with main.get_db() as conn:
         conn.execute("INSERT INTO co_luxury(hid, produced, invested) VALUES(?,?,?)", (a, 1500.0, 1000.0))
-        conn.execute("INSERT INTO co_luxury(hid, produced, invested) VALUES(?,?,?)", (b, 900.0, 0.0))
+        conn.execute("INSERT INTO co_luxury(hid, produced, invested) VALUES(?,?,?)", (b, 9000.0, 800.0))
         conn.commit()
     rankings._cache.clear()
     r = call("/api/v1/rank/tantalum", a_sid)
     rows = [x for x in r["rows"] if x["isMe"] or x["name"].startswith("rkt2")]
-    assert rows[0]["isMe"] and rows[0]["mg"] == 1500.0 and rows[1]["mg"] == 900.0 and r["myMg"] == 1500.0
+    # b made far more, but a put more into research: a is first
+    assert rows[0]["isMe"] and rows[0]["mg"] == 1000.0 and rows[1]["mg"] == 800.0 and r["myMg"] == 1000.0
+    assert rows[1]["producedMg"] == 9000.0
 
 
 def _active(hid, days):

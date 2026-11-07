@@ -192,7 +192,7 @@ def install(api) -> None:
         top = [{"name": r["company_name"], "mg": round(r["produced"], 3), "you": r["hid"] == hid}
                for r in conn.execute("SELECT l.hid, l.produced, p.company_name FROM co_luxury l "
                                      "JOIN players p ON p.hID=l.hid WHERE l.produced>0 "
-                                     "ORDER BY l.produced DESC LIMIT 20")]
+                                     "ORDER BY l.produced DESC LIMIT 1")]      # owner 2026-11-07: the record holder only
         return {"err": 0, "heldMg": round(co.stock(conn, hid).get("ta180m", 0.0), 3),
                 "producedMg": round(produced, 3), "investedMg": round(invested, 3), "top": top}
 

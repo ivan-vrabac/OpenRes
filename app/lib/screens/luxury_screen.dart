@@ -95,16 +95,11 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
                       textAlign: TextAlign.center, style: TextStyle(color: AppColors.t54)))
                 else
                   RowGroup([
-                    for (final (i, t) in (d['top'] as List).cast<Map<String, dynamic>>().indexed)
+                    for (final t in (d['top'] as List).cast<Map<String, dynamic>>())
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         child: Row(children: [
-                          CircleAvatar(
-                            radius: 13,
-                            backgroundColor: i < 3 ? Colors.amber.withValues(alpha: 0.25) : Colors.white10,
-                            child: Text('${i + 1}', style: TextStyle(fontSize: 12,
-                                color: i < 3 ? Colors.amber : AppColors.t70, fontWeight: FontWeight.bold)),
-                          ),
+                          const Icon(Icons.emoji_events, color: Colors.amber, size: 24),   // the record holder
                           const SizedBox(width: 12),
                           Expanded(child: Text(t['name'] as String? ?? '', overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontWeight: t['you'] == true ? FontWeight.bold : FontWeight.normal,
@@ -114,7 +109,7 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
                       ),
                   ]),
                 const SizedBox(height: 8),
-                Text('The ranking counts everything ever made, so putting it into research never costs you your place.',
+                Text('The one company that made the most. The Tantalum leaderboard ranks what companies put into research.',
                     style: TextStyle(fontSize: 11, color: AppColors.t38)),
               ]),
             ),

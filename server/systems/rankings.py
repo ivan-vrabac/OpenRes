@@ -8,7 +8,7 @@
   campus     Campus level; at the same level the more active company first, then the older one.
   hexes      hexes held now (leases run out when a company stops renewing, so it stays current).
   countries  the overall scores of every company of a country added up.
-  tantalum   Tantalum-180m made in total (the endgame).
+  tantalum   Tantalum-180m put into dark matter research (the endgame).
   output     output per item per hour, or "all": everything a company makes in an hour, valued at
              prices (so an item made in huge quantities doesn't win by numbers alone).
 Results are cached for CACHE_S seconds per board so large worlds stay cheap.
@@ -317,17 +317,19 @@ def install(api) -> None:
 
     @api.endpoint("/api/v1/rank/tantalum")
     def tantalum(conn, hid, form):
-        """Tantalum-180m made in total (mg), the luxury of 0.2.3; what went into research still counts."""
-        rows = _cached("tantalum", lambda: [(round(r[1], 3), round(r[2], 3), r[0]) for r in conn.execute(
-            "SELECT hid, produced, invested FROM co_luxury WHERE produced > 0 ORDER BY produced DESC LIMIT ?",
+        """Tantalum-180m put into research (mg): owner 2026-11-07, what was invested decides, not what was made
+        (the Tantalum tab names the one who made the most). Each row also says how much it made."""
+        rows = _cached("tantalum", lambda: [(round(r[2], 3), round(r[1], 3), r[0]) for r in conn.execute(
+            "SELECT hid, produced, invested FROM co_luxury WHERE invested > 0 ORDER BY invested DESC LIMIT ?",
             (MAX_ROWS,))])
         part, meta = page_of(conn, hid, form, rows, lambda r: r[2])
         rf = refs(conn, [r[2] for _, r in part], hid)
         cc = countries(conn)
-        mine = conn.execute("SELECT produced FROM co_luxury WHERE hid=?", (hid,)).fetchone()
+        mine = conn.execute("SELECT invested FROM co_luxury WHERE hid=?", (hid,)).fetchone()
         return {"err": 0, **meta, "myMg": round(mine[0], 3) if mine else 0,
-                "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "mg": r[0], "investedMg": r[1], "country": cc.get(r[2], ""),
-                          "isMe": r[2] == hid} for n, r in part], meta, mg=0, investedMg=0)}
+                "rows": with_me(conn, hid, [{"rank": n, **rf[r[2]], "mg": r[0], "investedMg": r[0], "producedMg": r[1],
+                          "country": cc.get(r[2], ""), "isMe": r[2] == hid} for n, r in part], meta,
+                          mg=0, investedMg=0, producedMg=0)}
 
     @api.endpoint("/api/v1/rank/resource")
     def resource(conn, hid, form):
