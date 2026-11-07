@@ -935,6 +935,9 @@ SYSTEM_HELPERS = _types.SimpleNamespace(
 INSTALLED_SYSTEMS = systems.install_all(app, SYSTEM_HELPERS)
 with get_db() as _conn:
     systems.rename_items(_conn)    # after every table exists: an item that got a new id keeps its stock, orders, history
+    import reqstats
+    reqstats.init(_conn)
+reqstats.start(get_db)             # each process adds its request counts to req_stats once a minute
 _init.__exit__(None, None, None)
 
 # ── Unknown paths ─────────────────────────────────────────────────────────────────

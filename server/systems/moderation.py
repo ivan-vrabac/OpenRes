@@ -283,6 +283,10 @@ def install(api) -> None:
         # 2026-11-06: the details never opened on resources.vrabac.eu)
         if form.get("company"):
             return mod_company(conn, "", {**form, "pid": form.get("company")})
+        if form.get("stats"):                  # request statistics: calls and time per endpoint (reqstats)
+            import reqstats
+            days = max(1, min(30, int(form.get("days") or 1)))
+            return {"err": 0, "days": days, "stats": reqstats.summary(conn, days)}
         status = form.get("status", "open")
         rows = conn.execute("SELECT * FROM reports WHERE status=? ORDER BY id DESC LIMIT 200", (status,)).fetchall()
         out = []

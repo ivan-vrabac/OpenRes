@@ -296,7 +296,8 @@ class _MarketItemScreenState extends State<MarketItemScreen> {
   @override
   void initState() {
     super.initState();
-    _live = Timer.periodic(const Duration(seconds: 10), (_) => _load());   // room, credits, orders
+    // room, credits, orders; it reloads after every trade anyway (owner 2026-11-07: less polling, was 10 s)
+    _live = Timer.periodic(const Duration(seconds: 30), (_) => _load());
     _load();
   }
 

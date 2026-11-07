@@ -12,6 +12,7 @@ import asyncio
 import os
 import sqlite3
 import threading
+import time
 import types
 import weakref
 
@@ -19,6 +20,7 @@ import anyio
 from fastapi import Request
 
 import procs
+import reqstats
 
 import econ
 import gamedata as g
@@ -95,14 +97,22 @@ class Api:
 
         def deco(fn):
             async def handler(request: Request):
+                # every answer is counted: calls and time per endpoint (reqstats, owner 2026-11-07)
+                t0 = time.perf_counter()
+                out = await answer(request)
+                reqstats.record(path, (time.perf_counter() - t0) * 1000,
+                                isinstance(out, dict) and bool(out.get("err")))
+                return h.zlib_resp(out)
+
+            async def answer(request: Request):
                 _, form = await h.read_form(request)
                 hid = h.hid_from_sid(form.get("sid", "")) if auth else ""
                 if auth and not hid:
-                    return h.zlib_resp({"err": 1, "code": "auth", "msg": "Please sign in again."})
+                    return {"err": 1, "code": "auth", "msg": "Please sign in again."}
                 if feature and not econ.feature(feature):
-                    return h.zlib_resp({"err": 1, "code": "disabled", "msg": "This feature is not enabled."})
+                    return {"err": 1, "code": "disabled", "msg": "This feature is not enabled."}
                 if too_often(hid, path):
-                    return h.zlib_resp({"err": 1, "code": "rate_limited", "msg": "Slow down a little and try again."})
+                    return {"err": 1, "code": "rate_limited", "msg": "Slow down a little and try again."}
 
                 country = request.headers.get("cf-ipcountry")
 
@@ -128,7 +138,7 @@ class Api:
                                 except Exception:
                                     pass
                             return e.resp()
-                return h.zlib_resp(await anyio.to_thread.run_sync(work, limiter=_db_limiter()))
+                return await anyio.to_thread.run_sync(work, limiter=_db_limiter())
             handler.__name__ = fn.__name__
             self.app.add_api_route(path, handler, methods=["POST"])
             return fn
