@@ -38,7 +38,7 @@ val releaseStoreFile = signing("storeFile", "RELEASE_STORE_FILE")
 
 android {
     namespace = "com.example.openres"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37                     // flutter_local_notifications 23 compiles against 37 (owner 2026-11-07)
     ndkVersion = flutter.ndkVersion
 
     buildFeatures {

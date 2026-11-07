@@ -20,7 +20,7 @@ class NotificationService {
     _initialized = true;
     tz.initializeTimeZones();
     const android = AndroidInitializationSettings('@drawable/ic_notification');
-    await _plugin.initialize(const InitializationSettings(android: android));
+    await _plugin.initialize(settings: const InitializationSettings(android: android));
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     await androidImpl?.createNotificationChannel(_androidChannel);
