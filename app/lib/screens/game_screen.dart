@@ -1,7 +1,6 @@
 import '../widgets/update_dialog.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/tab_config.dart';
 import '../models/player_provider.dart';
@@ -101,7 +100,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final Company _company = Company(context.read<PlayerProvider>().sid,
       onCredits: context.read<PlayerProvider>().setCredits)..start();
   late PageController _pageCtrl;
-  final _tabBar = ScrollController();     // the bottom tabs, when they don't all fit
+  double _width = 400;                   // the screen, for how many tabs fit the bar (set in build)
   int _currentIndex = 0;
 
   @override
@@ -147,7 +146,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _toMap() {
     if ((mapFocus.value == null && !campusMoveAsked.value) || !mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    final idx = _config.bottomTabs.indexOf(GameTabId.map);
+    final idx = _bar.indexOf(GameTabId.map);
     if (idx >= 0) _goToTab(idx);
   }
 
@@ -168,20 +167,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     ScreenMode.apply();
     _pageCtrl.dispose();
-    _tabBar.dispose();
     super.dispose();
   }
 
 
-  int get _totalTabs => _config.bottomTabs.length + 1; // +1 for More
+  /// The pinned tabs that fit the bar; the bar never scrolls (owner 2026-11-07), the others go under More.
+  List<GameTabId> get _bar {
+    final t = _config.bottomTabs, m = maxBarTabs(_width);
+    return t.length <= m ? t : t.sublist(0, m);
+  }
+
+  int get _totalTabs => _bar.length + 1; // +1 for More
 
   List<GameTabId> get _overflowIds => GameTabId.values
-      .where((t) => tabMeta.containsKey(t) && !_config.bottomTabs.contains(t))
+      .where((t) => tabMeta.containsKey(t) && !_bar.contains(t))
       .toList();
 
   Widget _tabBody(int i) {
     final isMore = i == _totalTabs - 1;
-    final id = isMore ? null : _config.bottomTabs[i];
+    final id = isMore ? null : _bar[i];
     final body = isMore
         ? _MoreTab(overflowIds: _overflowIds, onOpenSettings: _openSettings)
         : tabMeta[id]?.build() ?? PlaceholderScreen(title: id!.name, icon: Icons.help_outline, subtitle: '');
@@ -234,7 +238,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (isMore) {
       return _KeepAliveTab(key: const ValueKey('__more__'), child: w);
     }
-    final id = _config.bottomTabs[i];
+    final id = _bar[i];
     if (_kKeepAlive.contains(id)) {
       return _KeepAliveTab(key: ValueKey(id), child: w);
     }
@@ -254,7 +258,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   /// GPS only while the Map tab is open (owner 2026-10-31); screens that need a position ask for it.
   void _syncGps() {
-    final onMap = _currentIndex < _config.bottomTabs.length && _config.bottomTabs[_currentIndex] == GameTabId.map;
+    final onMap = _currentIndex < _bar.length && _bar[_currentIndex] == GameTabId.map;
     LocationService.instance.setAway(!onMap);
   }
 
@@ -300,7 +304,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _toTab(GameTabId id) {
-    final i = _config.bottomTabs.indexOf(id);
+    final i = _bar.indexOf(id);
     _goToTab(i >= 0 ? i : _totalTabs - 1);
   }
 
@@ -327,11 +331,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
     setState(() => _currentIndex = index);
     _syncGps();
-    // the bar keeps the open tab in view (it stayed scrolled to More after the tutorial)
-    if (_tabBar.hasClients && _totalTabs > 1) {
-      _tabBar.animateTo(_tabBar.position.maxScrollExtent * index / (_totalTabs - 1),
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-    }
   }
 
   void _onConfigSaved(TabConfig cfg) {
@@ -344,7 +343,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   /// The top bar opens the Stats tab: switch to it if it's in the bottom bar, otherwise open it
   /// the same way the More tab does.
   void _openStats() {
-    final idx = _config.bottomTabs.indexOf(GameTabId.stats);
+    final idx = _bar.indexOf(GameTabId.stats);
     if (idx >= 0) {
       _goToTab(idx);
       return;
@@ -394,6 +393,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget _scaffold(BuildContext context, ColorScheme cs) {
+    _width = MediaQuery.sizeOf(context).width;
+    if (_currentIndex >= _totalTabs) _currentIndex = _totalTabs - 1;
     final hud = UiLook.showHud.value;
     final under = UiLook.underStatusBar.value;
     // see-through on every tab: the other pages bring their own background under it, so the colour
@@ -439,16 +440,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             child: SizedBox(
             height: 60,
             child: LayoutBuilder(builder: (context, constraints) {
-              const double minTabW = 68;
               final n = _totalTabs;
-              final natural = constraints.maxWidth / n;
-              final tabW = natural < minTabW ? minTabW : natural;
-              final scrollable = tabW * n > constraints.maxWidth;
+              final tabW = constraints.maxWidth / n;
 
               Widget buildTab(int i) {
                 final isMore     = i == n - 1;
                 final isSelected = i == _currentIndex;
-                final id         = isMore ? null : _config.bottomTabs[i];
+                final id         = isMore ? null : _bar[i];
                 final meta       = isMore ? null : tabMeta[id]!;
                 final label      = isMore ? 'More' : tabMeta[id]!.label;
 
@@ -478,15 +476,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 );
               }
 
-              final tabs = List.generate(n, buildTab);
-              if (scrollable) {
-                return SingleChildScrollView(
-                  controller: _tabBar,
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: tabs),
-                );
-              }
-              return Row(children: tabs);
+              return Row(children: List.generate(n, buildTab));
             }),
           ),
           ),

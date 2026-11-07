@@ -877,11 +877,12 @@ Future<void> showCampusLevels(BuildContext context) async {
     builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
       final cs = Theme.of(ctx).colorScheme;
       final shown = levels.skip(page * per).take(per).toList();
-      // owner 2026-11-06: a sheet, never taller than 80 % of the screen; the levels scroll inside it
-      return ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8), child: SafeArea(
+      // owner 2026-11-06: a sheet, never taller than 80 % of the screen; the levels scroll inside it.
+      // Every page the same height (owner 2026-11-07: a locked page made the sheet shrink)
+      return SizedBox(height: MediaQuery.of(ctx).size.height * 0.8, child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               const Expanded(child: Text('Campus levels', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
               IconButton(
@@ -895,7 +896,7 @@ Future<void> showCampusLevels(BuildContext context) async {
               ),
             ]),
             const SizedBox(height: 6),
-            Flexible(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (!open(page))
               Container(
                 height: 240,
