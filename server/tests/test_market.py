@@ -238,3 +238,27 @@ def test_overview_best_bid_ignores_your_own_order():
     assert call(M + "order", me_sid, item=WOOL, qty=10, price=round(p * 1.3, 2))["err"] == 0
     items = {e["item"]: e for e in call(M + "overview", me_sid)["items"]}
     assert "bestBid" not in items[WOOL]
+
+
+def test_renamed_item_keeps_stock_tax_history_and_json(monkeypatch):
+    """An item that gets a new id (gamedata.ITEM_RENAMES) keeps everything stored under the old one, once."""
+    import systems
+    hid, _ = player("ren")
+    old, new = "old_thing_x", "new_thing_x"
+    with main.get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO co_stock(hid, item, qty) VALUES (?, ?, 7)", (hid, old))
+        conn.execute("INSERT INTO market_tax(item, day, rate) VALUES (?, '2026-01-01', 0.1)", (old,))
+        conn.execute("INSERT INTO ledger(hid, ts, kind, ref) VALUES (?, datetime('now'), 'x', ?)",
+                     (hid, f'{{"item": "{old}", "other": "{old}_not"}}'))
+        conn.commit()
+        monkeypatch.setitem(g.ITEM_RENAMES, old, new)
+        systems.rename_items(conn)
+        assert conn.execute("SELECT qty FROM co_stock WHERE hid=? AND item=?", (hid, new)).fetchone()[0] == 7
+        assert not conn.execute("SELECT 1 FROM co_stock WHERE item=?", (old,)).fetchone()
+        assert conn.execute("SELECT 1 FROM market_tax WHERE item=?", (new,)).fetchone()
+        d = conn.execute("SELECT ref FROM ledger WHERE hid=? AND kind='x'", (hid,)).fetchone()[0]
+        assert f'"{new}"' in d and f'"{old}_not"' in d      # only the exact quoted id
+        # once: a row with the old id written later stays (nothing scans again)
+        conn.execute("INSERT INTO market_tax(item, day, rate) VALUES (?, '2026-01-02', 0.1)", (old,))
+        systems.rename_items(conn)
+        assert conn.execute("SELECT 1 FROM market_tax WHERE item=?", (old,)).fetchone()

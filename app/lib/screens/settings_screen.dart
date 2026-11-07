@@ -142,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (_) => _BottomBarSettings(config: widget.config, onSave: widget.onSave)))),
           _tile(Icons.palette_outlined, 'App Appearance', 'Colors · map panels · full screen',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _AppAppearancePage()))),
-          _tile(Icons.thermostat, 'Survey Heatmap', 'Opacity · palette',
+          _tile(Icons.satellite_alt, 'Survey Heatmap', 'Opacity · palette',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _ScanHeatmapPage()))),
         ]),
         const SizedBox(height: 16),

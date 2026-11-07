@@ -47,13 +47,16 @@ OPERATIONS = {
     }, None),
     "ranch": ("Ranch", "any", {
         "milk": (1, 100), "eggs": (1, 120), "wool": (2, 40), "honey": (2, 30),
-        "beef": (2, 30), "pork": (2, 40), "chicken_meat": (2, 50),
+        "beef": (2, 30), "pork": (2, 40), "chicken": (2, 50),
     }, None),
     "fish_farm": ("Fish farm", "any", {"carp": (2, 40), "trout": (2, 30)}, None),
     "fishing_port": ("Fishing port", "water", {"sardines": (2, 60), "cod": (3, 30), "tuna": (3, 20)}, None),
     "solar_farm": ("Solar farm", "any", {"electricity": (2, None)}, None),
     "wind_farm": ("Wind farm", "any", {"electricity": (2, None)}, None),
 }
+
+# Item ids that changed: systems.rename_items moves every stored copy to the new id once
+ITEM_RENAMES = {"chicken_meat": "chicken"}       # owner 2026-11-07: Chicken, like Beef and Pork
 
 ITEM_NAMES = {
     "stone": "Stone", "sand": "Sand", "clay": "Clay", "limestone": "Limestone", "coal": "Coal",
@@ -62,7 +65,7 @@ ITEM_NAMES = {
     "wood": "Wood", "wheat": "Wheat", "potatoes": "Potatoes", "corn": "Corn", "tomatoes": "Tomatoes",
     "sugar_beet": "Sugar beet", "apples": "Apples", "grapes": "Grapes", "cotton": "Cotton",
     "milk": "Milk", "eggs": "Eggs", "wool": "Wool", "honey": "Honey", "beef": "Beef", "pork": "Pork",
-    "chicken_meat": "Chicken", "carp": "Carp", "trout": "Trout", "sardines": "Sardines", "cod": "Cod",
+    "chicken": "Chicken", "carp": "Carp", "trout": "Trout", "sardines": "Sardines", "cod": "Cod",
     "tuna": "Tuna", "electricity": "Electricity",
     "lumber": "Lumber", "wood_pellets": "Wood pellets", "paper": "Paper", "books": "Books",
     "furniture": "Furniture", "bricks": "Bricks", "cement": "Cement", "concrete": "Concrete", "glass": "Glass",
@@ -109,7 +112,7 @@ FACTORIES = {
         ({"milk": 20}, ("dairy_products", 10), 1, 5),
         ({"beef": 10}, ("meat_products", 10), 1, 10),
         ({"pork": 12}, ("meat_products", 10), 1, 10),
-        ({"chicken_meat": 15}, ("meat_products", 10), 1, 10),
+        ({"chicken": 15}, ("meat_products", 10), 1, 10),
         ({"carp": 10}, ("fish_products", 8), 1, 5),
         ({"trout": 8}, ("fish_products", 8), 1, 5),
     ]),

@@ -21,6 +21,7 @@ from fastapi import Request
 import procs
 
 import econ
+import gamedata as g
 
 from . import integrity
 
@@ -144,6 +145,30 @@ def install_all(app, helpers) -> list[str]:
         mod.install(api)
         installed.append(name)
     return installed
+
+
+def rename_items(conn) -> None:
+    """Item ids that changed (gamedata.ITEM_RENAMES): every stored copy gets the new id, once. Plain
+    columns holding exactly the old id, and JSON text holding it as a quoted string. Done renames are
+    remembered (item_renames), so a start after that costs nothing."""
+    conn.execute("CREATE TABLE IF NOT EXISTS item_renames (old TEXT PRIMARY KEY, new TEXT NOT NULL, at TEXT)")
+    done = {r[0] for r in conn.execute("SELECT old FROM item_renames")}
+    todo = {o: n for o, n in g.ITEM_RENAMES.items() if o not in done}
+    if not todo:
+        return
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name!='item_renames'")]
+    for old, new in todo.items():
+        for t in tables:
+            for col in conn.execute(f'PRAGMA table_info("{t}")').fetchall():
+                c, typ = col[1], (col[2] or "").upper()
+                if typ and "TEXT" not in typ and "CHAR" not in typ:
+                    continue
+                conn.execute(f'UPDATE OR IGNORE "{t}" SET "{c}"=? WHERE "{c}"=?', (new, old))
+                conn.execute(f'UPDATE "{t}" SET "{c}"=REPLACE("{c}", ?, ?) WHERE "{c}" LIKE ?',
+                             (f'"{old}"', f'"{new}"', f'%"{old}"%'))
+        conn.execute("INSERT INTO item_renames(old, new, at) VALUES (?, ?, datetime('now'))", (old, new))
+    conn.commit()
 
 
 # Order matters only for documentation; modules are independent.

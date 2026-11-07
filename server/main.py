@@ -933,6 +933,8 @@ SYSTEM_HELPERS = _types.SimpleNamespace(
     push=_push_to_player, new_id=new_id, record_daily_activity=record_daily_activity,
 )
 INSTALLED_SYSTEMS = systems.install_all(app, SYSTEM_HELPERS)
+with get_db() as _conn:
+    systems.rename_items(_conn)    # after every table exists: an item that got a new id keeps its stock, orders, history
 _init.__exit__(None, None, None)
 
 # ── Unknown paths ─────────────────────────────────────────────────────────────────

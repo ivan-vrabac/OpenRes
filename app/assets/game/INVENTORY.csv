@@ -27,7 +27,7 @@ item,wool,Wool,items/wool.png,placeholder,drawn by tools/game_assets.py,CC BY-NC
 item,honey,Honey,items/honey.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
 item,beef,Beef,items/beef.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
 item,pork,Pork,items/pork.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
-item,chicken_meat,Chicken,items/chicken_meat.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
+item,chicken,Chicken,items/chicken.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
 item,carp,Carp,items/carp.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
 item,trout,Trout,items/trout.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
 item,sardines,Sardines,items/sardines.png,placeholder,drawn by tools/game_assets.py,CC BY-NC 4.0
