@@ -85,8 +85,7 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
                 Row(children: [
                   StatTile(fmtMass(d['heldMg'] as num), 'You have', color: AppColors.accent),
                   const SizedBox(width: 8),
-                  StatTile(fmtMass(d['producedMg'] as num), 'Made in total'),
-                  const SizedBox(width: 8),
+                  // owner 2026-11-07: two tiles; what was made in total is the leaderboard's number below
                   StatTile(fmtMass(d['investedMg'] as num), 'In research'),
                 ]),
                 const SizedBox(height: 18),
