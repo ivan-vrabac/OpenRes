@@ -673,7 +673,7 @@ class _OrderDialogState extends State<_OrderDialog> {
   late final _qtyCtl = TextEditingController();
   int _q = 0;
 
-  static String _fmt(double v) => v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
+  static String _fmt(double v) => v == v.roundToDouble() ? v.round().toString() : trimDec(v.toStringAsFixed(2));
 
   int get _maxQty {
     if (_price <= 0) return 0;

@@ -7,6 +7,7 @@ import '../widgets/async_view.dart';
 import '../widgets/top_banner.dart';
 
 import '../app_colors.dart';
+import '../constants.dart' show fmtNum;
 import '../v3/company.dart';
 import '../v3/streak.dart';
 /// The Rewards tab (owner 2026-11-06): the daily reward with the game's only streak on top, then today's
@@ -158,25 +159,33 @@ class _QuestsScreenState extends State<QuestsScreen> {
               '${progress.toInt()} of ${target.toInt()}',
               if (!claimed) _left(q['expiresAt'] as String),
             ].join(' · '), style: TextStyle(fontSize: 11, color: AppColors.t54)),
-            if (books > 0 && !claimed)
+            // both rewards together under the title (owner 2026-11-07), the button only says Claim
+            if (!claimed && (books > 0 || reward > 0))
               Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Row(children: [
-                  const Icon(Icons.menu_book_outlined, size: 12, color: Colors.amber),
-                  const SizedBox(width: 3),
-                  Text('+ ${books.round()} books', style: const TextStyle(fontSize: 11, color: Colors.amber)),
+                padding: const EdgeInsets.only(top: 3),
+                child: Wrap(spacing: 10, runSpacing: 2, children: [
+                  if (books > 0) Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.menu_book_outlined, size: 13, color: Colors.amber),
+                    const SizedBox(width: 3),
+                    Text('+${fmtNum(books.round())} books', style: const TextStyle(fontSize: 12, color: Colors.amber)),
+                  ]),
+                  if (reward > 0) Row(mainAxisSize: MainAxisSize.min, children: [
+                    const CreditsIcon(size: 13, color: Colors.greenAccent),
+                    const SizedBox(width: 3),
+                    Text('+${fmtNum(reward)}', style: const TextStyle(fontSize: 12, color: Colors.greenAccent)),
+                  ]),
                 ]),
               ),
           ])),
           const SizedBox(width: 8),
-          if (!claimed)
+          if (!claimed && q['claimable'] == true)
             FilledButton(
               style: FilledButton.styleFrom(visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 12)),
-              onPressed: q['claimable'] == true && _claiming == null ? () => _claim(q) : null,
+              onPressed: _claiming == null ? () => _claim(q) : null,
               child: _claiming == q['id']
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(q['claimable'] == true ? 'Claim ${fmtCredits(reward)}' : fmtCredits(reward)),
+                  : const Text('Claim'),
             ),
         ]),
       ),

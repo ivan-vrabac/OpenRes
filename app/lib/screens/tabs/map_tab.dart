@@ -432,8 +432,8 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
 
   String _fmtDist(double m) {
     if (m < 1000) return '${m.round()} m';
-    if (m < 10000) return '${(m / 1000).toStringAsFixed(2)} km';
-    return '${(m / 1000).toStringAsFixed(1)} km';
+    if (m < 10000) return '${trimDec((m / 1000).toStringAsFixed(2))} km';
+    return '${trimDec((m / 1000).toStringAsFixed(1))} km';
   }
 
   // the snap list, made again only when the hexes change or a second passed (the 30 s share rings run
@@ -976,7 +976,7 @@ class _MapTabState extends State<MapTab> with WidgetsBindingObserver {
                           color: co.hasCampus ? AppColors.accent : Colors.white24),
                       const SizedBox(height: 2),
                       Text(_movingCampus ? 'Cancel'
-                          : scanRadius >= 1000 ? '${(scanRadius / 1000).toStringAsFixed(1)} km' : '${scanRadius.round()} m',
+                          : scanRadius >= 1000 ? '${trimDec((scanRadius / 1000).toStringAsFixed(1))} km' : '${scanRadius.round()} m',
                           style: TextStyle(fontSize: 9, color: AppColors.t54)),
                     ]),
                   ),

@@ -1,3 +1,4 @@
+import '../constants.dart' show trimDec;
 import '../widgets/glass.dart' show tabPadding;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,8 +10,8 @@ import '../widgets/cards.dart';
 
 /// "3.82 g", "120 mg", "1.25 kg".
 String fmtMass(num mg) {
-  if (mg >= 1e6) return '${(mg / 1e6).toStringAsFixed(2)} kg';
-  if (mg >= 1000) return '${(mg / 1000).toStringAsFixed(2)} g';
+  if (mg >= 1e6) return '${trimDec((mg / 1e6).toStringAsFixed(2))} kg';
+  if (mg >= 1000) return '${trimDec((mg / 1000).toStringAsFixed(2))} g';
   return '${mg < 10 ? mg.toStringAsFixed(2) : mg.toStringAsFixed(0)} mg';
 }
 

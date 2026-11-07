@@ -1,4 +1,4 @@
-import '../widgets/update_dialog.dart';
+import '../services/play_update.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -139,7 +139,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       IntegrityCheck.start(prov.sid);             // real app on a real device?
       PlayGames.start(prov.sid);                  // achievements recorded, and on to Play Games
       // offer a newer published build (once per build; Settings > Updates anytime)
-      Future.delayed(const Duration(seconds: 4), () { if (mounted) UpdateDialog.checkOnStart(context); });
+      Future.delayed(const Duration(seconds: 3), () { if (mounted) PlayUpdate.checkOnStart(context); });
       Future.delayed(const Duration(seconds: 2), _offerStreak);
     });
   }

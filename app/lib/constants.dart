@@ -18,6 +18,9 @@ const kBigSuffixes = <(double, String)>[
 ];
 
 /// [v] with the biggest suffix it reaches at or above [from], with [d] decimals; null below [from].
+/// Without a decimal that says nothing (owner 2026-11-07): 1.50 is 1.5, 1.00 is 1, 1.25 stays.
+String trimDec(String s) => s.contains('.') && !s.contains('e') ? s.replaceFirst(RegExp(r'\.?0+$'), '') : s;
+
 String? suffixed(num v, int d, {double from = 1e3, bool lowerK = false}) {
   if (!v.isFinite) return v.isNaN ? '-' : (v < 0 ? '-∞' : '∞');
   final a = v.abs();
@@ -25,7 +28,7 @@ String? suffixed(num v, int d, {double from = 1e3, bool lowerK = false}) {
     if (base < from) break;
     if (a >= base) {
       final x = a / base;
-      final body = x >= 1e15 ? x.toStringAsExponential(2) : x.toStringAsFixed(d);
+      final body = x >= 1e15 ? x.toStringAsExponential(2) : trimDec(x.toStringAsFixed(d));
       return '${v < 0 ? '-' : ''}$body${lowerK && suf == 'K' ? 'k' : suf}';
     }
   }
@@ -37,7 +40,7 @@ String? suffixed(num v, int d, {double from = 1e3, bool lowerK = false}) {
 String fmtFull(num v) {
   if (!v.isFinite || v.abs() >= 1e21) return fmtNum(v);
   final a = v.abs();
-  final s = a.toStringAsFixed(a == a.roundToDouble() ? 0 : 2);
+  final s = a.toStringAsFixed(a == a.roundToDouble() ? 0 : 2);         // exact amounts keep their cents
   final parts = s.split('.');
   final w = parts[0];
   final buf = StringBuffer(v < 0 ? '-' : '');

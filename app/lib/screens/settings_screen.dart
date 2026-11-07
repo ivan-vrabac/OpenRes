@@ -14,12 +14,9 @@ import '../widgets/hold_button.dart';
 import '../services/game_api.dart';
 import '../services/google_auth.dart';
 import '../services/play_games.dart';
-import '../branding.dart';
 import '../models/player_provider.dart';
 import '../models/tab_config.dart';
 import '../services/location_service.dart';
-import '../services/update_service.dart';
-import '../widgets/update_dialog.dart';
 import '../constants.dart' show fmtNum;
 import 'game_screen.dart' show tabMeta;
 
@@ -153,9 +150,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _tile(Icons.school_outlined, 'Tutorial', 'See the first steps again', () => tutorialAsked.value = true),
           _tile(Icons.speed, 'Performance', 'Frame rate · GPS',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _PerformancePage()))),
-          if (UpdateService.supported)
-            _tile(Icons.system_update, 'Updates',
-                'Version ${Branding.buildName} (build ${Branding.buildNumber})', () => UpdateDialog.open(context)),
         ]),
         const SizedBox(height: 16),
         const SectionLabel('Account'),

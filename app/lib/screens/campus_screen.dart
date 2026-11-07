@@ -8,7 +8,7 @@ import '../app_colors.dart';
 import '../constants.dart';
 import '../services/location_service.dart';
 import '../v3/company.dart';
-import '../widgets/async_view.dart' show GamePicture, fmtCredits, fmtQty;
+import '../widgets/async_view.dart' show GamePicture, fmtCredits;
 import '../widgets/cards.dart';
 import '../widgets/popups.dart';
 import '../widgets/slide_confirm.dart';
@@ -379,12 +379,12 @@ class _CampusScreenState extends State<CampusScreen> {
 
     final tiles = <Widget>[
       ring(Icon(Icons.toll, size: 28, color: AppColors.t70), 'Credits', co.credits.toDouble(), credits,
-          '${fmtCredits(co.credits)} / ${fmtCredits(credits)}'),
+          'ꞓ${_whole(co.credits)} / ꞓ${_whole(credits, up: true)}'),
       for (final e in mats.entries)
         ring(GamePicture(itemPicture(e.key), width: 40, height: 40, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 20, color: AppColors.t38)),
             co.itemName(e.key), have(e.key), (e.value as num).toDouble(),
-            '${fmtQty(have(e.key).floor())} / ${fmtQty(e.value as num)}'),
+            '${_whole(have(e.key))} / ${_whole(e.value as num, up: true)}'),
       ring(Icon(Icons.warehouse_outlined, size: 26, color: AppColors.t70), 'Storage', storageLv.toDouble(),
           needStorage.toDouble(), 'Level $storageLv / $needStorage'),
     ];
@@ -852,6 +852,18 @@ class _CampusScreenState extends State<CampusScreen> {
         onConfirm: () => _act('/api/v3/darkmatter/invest', const {}, 'Dark matter research level ${level + 1}'),
       ),
     ]));
+  }
+
+  /// No decimals in the upgrade rings (owner 2026-11-07): 11K / 30K. What you have rounds down and what is
+  /// needed rounds up, so it never reads as enough while it isn't.
+  static String _whole(num v, {bool up = false}) {
+    const units = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi'];
+    var x = v.toDouble(), i = 0;
+    while (x.abs() >= 1000 && i < units.length - 1) {
+      x /= 1000;
+      i++;
+    }
+    return '${up ? x.ceil() : x.floor()}${units[i]}';
   }
 
   static String _hours(num h) => h < 1 ? '${(h * 60).round()} min' : '${h % 1 == 0 ? h.toInt() : h} h';

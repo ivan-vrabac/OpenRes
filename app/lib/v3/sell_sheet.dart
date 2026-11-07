@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
-import '../constants.dart' show fmtNum;
+import '../constants.dart' show fmtNum, trimDec;
 import '../widgets/async_view.dart' show GameItemIcon;
 import '../widgets/popups.dart';
 import '../widgets/top_banner.dart';
@@ -72,7 +72,7 @@ Future<bool> showSellSheet(BuildContext context, Company co, String item, double
       final avg = sold > 0 ? gross / sold : 0.0;      // one price, or the mix of orders and the system
       final more = qty > (levels.first.$3 == null ? double.infinity : levels.first.$2);   // more than the best order takes
       final u = _unit(item);
-      String pr(double v) => 'ꞓ${v < 10 ? v.toStringAsFixed(2) : fmtNum(v)}';
+      String pr(double v) => 'ꞓ${v < 10 ? trimDec(v.toStringAsFixed(2)) : fmtNum(v)}';
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [

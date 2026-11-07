@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../branding.dart';
 import '../services/storage_service.dart';
 import '../services/api_service.dart';
-import '../services/update_service.dart';
 import '../models/player_provider.dart';
 import 'login_screen.dart';
 import 'legal_screen.dart';
@@ -24,7 +23,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _init() async {
-    UpdateService.cleanupOldDownloads();       // the update worked: remove its downloaded APK
     // terms of use + privacy policy: accepted for this version, or the app closes (owner 2026-10-25)
     if (!await Legal.ensure(context)) return;
     // Older installs stored only the player ID; they have no session and must sign in.

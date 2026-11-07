@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
-import '../constants.dart' show suffixed;
+import '../constants.dart' show suffixed, trimDec;
 import 'hex_tiles.dart';
 
 /// Clips to the flat-top hex of the map's hexes (centred; a square box shows it full width).
@@ -188,7 +188,7 @@ String fmtCredits(num v) {
   if (!v.isFinite) return 'ꞓ${suffixed(v, 0)}';
   final a = v.abs();
   final s = a >= 1e6 ? suffixed(v, 2, from: 1e6)!
-      : a >= 1e4 ? '${(v / 1e3).toStringAsFixed(1)}k'
+      : a >= 1e4 ? '${trimDec((v / 1e3).toStringAsFixed(1))}k'
       : v.round().toString();
   return 'ꞓ$s';
 }
@@ -197,6 +197,6 @@ String fmtQty(num v) {
   if (!v.isFinite) return suffixed(v, 0)!;
   final a = v.abs();
   if (a >= 1e6) return suffixed(v, 2, from: 1e6)!;
-  if (a >= 1e4) return '${(v / 1e3).toStringAsFixed(1)}k';
-  return v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
+  if (a >= 1e4) return '${trimDec((v / 1e3).toStringAsFixed(1))}k';
+  return v == v.roundToDouble() ? v.round().toString() : trimDec(v.toStringAsFixed(2));
 }
