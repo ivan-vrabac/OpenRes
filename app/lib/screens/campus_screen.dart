@@ -977,7 +977,7 @@ Widget _levelCard(Company co, ColorScheme cs, Map<String, dynamic> l, int cur) {
         Wrap(spacing: 4, runSpacing: 4, children: [
           chip(Icons.groups_outlined, '${l['supervisors']} supervisors'),
           chip(Icons.school_outlined, '$slots education slot${slots == 1 ? '' : 's'}'),
-          chip(Icons.radar, 'Surveys ${_dist(l['surveyRadius'] as num)}'),
+          chip(Icons.satellite_alt, 'Surveys ${_dist(l['surveyRadius'] as num)}'),
         ]),
         for (final (what, list) in unlocks)
           Padding(
