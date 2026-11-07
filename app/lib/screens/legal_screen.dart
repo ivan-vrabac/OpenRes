@@ -124,6 +124,15 @@ class LegalText extends StatelessWidget {
       if (b.startsWith('# ')) {
         blocks.add(Padding(padding: const EdgeInsets.only(bottom: 6),
             child: Text(b.substring(2), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))));
+      } else if (b.startsWith('## WARNING')) {
+        // the real-world safety warning at the top of the terms (owner 2026-11-07): it must stand out
+        blocks.add(Padding(padding: const EdgeInsets.only(top: 6, bottom: 6),
+            child: Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+              const SizedBox(width: 8),
+              Expanded(child: Text(b.substring(3), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                  color: Colors.amber))),
+            ])));
       } else if (b.startsWith('## ')) {
         blocks.add(Padding(padding: const EdgeInsets.only(top: 10, bottom: 4),
             child: Text(b.substring(3), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))));

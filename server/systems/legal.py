@@ -15,7 +15,7 @@ RETENTION_DAYS = 30                 # logs and backups (privacy policy)
 _contact_bucket = econ.TokenBucket(10, 1800.0)   # site-wide: 10 messages, then one more every 30 minutes
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-LEGAL_VERSION = "2026-11-06.2"      # country from the Campus location (owner 2026-11-06)
+LEGAL_VERSION = "2026-11-07"        # real-world safety warning and section 2 (owner 2026-11-07)
 LEDGER_DAYS = 90
 EVENT_DAYS = 7
 ACTIVITY_KEEP_DAYS = 110       # the leaderboards look at the last 100 days
