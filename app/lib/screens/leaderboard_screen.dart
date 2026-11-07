@@ -394,11 +394,11 @@ class _LuxuryBoardState extends _BoardState<_LuxuryBoard> {
     super.build(context);
     return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
       final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
-      return list(rows, gapText: (g) => fmtMass(g), (r) => _row(context, r, value: fmtMass(r['mg'] as num),
-          middle: Text(fmtMass(r['producedMg'] as num? ?? 0), style: TextStyle(fontSize: 12, color: AppColors.t70))),
+      // owner 2026-11-07: only what is in research, nothing else on the row
+      return list(rows, gapText: (g) => fmtMass(g), (r) => _row(context, r, value: fmtMass(r['mg'] as num)),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
-        controls(note: 'Top 100 · updates every 5 minutes · you have ${fmtMass(data!['myMg'] as num? ?? 0)} in research'),
-        _infoRow('Made in total', 'In research'),
+        controls(),
+        _infoRow('', 'In research'),
       ]));
     });
   }
