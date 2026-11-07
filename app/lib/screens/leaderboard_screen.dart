@@ -25,14 +25,15 @@ class LeaderboardScreen extends StatelessWidget {
     return Scaffold(
       appBar: !embedded && ModalRoute.of(context)?.canPop == true ? AppBar(toolbarHeight: 36) : null,
       body: const DefaultTabController(
-        length: 6,
+        length: 5,
         child: Column(children: [
           TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
-            Tab(text: 'Overall'), Tab(text: 'Campus'), Tab(text: 'Hexes'), Tab(text: 'Countries'), Tab(text: 'Tantalum'),
+            // owner 2026-11-07: no Hexes board (everyone ends at the same 10 000); Production says it better
+            Tab(text: 'Overall'), Tab(text: 'Campus'), Tab(text: 'Countries'), Tab(text: 'Tantalum'),
             Tab(text: 'Production'),
           ]),
           Expanded(child: TabBarView(children: [
-            _OverallBoard(), _CampusBoard(), _HexBoard(), _CountryBoard(), _LuxuryBoard(), _ResourceBoard(),
+            _OverallBoard(), _CampusBoard(), _CountryBoard(), _LuxuryBoard(), _ResourceBoard(),
           ])),
         ]),
       ),
@@ -305,31 +306,6 @@ class _CampusBoardState extends _BoardState<_CampusBoard> {
   }
 }
 
-class _HexBoard extends StatefulWidget {
-  const _HexBoard();
-  @override
-  State<_HexBoard> createState() => _HexBoardState();
-}
-
-class _HexBoardState extends _BoardState<_HexBoard> {
-  @override
-  String get path => '/api/v1/rank/hexes';
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return AsyncView(loading: loading && data == null, error: error, onRetry: load, builder: () {
-      final rows = (data!['rows'] as List).cast<Map<String, dynamic>>();
-      return list(rows, (r) => _row(context, r, value: _short(r['hexes'] as num),
-          middle: Text('${r['items']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
-          header: Column(mainAxisSize: MainAxisSize.min, children: [
-            controls(),
-            _infoRow('Resources', 'Hexes'),
-          ]));
-    });
-  }
-}
-
 class _CountryBoard extends StatefulWidget {
   const _CountryBoard();
   @override
@@ -428,8 +404,7 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
       final names = (data!['names'] as Map? ?? const {}).cast<String, dynamic>();
       final item = data!['item'] as String? ?? '';
       return list(rows, gapText: (g) => all ? 'ꞓ${_short(g)} an hour' : '${_short(g.round())} an hour', (r) => _row(context, r,
-          value: all ? 'ꞓ${_short(r['perHour'] as num)}' : _short((r['perHour'] as num).round()),
-          middle: Text('${r['count']}', style: TextStyle(color: AppColors.t70, fontSize: 12))),
+          value: all ? 'ꞓ${_short(r['perHour'] as num)}' : _short((r['perHour'] as num).round())),
           header: Column(mainAxisSize: MainAxisSize.min, children: [
           // owner 2026-11-06: the buttons never move: no check mark, fixed width, and the item list's place is kept
           SizedBox(height: 52, child: Padding(
@@ -467,7 +442,8 @@ class _ResourceBoardState extends _BoardState<_ResourceBoard> {
           )),
           controls(),
           if (all) _note('Everything a company makes in an hour (hexes and plants), valued at market prices.'),
-          _infoRow(all ? 'Hexes + levels' : _kind == 'raw' ? 'Hexes' : 'Levels', all ? 'Value / h' : 'Output / h'),
+          // owner 2026-11-07: just what they make; hexes and levels are on the company's profile
+          _infoRow('', all ? 'Value / h' : 'Output / h'),
           ]));
     });
   }
