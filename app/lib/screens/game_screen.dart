@@ -86,7 +86,7 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -102,6 +102,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       onCredits: context.read<PlayerProvider>().setCredits)..start();
   late PageController _pageCtrl;
   final _tabBar = ScrollController();     // the bottom tabs, when they don't all fit
+  // a tapped tab slides in from its side of the bar, straight from the open one (owner 2026-11-07)
+  late final _slide = AnimationController(vsync: this, duration: const Duration(milliseconds: 260), value: 1);
+  double _slideDir = 0;                  // +1: the new tab is to the right, -1: to the left
   double _tabW = 68;                     // one tab's width in the bar (set when it is laid out)
   int _currentIndex = 0;
 
@@ -169,6 +172,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     ScreenMode.apply();
     _pageCtrl.dispose();
+    _slide.dispose();
     _tabBar.dispose();
     super.dispose();
   }
@@ -319,6 +323,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // straight to the tab (owner 2026-11-07: the slide from a neighbouring tab showed a page on the way,
     // Market to Map went past Hexes); swiping between tabs still slides
     if (_pageCtrl.hasClients) _pageCtrl.jumpToPage(index + 1);
+    _slideDir = index > _currentIndex ? 1 : -1;
+    _slide.forward(from: 0);
     setState(() => _currentIndex = index);
     _syncGps();
     // the bar stays where the player left it (owner 2026-11-07: no centring); only a tab out of
@@ -416,11 +422,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           Expanded(
             key: const ValueKey('pages'),
             child: Stack(children: [
-              PageView(
-                controller: _pageCtrl,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: _onPageChanged,
-                children: _buildPages(),
+              AnimatedBuilder(
+                animation: _slide,
+                child: PageView(
+                  controller: _pageCtrl,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: _onPageChanged,
+                  children: _buildPages(),
+                ),
+                builder: (context, page) {
+                  // Material's shared-axis motion: a short move from the tab's side while it fades in.
+                  // Always the same widgets around the pages (at rest: no move, full opacity, no layer),
+                  // so the pages keep their state.
+                  final t = Curves.easeOutCubic.transform(_slide.value);
+                  return FractionalTranslation(
+                    translation: Offset(_slideDir * 0.18 * (1 - t), 0),
+                    child: Opacity(opacity: 0.25 + 0.75 * t, child: page),
+                  );
+                },
               ),
               if (hud)
                 Positioned(top: under ? statusTop : 0, left: 0, right: 0, child: ValueListenableBuilder<bool>(

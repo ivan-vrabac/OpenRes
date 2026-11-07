@@ -7,6 +7,7 @@ import '../widgets/async_view.dart';
 import '../widgets/top_banner.dart';
 
 import '../app_colors.dart';
+import '../services/kept.dart';
 import '../constants.dart' show fmtNum;
 import '../v3/company.dart';
 import '../v3/streak.dart';
@@ -27,18 +28,29 @@ class _QuestsScreenState extends State<QuestsScreen> {
 
   String get _sid => context.read<PlayerProvider>().sid;
 
+  // the last answer, shown at once (owner 2026-11-07: a spinner flashed when the tab opened)
+  String get _keptKey => Kept.key(context.read<PlayerProvider>().player?.hid ?? '', 'quests');
+
   @override
   void initState() {
     super.initState();
+    _d = Kept.now(_keptKey);
+    _loading = _d == null;
+    if (_d == null) {
+      Kept.fromDisk(_keptKey).then((d) {
+        if (mounted && d != null && _d == null) setState(() { _d = d; _loading = false; });
+      });
+    }
     _load();
   }
 
   Future<void> _load() async {
     final r = await GameApi.call('/api/v1/quests', _sid);
     if (!mounted) return;
+    if (r.ok) Kept.save(_keptKey, r.data);
     setState(() {
       _loading = false;
-      _error = r.ok ? null : r.message;
+      _error = r.ok || _d != null ? null : r.message;      // a failed refresh keeps what is shown
       if (r.ok) _d = r.data;
     });
   }
