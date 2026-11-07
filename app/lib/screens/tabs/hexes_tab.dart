@@ -71,7 +71,7 @@ class _HexesTabState extends State<HexesTab> {
     }
     final order = groups.keys.toList()
       ..sort((a, b) => (groups[b]!.length).compareTo(groups[a]!.length));
-    final value = all.fold<double>(0, (s, m) => s + m.rateHr * _price(co, m.item));
+    final value = all.fold<double>(0, (s, m) => s + m.rateHr * _price(co, m.item)) * co.outputFactor;
     final due = all.where((m) => m.leaseDays < _kDueDays).toList();
     final dueNow = due.where((m) => m.renewInHours <= 0).toList();
     final dueCost = dueNow.fold<int>(0, (s, m) => s + m.renewPrice);
@@ -164,7 +164,7 @@ class _ResourceHex extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rate = hexes.fold<double>(0, (s, m) => s + m.rateHr);
+    final rate = hexes.fold<double>(0, (s, m) => s + m.rateHr) * co.outputFactor;   // visit and research included
     final soon = hexes.any((m) => m.leaseDays < _kDueDays);
     final unit = item == 'electricity' ? ' kWh' : '';
     final perHour = item == 'electricity' ? rate / 1000 : rate;
@@ -307,7 +307,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${hexes.length} hex${hexes.length == 1 ? '' : 'es'}',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text('${fmtNum(shown(hexes.fold<double>(0, (s, m) => s + m.rateHr)))}$unit per hour · '
+                  Text('${fmtNum(shown(hexes.fold<double>(0, (s, m) => s + m.rateHr) * co.outputFactor))}$unit per hour · '
                       '${hexes.where((m) => m.edu != null).length} with a supervisor',
                       style: TextStyle(fontSize: 12, color: AppColors.t54)),
                 ])),
@@ -398,7 +398,7 @@ class _HexGroupPageState extends State<_HexGroupPage> {
                 Text('Q ${m.quality}%', style: TextStyle(fontWeight: FontWeight.bold,
                     color: m.quality > 70 ? Colors.greenAccent : m.quality > 40 ? Colors.amber : Colors.orange)),
                 const SizedBox(width: 10),
-                Text('${fmtNum(shown(m.rateHr))}$unit/h', style: TextStyle(color: AppColors.t70, fontSize: 13)),
+                Text('${fmtNum(shown(m.rateHr * co.outputFactor))}$unit/h', style: TextStyle(color: AppColors.t70, fontSize: 13)),
                 const Spacer(),
                 Icon(Icons.person_outline, size: 15, color: sup == null ? AppColors.t38 : Colors.purpleAccent),
                 const SizedBox(width: 3),

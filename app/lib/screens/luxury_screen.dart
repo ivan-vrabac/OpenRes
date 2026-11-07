@@ -77,8 +77,9 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 Text('The rarest natural isotope we know: no one has ever seen it decay. Your isotope lab makes it '
-                    'from tantalum and supercomputers, counted in milligrams. It can\'t be sold, only made, and '
-                    'later put into dark matter research.',
+                    'from tantalum and supercomputers. It can\'t be sold, only made, and put into dark matter '
+                    'research on the Campus: every level adds 1 % to everything your company makes. Research opens '
+                    'once all 500 supervisors are educated to Master\'s (Campus level 50).',
                     textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.t60)),
                 const SizedBox(height: 14),
                 Row(children: [

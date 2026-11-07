@@ -102,4 +102,5 @@ def test_tantalum_luxury_and_dark_matter():
     assert dm["open"] and dm["level"] == 0
     assert call("/api/v3/darkmatter/invest", sid)["level"] == 1
     assert call("/api/v3/darkmatter", sid)["bonus"] == g.DARK_MATTER_BONUS
+    assert call("/api/v3/state", sid)["campus"]["research"] == g.DARK_MATTER_BONUS     # shown on the Campus
     assert call("/api/v3/luxury", sid)["investedMg"] == g.dark_matter_cost_mg(1)

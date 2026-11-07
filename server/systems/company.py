@@ -660,6 +660,7 @@ def install(api) -> None:
         if lv:
             campus = {"level": lv, "lat": row["campus_lat"], "lng": row["campus_lng"], "stage": g.campus_stage(lv),
                   "nextVisit": next_visit(row, now), "efficiency": efficiency(row, now), "lastVisit": row["last_visit"],
+                  "research": row["dm_level"] * g.DARK_MATTER_BONUS,     # dark matter: +1 % output per level
                   "next": g.campus_upgrade(lv) if lv < g.CAMPUS_MAX else None, **move_status(conn, hid, row, now)}
         survey = None
         if row["survey_at"]:

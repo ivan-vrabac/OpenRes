@@ -51,6 +51,11 @@ class Company extends ChangeNotifier {
   int get campusLevel => (campus?['level'] as num?)?.toInt() ?? 0;
   bool get hasCampus => campusLevel > 0;
   double get efficiency => (campus?['efficiency'] as num?)?.toDouble() ?? 1.0;
+  /// Dark matter research: +1 % output per level (0.3 = +30 %).
+  double get research => (campus?['research'] as num?)?.toDouble() ?? 0.0;
+  /// What hexes and plants really make compared with their base rate: the weekly visit times research
+  /// (owner 2026-11-07: the rates shown left the research boost out).
+  double get outputFactor => efficiency * (1 + research);
   Map<String, dynamic> get stock => (state['stock'] as Map?)?.cast<String, dynamic>() ?? const {};
   Map<String, dynamic>? get survey => state['survey'] as Map<String, dynamic>?;
   int get surveyMaxRadius => (state['surveyMaxRadius'] as num?)?.toInt() ?? 100;

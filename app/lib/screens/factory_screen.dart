@@ -264,7 +264,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
               _RecipeList(co: co, recipes: recipes, level: level, selected: ri,
                   onSelect: _busy ? null : (i) => act('/api/v3/plants/recipe', {'key': p['key'], 'recipe': i})),
               const SizedBox(height: 8),
-              Text('Adds ꞓ${fmtNum(((rec['profitPerHour'] as num) * level).round())} of value per hour',
+              Text('Adds ꞓ${fmtNum(((rec['profitPerHour'] as num) * level * co.outputFactor).round())} of value per hour',
                   style: TextStyle(fontSize: 12, color: AppColors.t54)),
               const SizedBox(height: 16),
               SlideToConfirm(
@@ -442,7 +442,7 @@ class _RecipeList extends StatelessWidget {
 
   Widget _row(int i) {
     final rec = recipes[i];
-    final per = level / (rec['hours'] as num).toDouble();          // batches per hour
+    final per = level / (rec['hours'] as num).toDouble() * co.outputFactor;   // batches per hour (visit, research)
     final inputs = (rec['inputs'] as Map).cast<String, dynamic>();
     final kwh = (rec['kwh'] as num).toDouble();
     final on = selected == i;
@@ -493,7 +493,7 @@ class _EnergyCard extends StatelessWidget {
     for (final p in plants) {
       if (p['running'] != true) continue;
       final rec = (p['recipes'] as List)[(p['recipe'] as num).toInt()] as Map<String, dynamic>;
-      final per = (p['level'] as num) / (rec['hours'] as num);
+      final per = (p['level'] as num) / (rec['hours'] as num) * co.outputFactor;
       if (rec['output'] == 'electricity') fromPlants += (rec['qty'] as num) * per;
       used += (rec['kwh'] as num) * per;
     }

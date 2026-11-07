@@ -244,6 +244,11 @@ class _CampusScreenState extends State<CampusScreen> {
       const SizedBox(height: 12),
       Row(children: [
         StatTile('$eff %', 'Efficiency', color: eff >= 100 ? Colors.greenAccent : Colors.orangeAccent),
+        // dark matter research: on top of everything made (owner 2026-11-07: it wasn't visible)
+        if (co.research > 0) ...[
+          const SizedBox(width: 8),
+          StatTile('+${(co.research * 100).round()} %', 'Research', color: Colors.lightBlueAccent),
+        ],
         const SizedBox(width: 8),
         StatTile(assigned == null ? '$total' : '$assigned / $total', 'Appointed'),
       ]),
