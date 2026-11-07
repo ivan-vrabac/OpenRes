@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app_colors.dart';
+import '../models/player_provider.dart';
+import '../services/kept.dart';
 import '../v3/company.dart';
 import '../widgets/async_view.dart' show TaIcon;
 import '../widgets/cards.dart';
@@ -27,15 +29,26 @@ class _LuxuryScreenState extends State<LuxuryScreen> {
   Map<String, dynamic>? _data;
   String? _error;
 
+  // the last answer, shown at once (owner 2026-11-07: the tab showed a spinner first)
+  String get _keptKey => Kept.key(context.read<PlayerProvider>().player?.hid ?? '', 'luxury');
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    _data = Kept.now(_keptKey);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_data == null) {
+        final d = await Kept.fromDisk(_keptKey);
+        if (mounted && d != null && _data == null) setState(() => _data = d);
+      }
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
     final r = await context.read<Company>().call('/api/v3/luxury');
     if (!mounted) return;
+    if (r.ok) Kept.save(_keptKey, r.data);
     setState(() {
       if (r.ok) {
         _data = r.data;

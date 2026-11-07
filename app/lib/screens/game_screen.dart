@@ -316,16 +316,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _goToTab(int index) {
     if (index == _currentIndex) return;
-    // one slide only (owner 2026-11-03): a far tab first jumps next to the target, so the pages in
-    // between are never built and drawn on the way
-    if (_pageCtrl.hasClients && (index - _currentIndex).abs() > 1) {
-      _pageCtrl.jumpToPage(index > _currentIndex ? index : index + 2);
-    }
-    _pageCtrl.animateToPage(
-      index + 1,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    // straight to the tab (owner 2026-11-07: the slide from a neighbouring tab showed a page on the way,
+    // Market to Map went past Hexes); swiping between tabs still slides
+    if (_pageCtrl.hasClients) _pageCtrl.jumpToPage(index + 1);
     setState(() => _currentIndex = index);
     _syncGps();
     // the bar stays where the player left it (owner 2026-11-07: no centring); only a tab out of
