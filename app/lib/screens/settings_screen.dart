@@ -137,8 +137,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SectionLabel('Look'),
         RowGroup([
           _tile(Icons.tab, 'Bottom bar',
-              () { final n = math.min(widget.config.bottomTabs.length, maxBarTabs(MediaQuery.sizeOf(context).width));
-                   return '$n tab${n == 1 ? '' : 's'} pinned'; }(),
+              '${widget.config.bottomTabs.length} tab${widget.config.bottomTabs.length == 1 ? '' : 's'} pinned',
               () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => _BottomBarSettings(config: widget.config, onSave: widget.onSave)))),
           _tile(Icons.palette_outlined, 'App Appearance', 'Colors · map panels · full screen',
@@ -1028,27 +1027,7 @@ class _BottomBarSettingsState extends State<_BottomBarSettings> {
         .toList();
   }
 
-  int get _max => maxBarTabs(MediaQuery.sizeOf(context).width);
-  bool _trimmed = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // the bar never scrolls (owner 2026-11-07): what doesn't fit this screen is under More
-    if (_trimmed) return;
-    _trimmed = true;
-    if (_bottom.length > _max) {
-      _overflow.insertAll(0, _bottom.sublist(_max));
-      _bottom.removeRange(_max, _bottom.length);
-    }
-  }
-
   void _moveToBottom(GameTabId id) {
-    if (_bottom.length >= _max) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('The bar holds $_max tabs. Remove one first.')));
-      return;
-    }
     setState(() {
       _overflow.remove(id);
       _bottom.add(id);
@@ -1075,7 +1054,7 @@ class _BottomBarSettingsState extends State<_BottomBarSettings> {
     return Scaffold(
       appBar: AppBar(toolbarHeight: 36),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        _sectionHeader('Pinned tabs (up to $_max, drag to reorder)'),
+        _sectionHeader('Pinned tabs (drag to reorder)'),
         if (_bottom.isEmpty)
           Padding(
             padding: EdgeInsets.symmetric(vertical: 8),

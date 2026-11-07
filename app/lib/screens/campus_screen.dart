@@ -878,11 +878,12 @@ Future<void> showCampusLevels(BuildContext context) async {
       final cs = Theme.of(ctx).colorScheme;
       final shown = levels.skip(page * per).take(per).toList();
       // owner 2026-11-06: a sheet, never taller than 80 % of the screen; the levels scroll inside it.
-      // Every page the same height (owner 2026-11-07: a locked page made the sheet shrink)
-      return SizedBox(height: MediaQuery.of(ctx).size.height * 0.8, child: SafeArea(
+      // A locked page keeps the height of its hidden levels (owner 2026-11-07: it made the sheet shrink,
+      // and a fixed 80 % left an empty band under an open page)
+      return ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8), child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               const Expanded(child: Text('Campus levels', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
               IconButton(
@@ -896,22 +897,29 @@ Future<void> showCampusLevels(BuildContext context) async {
               ),
             ]),
             const SizedBox(height: 6),
-            Expanded(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (!open(page))
-              Container(
-                height: 240,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.lock_outline, size: 48, color: AppColors.t38),
-                  const SizedBox(height: 10),
-                  Text('Reach Campus level ${page * per} to see what comes next',
-                      textAlign: TextAlign.center, style: TextStyle(color: AppColors.t70)),
-                ]),
-              )
-            else
-              for (final l in shown) _levelCard(co, cs, l, cur),
-            ]))),
+            Flexible(child: SingleChildScrollView(child: open(page)
+                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    for (final l in shown) _levelCard(co, cs, l, cur),
+                  ])
+                : Stack(children: [
+                    // the page's levels, unseen, only to give it their height
+                    ExcludeSemantics(child: IgnorePointer(child: Visibility(
+                      visible: false, maintainSize: true, maintainAnimation: true, maintainState: true,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        for (final l in shown) _levelCard(co, cs, l, cur),
+                      ]),
+                    ))),
+                    Positioned.fill(child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.lock_outline, size: 48, color: AppColors.t38),
+                        const SizedBox(height: 10),
+                        Text('Reach Campus level ${page * per} to see what comes next',
+                            textAlign: TextAlign.center, style: TextStyle(color: AppColors.t70)),
+                      ]),
+                    )),
+                  ]))),
           ]),
         ),
       ));

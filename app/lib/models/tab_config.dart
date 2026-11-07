@@ -17,9 +17,8 @@ enum GameTabId {
 
 const _kPrefKey = 'bottom_bar_tabs';
 
-/// Default tabs in the bottom bar ('more' is always appended): the tutorial's order, so its Next goes to the
-/// neighbouring tab (owner 2026-11-02). The bar never scrolls (owner 2026-11-07): only the first ones that fit
-/// the screen are on it (maxBarTabs), the rest is under More.
+/// Default tabs in the bottom bar, which scrolls ('more' is always appended): the tutorial's order, so its
+/// Next goes to the neighbouring tab (owner 2026-11-02). The rest is under More.
 const List<GameTabId> kDefaultBottomTabs = [
   GameTabId.map,
   GameTabId.mines,
@@ -31,15 +30,6 @@ const List<GameTabId> kDefaultBottomTabs = [
   GameTabId.leaderboard,
   GameTabId.luxury,
 ];
-
-/// The narrowest a tab may be: its label still readable at 10 points.
-const double kMinTabWidth = 58;
-
-/// How many pinned tabs fit next to More on a screen this wide (6 on a usual phone).
-int maxBarTabs(double width) {
-  final n = (width / kMinTabWidth).floor() - 1;
-  return n < 3 ? 3 : n;
-}
 
 class TabConfig {
   /// Tabs shown in the bottom bar (excluding the implicit "More" button)
