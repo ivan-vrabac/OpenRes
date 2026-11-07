@@ -44,4 +44,12 @@ void main() {
     expect(fmtNum(double.nan), '-');
     expect(fmtCredits(double.negativeInfinity), 'ꞓ-∞');
   });
+
+  test('Tantalum-180m in mg, g, kg and t', () {
+    expect(fmtMass(5), '5 mg');
+    expect(fmtMass(2.5), '2.5 mg');
+    expect(fmtMass(1500), '1.5 g');
+    expect(fmtMass(10013084), '10.01 kg');
+    expect(fmtMass(2e9), '2 t');
+  });
 }

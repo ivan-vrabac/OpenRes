@@ -41,7 +41,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
 
   /// Stored units -> what the player sees (electricity is stored in Wh, shown in kWh).
   static double _shown(String item, num q) => item == 'electricity' ? q / 1000 : q.toDouble();
-  static String _unit(String item) => item == 'electricity' ? ' kWh' : item == 'ta180m' ? ' mg' : '';
+  static String _unit(String item) => item == 'electricity' ? ' kWh' : '';
 
   double _price(Company co, String item) => ((co.catalog['items']?[item]?['price']) as num?)?.toDouble() ?? 0;
   bool _tradable(Company co, String item) => co.catalog['items']?[item]?['tradable'] == true;
@@ -228,7 +228,7 @@ class _WarehouseTabState extends State<WarehouseTab> {
               ])),
               const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('${fmtNum(shown)}${_unit(e.key)}',
+                Text(e.key == 'ta180m' ? fmtMass(shown) : '${fmtNum(shown)}${_unit(e.key)}',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber, fontSize: 14)),
                 if (tradable)
                   Text(fmtCredits(_worth(co, e)), style: TextStyle(fontSize: 11, color: AppColors.t54)),

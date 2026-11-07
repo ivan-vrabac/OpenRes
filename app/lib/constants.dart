@@ -58,3 +58,13 @@ String fmtNum(num n, {int? decimals}) {
   final d = decimals ?? kNumDecimals;
   return suffixed(n, d) ?? n.toStringAsFixed(0);
 }
+
+/// Tantalum-180m (kept in mg) in the unit that reads best (owner 2026-11-07: "10M mg" looked silly):
+/// 5 mg, 1.5 g, 10.01 kg, and t past a million grams (it should never get there).
+String fmtMass(num mg) {
+  final a = mg.abs();
+  if (a >= 1e9) return '${fmtNum(mg / 1e9)} t';
+  if (a >= 1e6) return '${trimDec((mg / 1e6).toStringAsFixed(2))} kg';
+  if (a >= 1000) return '${trimDec((mg / 1000).toStringAsFixed(2))} g';
+  return '${trimDec(mg.toStringAsFixed(a < 10 ? 2 : 0))} mg';
+}

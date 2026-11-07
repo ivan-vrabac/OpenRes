@@ -14,7 +14,6 @@ import '../widgets/popups.dart';
 import '../widgets/slide_confirm.dart';
 import '../widgets/top_banner.dart';
 import '../widgets/tutorial.dart';
-import 'luxury_screen.dart' show fmtMass;
 
 /// The Campus: its picture, level and stage, the weekly visit, the upgrade to the next level, the
 /// supervisors with their education, and moving it. Placing it happens on the map ("Place Campus here").

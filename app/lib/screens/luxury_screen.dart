@@ -1,4 +1,5 @@
-import '../constants.dart' show trimDec;
+import '../constants.dart' show fmtMass;
+export '../constants.dart' show fmtMass;
 import '../widgets/glass.dart' show tabPadding;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,13 +10,6 @@ import '../services/kept.dart';
 import '../v3/company.dart';
 import '../widgets/async_view.dart' show TaIcon;
 import '../widgets/cards.dart';
-
-/// "3.82 g", "120 mg", "1.25 kg".
-String fmtMass(num mg) {
-  if (mg >= 1e6) return '${trimDec((mg / 1e6).toStringAsFixed(2))} kg';
-  if (mg >= 1000) return '${trimDec((mg / 1000).toStringAsFixed(2))} g';
-  return '${mg < 10 ? mg.toStringAsFixed(2) : mg.toStringAsFixed(0)} mg';
-}
 
 /// Luxury: Tantalum-180m, the rarest material in the game (only produced, never sold), what the
 /// company holds and has made, and the leaderboard of everything ever produced (/api/v3/luxury).

@@ -379,7 +379,7 @@ Widget _statusBadge(_Status s, String text) => Container(
 String _qty(Company co, String item, num q) {
   final name = co.itemName(item).toLowerCase();
   if (item == 'electricity') return '${fmtNum(q)} kWh';
-  if (item == 'ta180m') return '${fmtNum(q)} mg $name';
+  if (item == 'ta180m') return '${fmtMass(q)} $name';
   return '${fmtNum(q)} $name';
 }
 
