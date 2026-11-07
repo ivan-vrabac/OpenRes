@@ -570,7 +570,7 @@ def hex_min_dist(lat1, lng1, lat2, lng2) -> float:
 _VALID_NAME = re.compile(r"^.{1,25}$")     # the real rules: names.py
 
 def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "?"
+    return systems.client_ip(request)      # the real player address from Cloudflare (was Cloudflare's own)
 
 @app.post("/api/v1/auth/session")
 async def auth_session(request: Request):

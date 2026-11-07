@@ -39,17 +39,23 @@ We do not encourage or accept any breaking of the law, trespassing, or unsafe be
 
 You are responsible for any damage, injury or loss you cause to yourself, to other people or to their property while playing, and, as far as the law allows, for any claims others make against us because of how you played.
 
-## 3. Your account
+## 3. What you share about yourself
+
+Your company name, your public profile and the places where you put your Campus and your hexes are visible to other players. Your Campus doesn't have to be near your home or near where you really are: you choose where it goes, and it is your free decision. Don't reveal your real name, address, home, workplace or other personal details through your company name, your profile, or where you place things on the map.
+
+Whatever you choose to make public about yourself in the game, by its name, its placement or otherwise, is your own decision and your own responsibility. To the extent the law allows, we are not responsible for what other people learn or do with what you made public yourself. If you realise you have shared too much, you can rename your company (in Settings), move your Campus, or delete your account at any time.
+
+## 4. Your account
 
 You are responsible for your account and for keeping your password secret. One person, one company. Don't share, sell or trade accounts.
 
 You must be at least 16 years old, or have the permission of a parent or guardian.
 
-## 4. Virtual items
+## 5. Virtual items
 
 Credits, raw materials, products, hexes, your Campus, plants, Tantalum-180m and every other in-game item are part of the game only. They have no real-world value, are not your property, cannot be exchanged for money and may be changed, rebalanced or removed by us at any time.
 
-## 5. Buying the game
+## 6. Buying the game
 
 OpenRes is sold through Google Play. Google handles the purchase and the payment, and we never see your payment details.
 
@@ -63,19 +69,19 @@ Where a refund can't be excluded, only the Google Play refund rules that apply t
 
 This does not limit any rights that mandatory consumer law gives you and that can't be excluded.
 
-## 6. Fair play and behaviour
+## 7. Fair play and behaviour
 
 Don't cheat or abuse the game. That includes, among other things: faking your location (GPS spoofing, mock locations), bots, scripts or automation, exploiting bugs instead of reporting them, using several accounts to gain an advantage, attacking or overloading the servers, and harassing, threatening, insulting or spamming other players.
 
 We decide ourselves what counts as abuse of the game mechanics or as bad behaviour, and we interpret these rules ourselves. We may warn, limit, suspend, reset or delete any account, and remove anything it has, at any time and without prior notice or compensation.
 
-## 7. Company names and reports
+## 8. Company names and reports
 
 Choose a company name that is respectful. A name is offensive if it contains insults, hate speech, bad words, mockery of other people, sexualised words or propaganda. Impersonation and advertising are not allowed either.
 
 You can report a company in the app (on its profile). We decide ourselves whether a name is offensive. We may change the name of a company, or suspend or ban the company, for some time or forever, at any time, without asking for your permission, without prior notice and without any update to the game.
 
-## 8. No warranty, liability
+## 9. No warranty, liability
 
 The game is provided "as is" and "as available", without any warranty that it works without interruptions, errors or data loss. To the extent the law allows, we are not liable for any loss or damage from using or not being able to use the game, including lost progress or items.
 
@@ -83,16 +89,16 @@ To the extent the law allows, we are also not liable for any injury, damage to p
 
 Nothing in these terms excludes or limits our liability for death or personal injury caused by our own fault, for intent or gross negligence, or any other liability that cannot be excluded or limited by law, and nothing takes away rights you have as a consumer under mandatory law.
 
-## 9. Changes to these terms
+## 10. Changes to these terms
 
 We may change these terms and the Privacy Policy at any time. The current version is always available in the game (More › Terms of use). When they change, the game shows the new version when you open it: you can accept it and keep playing, or decline it, in which case the game closes.
 
-## 10. Law and courts
+## 11. Law and courts
 
 The game is run from the Republic of Croatia by an operator established there, and that is where we provide it to you. Croatian law applies to these terms, to your use of the game and to everything related to it, and any dispute is decided by the competent court in the Republic of Croatia.
 
 If you are a consumer in the European Union, you keep the protection of EU law and of the mandatory rules that can't be excluded where you live, including where you may bring or must answer a claim. Nothing else in these terms is governed by any other law.
 
-## 11. Contact
+## 12. Contact
 
 {contact}

@@ -23,7 +23,7 @@ Where no other legal basis is named below, we process the data to perform our ag
 - **App and device check:** the app asks Google Play to confirm that it is the real app from Google Play on a genuine device, and our server keeps the result (for example whether the device passed and whether Play Protect found a problem), to keep the game fair (GDPR Art. 6(1)(f), legitimate interest). If the check fails, some game actions (for example surveys and market trades) are blocked until it passes. You can ask us to look at this through the contact form.
 - **Cheating checks:** when the game sees a position jump nobody could travel, a failed app and device check, or a fake (simulated) GPS position, the server keeps a short record of it (when, what and where) so moderators can look into cheating (GDPR Art. 6(1)(f), legitimate interest). It is kept for up to 1 year.
 - **Device ID:** a one-way scrambled (hashed) form of Android's ID for this app on your phone, to recognise several companies played from the same phone (one person, one company; GDPR Art. 6(1)(f), preventing cheating). It is not used for ads and never shared. Kept as long as your account exists.
-- **Technical data:** IP address, device and app version and server logs, needed to run and protect the service (GDPR Art. 6(1)(f), legitimate interest).
+- **Technical data:** IP address, device and app version and server logs, needed to run and protect the service (GDPR Art. 6(1)(f), legitimate interest). Your IP address is used for sign-in protection and request limits and is not stored with your account. We also count how often each kind of request is made and how long it takes, without any player or IP address, for 30 days.
 
 ## Who else receives data
 
@@ -45,7 +45,9 @@ We don't sell or rent personal data and we don't share it for marketing ("we do 
 - Passwords are stored only as salted hashes; nobody, including us, can read them.
 - Sign-in sessions are signed and expire; repeated wrong passwords are blocked for a while.
 - Other players get only a random public id for you, never your internal account id.
-- The server and its backups are only accessible to the operator.
+- The server and its backups are only accessible to the operator, and the accounts that control them use two-step sign-in.
+- Every player and every address has a limit on how many requests it can make per minute, and every game action has its own limit, so nobody can overload the game or abuse it with scripts.
+- If a personal data breach happens that is likely to put your rights at risk, we report it to the Croatian data protection authority (AZOP) within 72 hours, and if the risk is high we also tell the players affected without undue delay.
 
 ## How long we keep data
 

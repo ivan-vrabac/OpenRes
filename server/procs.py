@@ -92,8 +92,26 @@ def _rl_conn() -> sqlite3.Connection:
         c.execute("PRAGMA synchronous=OFF")          # counts of the last minute: nothing to lose
         c.execute("CREATE TABLE IF NOT EXISTS hits (hid TEXT NOT NULL, path TEXT NOT NULL, t REAL NOT NULL)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_hits ON hits(hid, path, t)")
+        c.execute("CREATE TABLE IF NOT EXISTS caps (key TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, "
+                  "PRIMARY KEY (key, minute)) WITHOUT ROWID")
         _rl.conn, _rl.path = c, path
     return c
+
+
+def over_cap(key: str, limit: int, now: float | None = None) -> bool:
+    """The general cap (owner 2026-11-07): True when `key` (a player, or an address) has made more than `limit`
+    requests in this clock minute, counted across all the server's processes. One small write per request."""
+    now = time.time() if now is None else now
+    minute = int(now // 60)
+    c = _rl_conn()
+    try:
+        n = c.execute("INSERT INTO caps(key, minute, n) VALUES (?, ?, 1) ON CONFLICT(key, minute) DO UPDATE SET n=n+1 "
+                      "RETURNING n", (key, minute)).fetchone()[0]
+        if random.random() < 0.001:                   # now and then: forget the minutes that are over
+            c.execute("DELETE FROM caps WHERE minute < ?", (minute - 1,))
+        return n > limit
+    except sqlite3.Error:                             # never block a player because counting failed
+        return False
 
 
 def too_often(hid: str, path: str, n: int, window: float, now: float | None = None) -> bool:

@@ -61,6 +61,28 @@ def see_country(conn, hid: str, header: str | None) -> None:
         conn.rollback()
 
 
+# The general cap (owner 2026-11-07): every request counts, per player (or per address before sign-in), per clock
+# minute. A player sends about 10 a minute; the map, which asks again as the view moves, has its own allowance.
+CAP_PER_MINUTE = int(os.environ.get("CAP_PER_MINUTE", "90"))
+MAP_CAP_PER_MINUTE = int(os.environ.get("MAP_CAP_PER_MINUTE", "240"))
+_MAP_PATHS = {"/api/v3/map", "/api/v3/campuses/top"}
+
+
+def over_cap(who: str, path: str, now: float | None = None) -> bool:
+    if path in _MAP_PATHS:
+        return procs.over_cap(f"map:{who}", MAP_CAP_PER_MINUTE, now)
+    return procs.over_cap(who, CAP_PER_MINUTE, now)
+
+
+def client_ip(request) -> str:
+    """The player's address: Cloudflare sends it in CF-Connecting-IP (the connection itself comes from Cloudflare
+    and Caddy, so request.client is theirs, owner 2026-11-07)."""
+    ip = request.headers.get("cf-connecting-ip") or ""
+    if ip:
+        return ip.strip()
+    return request.client.host if request.client else "?"
+
+
 def too_often(hid: str, path: str, now: float | None = None) -> bool:
     """True when `hid` already used `path` its LIMITS[path] times in the window (then not counted). Counted
     across all the server's processes (procs.too_often)."""
@@ -111,6 +133,8 @@ class Api:
                     return {"err": 1, "code": "auth", "msg": "Please sign in again."}
                 if feature and not econ.feature(feature):
                     return {"err": 1, "code": "disabled", "msg": "This feature is not enabled."}
+                if over_cap(hid or f"ip:{client_ip(request)}", path):
+                    return {"err": 1, "code": "rate_limited", "msg": "Slow down a little and try again."}
                 if too_often(hid, path):
                     return {"err": 1, "code": "rate_limited", "msg": "Slow down a little and try again."}
 
