@@ -260,23 +260,9 @@ class _FactoryScreenState extends State<FactoryScreen> {
               ]),
               const SizedBox(height: 6),
               Text(st.explain(_short(co, rec)), style: TextStyle(fontSize: 12, color: st.color)),
-              if (recipes.length > 1) ...[
-                const SizedBox(height: 12),
-                Text('Makes', style: TextStyle(fontSize: 12, color: AppColors.t54)),
-                const SizedBox(height: 6),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (var i = 0; i < recipes.length; i++)
-                    ChoiceChip(
-                      avatar: _itemIcon(recipes[i]['output'] as String, size: 20),
-                      label: Text(co.itemName(recipes[i]['output'] as String)),
-                      selected: i == ri,
-                      onSelected: _busy || i == ri ? null
-                          : (_) => act('/api/v3/plants/recipe', {'key': p['key'], 'recipe': i}),
-                    ),
-                ]),
-              ],
               const SizedBox(height: 12),
-              _recipeFlow(co, rec, level),
+              _RecipeList(co: co, recipes: recipes, level: level, selected: ri,
+                  onSelect: _busy ? null : (i) => act('/api/v3/plants/recipe', {'key': p['key'], 'recipe': i})),
               const SizedBox(height: 8),
               Text('Adds ꞓ${fmtNum(((rec['profitPerHour'] as num) * level).round())} of value per hour',
                   style: TextStyle(fontSize: 12, color: AppColors.t54)),
@@ -326,10 +312,7 @@ class _FactoryScreenState extends State<FactoryScreen> {
                 ])),
               ]),
               const SizedBox(height: 12),
-              Text(recipes.length > 1 ? 'Makes one of these' : 'Makes', style: TextStyle(fontSize: 12, color: AppColors.t54)),
-              const SizedBox(height: 6),
-              for (final rec in recipes)
-                Padding(padding: const EdgeInsets.only(bottom: 8), child: _recipeFlow(co, rec, 1)),
+              _RecipeList(co: co, recipes: recipes, level: 1),
               const SizedBox(height: 8),
               if (!locked)
                 SlideToConfirm(
@@ -417,30 +400,82 @@ Widget _recipeIcons(Map<String, dynamic> rec, {double size = 22}) => Row(mainAxi
       _itemIcon(rec['output'] as String, size: size),
     ]);
 
-/// The recipe per hour for `level` levels: each input with its amount, then the product.
-Widget _recipeFlow(Company co, Map<String, dynamic> rec, int level) {
-  final per = level / (rec['hours'] as num).toDouble();          // batches per hour
-  final inputs = (rec['inputs'] as Map).cast<String, dynamic>();
-  final kwh = (rec['kwh'] as num).toDouble();
-  Widget chip(String item, num q, {bool out = false}) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: out ? Colors.greenAccent.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(10),
+/// What a plant makes, grouped by product (owner 2026-11-07: the old wrapped chips looked random):
+/// a header per product, then one row per way to make it, inputs on the left and the amount per hour on
+/// the right, all lined up. With `onSelect` the rows choose the plant's recipe; `selected` is lit.
+class _RecipeList extends StatelessWidget {
+  final Company co;
+  final List<Map<String, dynamic>> recipes;
+  final int level;
+  final int? selected;
+  final ValueChanged<int>? onSelect;
+  const _RecipeList({required this.co, required this.recipes, required this.level, this.selected, this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <String, List<int>>{};
+    for (var i = 0; i < recipes.length; i++) {
+      groups.putIfAbsent(recipes[i]['output'] as String, () => []).add(i);
+    }
+    final choose = recipes.length > 1 && selected != null;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: Text(choose ? 'Makes (tap to switch)' : recipes.length > 1 ? 'Makes one of these' : 'Makes',
+            style: TextStyle(fontSize: 12, color: AppColors.t54))),
+        Text('per hour', style: TextStyle(fontSize: 11, color: AppColors.t38)),
+      ]),
+      const SizedBox(height: 6),
+      for (final g in groups.entries) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 4),
+          child: Row(children: [
+            _itemIcon(g.key, size: 24),
+            const SizedBox(width: 8),
+            Expanded(child: Text(co.itemName(g.key), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+          ]),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _itemIcon(item, size: 22),
-          const SizedBox(width: 6),
-          Text(_qty(co, item, q), style: TextStyle(fontSize: 12, fontWeight: out ? FontWeight.bold : null)),
-        ]),
-      );
-  return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
-    for (final e in inputs.entries) chip(e.key, (e.value as num) * per),
-    if (kwh > 0) chip('electricity', kwh * per),
-    Icon(Icons.chevron_right, color: AppColors.t38),
-    chip(rec['output'] as String, (rec['qty'] as num) * per, out: true),
-    Text('per hour', style: TextStyle(fontSize: 11, color: AppColors.t54)),
-  ]);
+        for (final i in g.value) _row(i),
+        const SizedBox(height: 6),
+      ],
+    ]);
+  }
+
+  Widget _row(int i) {
+    final rec = recipes[i];
+    final per = level / (rec['hours'] as num).toDouble();          // batches per hour
+    final inputs = (rec['inputs'] as Map).cast<String, dynamic>();
+    final kwh = (rec['kwh'] as num).toDouble();
+    final on = selected == i;
+    Widget part(String item, num q) => Row(mainAxisSize: MainAxisSize.min, children: [
+          _itemIcon(item, size: 18),
+          const SizedBox(width: 5),
+          Text(_qty(co, item, q), style: TextStyle(fontSize: 12, color: AppColors.t70)),
+        ]);
+    final row = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: on ? AppColors.accent.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
+        border: Border.all(color: on ? AppColors.accent.withValues(alpha: 0.7) : Colors.transparent),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(children: [
+        Expanded(child: Wrap(spacing: 12, runSpacing: 6, children: [
+          for (final e in inputs.entries) part(e.key, (e.value as num) * per),
+        ])),
+        // electricity in its own column, so it lines up from row to row
+        SizedBox(width: 92, child: kwh > 0 ? FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+            child: part('electricity', kwh * per)) : null),
+        Icon(Icons.chevron_right, size: 18, color: AppColors.t38),
+        SizedBox(width: 64, child: Text(fmtNum((rec['qty'] as num) * per), textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.greenAccent))),
+      ]),
+    );
+    final tap = onSelect != null && recipes.length > 1 && !on ? () => onSelect!(i) : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: tap == null ? row : InkWell(borderRadius: BorderRadius.circular(10), onTap: tap, child: row),
+    );
+  }
 }
 
 /// Electricity at a glance (owner 2026-10-31: don't forget energy): what solar and wind hexes and
@@ -594,7 +629,14 @@ class _NewPlantCard extends StatelessWidget {
               Text(p['name'] as String, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: _recipeIcons(rec, size: 20)),
+              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Row(mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _recipeIcons(rec, size: 20),
+                    if ((p['recipes'] as List).length > 1)
+                      Padding(padding: const EdgeInsets.only(left: 6),
+                          child: Text('+${(p['recipes'] as List).length - 1}',
+                              style: TextStyle(fontSize: 12, color: AppColors.t54, fontWeight: FontWeight.bold))),
+                  ])),
               const SizedBox(height: 4),
               Row(children: locked
                   ? [Icon(Icons.lock_outline, size: 13, color: Colors.orangeAccent), const SizedBox(width: 3),
