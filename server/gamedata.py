@@ -62,7 +62,7 @@ ITEM_NAMES = {
     "wood": "Wood", "wheat": "Wheat", "potatoes": "Potatoes", "corn": "Corn", "tomatoes": "Tomatoes",
     "sugar_beet": "Sugar beet", "apples": "Apples", "grapes": "Grapes", "cotton": "Cotton",
     "milk": "Milk", "eggs": "Eggs", "wool": "Wool", "honey": "Honey", "beef": "Beef", "pork": "Pork",
-    "chicken_meat": "Chicken meat", "carp": "Carp", "trout": "Trout", "sardines": "Sardines", "cod": "Cod",
+    "chicken_meat": "Chicken", "carp": "Carp", "trout": "Trout", "sardines": "Sardines", "cod": "Cod",
     "tuna": "Tuna", "electricity": "Electricity",
     "lumber": "Lumber", "wood_pellets": "Wood pellets", "paper": "Paper", "books": "Books",
     "furniture": "Furniture", "bricks": "Bricks", "cement": "Cement", "concrete": "Concrete", "glass": "Glass",
